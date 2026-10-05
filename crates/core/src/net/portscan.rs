@@ -359,6 +359,21 @@ async fn syn_scan_all(
     host_ips: &[(String, IpAddr)],
     ports: &[u16],
 ) {
+    // The scan needs a raw TCP socket for the whole run, so check it up front:
+    // a missing capability is then reported as a permission problem instead of
+    // surfacing as a generic scan failure.
+    if let Err(e) = socket2::Socket::new(
+        socket2::Domain::IPV4,
+        socket2::Type::RAW,
+        Some(socket2::Protocol::TCP),
+    ) {
+        handle.send(ProbeEvent::Error {
+            message: format!("SYN scan needs a raw TCP socket: {e}"),
+            hint: crate::net::privilege::hint_for(e.kind() == std::io::ErrorKind::PermissionDenied),
+        });
+        return;
+    }
+
     for (host, ip) in host_ips {
         let IpAddr::V4(target) = ip else {
             handle.send(ProbeEvent::Info(format!(
@@ -371,7 +386,7 @@ async fn syn_scan_all(
             Err(e) => {
                 handle.send(ProbeEvent::Error {
                     message: format!("SYN scan failed: {e}"),
-                    hint: Some(crate::net::privilege::guidance()),
+                    hint: None,
                 });
                 return;
             }
@@ -386,9 +401,10 @@ async fn syn_scan_all(
     _host_ips: &[(String, IpAddr)],
     _ports: &[u16],
 ) {
+    // A missing platform backend is not a privilege problem, so no hint.
     handle.send(ProbeEvent::Error {
         message: "SYN scan currently supports Linux only".into(),
-        hint: Some(crate::net::privilege::guidance()),
+        hint: None,
     });
 }
 

@@ -12,8 +12,13 @@ state:
   stopping: 停止中…
   finished: 已完成
 privilege:
-  ok: "原始套接字: 可用"
-  limited: "原始套接字: 受限"
+  ok: "权限: 可用"
+  partial: "权限: 部分可用"
+  limited: "权限: 受限"
+  icmp_ok: "ICMP 探测: 可用"
+  icmp_limited: "ICMP 探测: 无法创建套接字（需要提权）"
+  raw_ok: "原始套接字: 可用"
+  raw_limited: "原始套接字: 不可用（需要提权）"
   copy_cmd: 复制命令
 common:
   settings: 设置

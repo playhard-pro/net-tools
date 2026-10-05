@@ -82,8 +82,13 @@ ICMP, SYN scan, UDP MTR) show a clear message with guidance when unavailable:
 - **macOS**: `sudo ./net-tools`.
 - **Windows**: right-click and choose "Run as administrator".
 
-The status bar at the top shows "raw socket: OK / limited"; when limited it
-offers a one-click copy of the authorization command.
+The status bar at the top reports both capabilities separately: the badge is
+neutral when everything works, warns when probing works but the raw-socket
+features do not, and turns red when even ICMP probing cannot open a socket.
+Hovering shows which capability is missing, and the `copy cmd` button offers the
+matching authorization command. The hint is only shown for real permission
+errors, so a DNS or address-family problem never sends you looking for
+administrator rights.
 
 ## Packaging installers
 

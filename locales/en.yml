@@ -12,8 +12,13 @@ state:
   stopping: stopping…
   finished: finished
 privilege:
-  ok: "raw socket: OK"
-  limited: "raw socket: limited"
+  ok: "privileges: OK"
+  partial: "privileges: partial"
+  limited: "privileges: limited"
+  icmp_ok: "ICMP probe: available"
+  icmp_limited: "ICMP probe: cannot open a socket (elevation required)"
+  raw_ok: "raw socket: available"
+  raw_limited: "raw socket: unavailable (elevation required)"
   copy_cmd: copy cmd
 common:
   settings: Settings

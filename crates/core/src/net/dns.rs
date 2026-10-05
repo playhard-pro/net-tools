@@ -8,37 +8,49 @@ use hickory_resolver::TokioResolver;
 use crate::model::IpVersion;
 
 /// Resolve a host name into addresses filtered by IP version. If the input is
-/// already an IP address it is returned as-is.
+/// already an IP address it is returned as-is, but only when it matches the
+/// requested version; otherwise the result is empty and the caller reports that
+/// no usable address was found.
 pub async fn resolve(host: &str, version: IpVersion) -> Result<Vec<IpAddr>> {
     if let Ok(ip) = host.parse::<IpAddr>() {
-        return Ok(match version {
-            IpVersion::V4 if ip.is_ipv4() => vec![ip],
-            IpVersion::V6 if ip.is_ipv6() => vec![ip],
-            IpVersion::Auto => vec![ip],
-            _ => vec![ip], // Version mismatch: still return it; the caller decides.
+        let matches_version = match version {
+            IpVersion::V4 => ip.is_ipv4(),
+            IpVersion::V6 => ip.is_ipv6(),
+            IpVersion::Auto => true,
+        };
+        return Ok(if matches_version {
+            vec![ip]
+        } else {
+            Vec::new()
         });
     }
 
     let resolver = TokioResolver::builder_tokio()?.build()?;
-    match version {
-        IpVersion::V4 => {
-            let lookup = resolver.ipv4_lookup(host).await?;
-            Ok(lookup
-                .answers()
-                .iter()
-                .filter_map(|r| r.data.ip_addr())
-                .collect())
-        }
-        IpVersion::V6 => {
-            let lookup = resolver.ipv6_lookup(host).await?;
-            Ok(lookup
-                .answers()
-                .iter()
-                .filter_map(|r| r.data.ip_addr())
-                .collect())
-        }
-        IpVersion::Auto => Ok(resolver.lookup_ip(host).await?.iter().collect()),
-    }
+    let mut addrs: Vec<IpAddr> = match version {
+        IpVersion::V4 => resolver
+            .ipv4_lookup(host)
+            .await?
+            .answers()
+            .iter()
+            .filter_map(|r| r.data.ip_addr())
+            .collect(),
+        IpVersion::V6 => resolver
+            .ipv6_lookup(host)
+            .await?
+            .answers()
+            .iter()
+            .filter_map(|r| r.data.ip_addr())
+            .collect(),
+        IpVersion::Auto => resolver.lookup_ip(host).await?.iter().collect(),
+    };
+
+    // For a dual-stack name the resolver hands back the IPv6 answers first. Put
+    // IPv4 in front instead: it is the family that works without extra
+    // privileges and that a host without IPv6 connectivity can actually use.
+    // The sort is stable, so the resolver order inside one family is kept.
+    addrs.sort_by_key(|addr| addr.is_ipv6());
+    addrs.dedup();
+    Ok(addrs)
 }
 
 /// PTR reverse lookup. Returns `None` on failure.

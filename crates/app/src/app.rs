@@ -10,6 +10,10 @@ use crate::tabs::mtr::MtrTab;
 use crate::tabs::ping::PingTab;
 use crate::tabs::port_scan::PortScanTab;
 
+/// Project homepage, shown as the title link. Taken from the manifest so the
+/// link and the published package metadata cannot drift apart.
+const PROJECT_URL: &str = env!("CARGO_PKG_REPOSITORY");
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Tab {
     Ping,
@@ -71,22 +75,45 @@ impl App {
             });
     }
 
+    /// Privilege badge: reports whether the ICMP engines can open a socket, with
+    /// the remaining raw-socket capability in the tooltip. Only a genuinely
+    /// missing capability offers the elevation command, and only a permission
+    /// error ever reaches this point with a hint.
     fn privilege_badge(&mut self, ui: &mut egui::Ui) {
-        if self.privilege.raw_socket {
-            ui.colored_label(egui::Color32::from_rgb(0, 180, 0), t!("privilege.ok"));
-        } else {
-            ui.colored_label(
-                egui::Color32::from_rgb(230, 160, 0),
+        let (color, label) = match (self.privilege.icmp, self.privilege.raw) {
+            (true, true) => (egui::Color32::from_rgb(0, 180, 0), t!("privilege.ok")),
+            // Probing works, but the features that need a raw socket do not.
+            (true, false) => (
+                egui::Color32::from_rgb(200, 170, 0),
+                t!("privilege.partial"),
+            ),
+            (false, _) => (
+                egui::Color32::from_rgb(220, 110, 50),
                 t!("privilege.limited"),
-            );
-            if let Some(hint) = &self.privilege.hint {
-                if ui
-                    .small_button(t!("privilege.copy_cmd"))
-                    .on_hover_text(hint)
-                    .clicked()
-                {
-                    ui.ctx().copy_text(hint.clone());
-                }
+            ),
+        };
+
+        let icmp_state = if self.privilege.icmp {
+            t!("privilege.icmp_ok")
+        } else {
+            t!("privilege.icmp_limited")
+        };
+        let raw_state = if self.privilege.raw {
+            t!("privilege.raw_ok")
+        } else {
+            t!("privilege.raw_limited")
+        };
+        let tooltip = format!("{icmp_state}\n{raw_state}");
+
+        ui.colored_label(color, label).on_hover_text(tooltip);
+
+        if let Some(hint) = &self.privilege.hint {
+            if ui
+                .small_button(t!("privilege.copy_cmd"))
+                .on_hover_text(hint)
+                .clicked()
+            {
+                ui.ctx().copy_text(hint.clone());
             }
         }
     }
@@ -104,7 +131,10 @@ impl eframe::App for App {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         egui::Panel::top("top_bar").show(ui, |ui| {
             ui.horizontal(|ui| {
-                ui.heading(t!("app.title"));
+                ui.add(egui::Hyperlink::from_label_and_url(
+                    egui::RichText::new(t!("app.title")).heading(),
+                    PROJECT_URL,
+                ));
                 ui.separator();
                 self.tab_button(ui, Tab::Ping, &t!("tab.ping"));
                 self.tab_button(ui, Tab::Mtr, &t!("tab.mtr"));

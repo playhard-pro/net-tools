@@ -1,37 +1,71 @@
 //! Privilege probing and platform-specific guidance.
 
-/// Result of the privilege probe.
+use socket2::{Domain, Protocol, Socket, Type};
+
+/// Socket capabilities the probing engines need, as far as they can be detected
+/// without actually running a probe.
 #[derive(Debug, Clone, Default)]
 pub struct PrivilegeStatus {
-    /// Whether a raw socket can be created (needed for ICMP / SYN / UDP-MTR).
-    pub raw_socket: bool,
-    /// Copyable command shown when privileges are missing.
+    /// Whether an ICMP probe can open its socket. Linux offers ICMP to
+    /// unprivileged users through the ICMP datagram ("ping") socket, so this is
+    /// commonly true for a normal user; on platforms without that socket the
+    /// engines fall back to a raw socket and need elevation.
+    pub icmp: bool,
+    /// Whether a raw socket can be created, which the SYN scan and the UDP MTR
+    /// mode require.
+    pub raw: bool,
+    /// Copyable command shown when a capability is missing.
     pub hint: Option<String>,
 }
 
-/// Probe whether the current process can create a raw socket (best effort;
-/// failure does not necessarily mean the feature is unusable).
+/// Probe the available socket capabilities (best effort; a negative result does
+/// not necessarily mean that every feature is unusable).
 pub fn probe() -> PrivilegeStatus {
-    let raw_socket = can_raw_socket();
+    let icmp = can_icmp();
+    let raw = can_raw();
     PrivilegeStatus {
-        raw_socket,
-        hint: if raw_socket { None } else { Some(guidance()) },
+        icmp,
+        raw,
+        hint: if icmp && raw { None } else { Some(guidance()) },
     }
 }
 
-fn can_raw_socket() -> bool {
-    #[cfg(unix)]
-    {
-        use socket2::{Domain, Protocol, Socket, Type};
-        // ICMPv4 raw socket: requires privileges on Linux and macOS.
-        Socket::new(Domain::IPV4, Type::RAW, Some(Protocol::ICMPV4)).is_ok()
-    }
-    #[cfg(not(unix))]
-    {
-        // Windows: ICMP probing uses the system API (no privileges needed);
-        // only SYN / UDP-MTR need administrator rights. Try a raw socket here.
-        use socket2::{Domain, Protocol, Socket, Type};
-        Socket::new(Domain::IPV4, Type::RAW, Some(Protocol::ICMPV4)).is_ok()
+/// Whether the ICMP engines can open a socket.
+///
+/// This mirrors what surge-ping does: try the ICMP datagram ("ping") socket
+/// first and only fall back to a raw socket, so the report matches the socket
+/// the probes really use instead of always demanding raw-socket privileges.
+fn can_icmp() -> bool {
+    icmp_socket_available(Domain::IPV4, Protocol::ICMPV4)
+        || icmp_socket_available(Domain::IPV6, Protocol::ICMPV6)
+        || raw_socket_available(Domain::IPV4, Protocol::ICMPV4)
+        || raw_socket_available(Domain::IPV6, Protocol::ICMPV6)
+}
+
+/// Whether a raw socket can be created, which the SYN scan (raw TCP) and the
+/// UDP MTR mode (raw ICMP) need.
+fn can_raw() -> bool {
+    raw_socket_available(Domain::IPV4, Protocol::TCP)
+        || raw_socket_available(Domain::IPV4, Protocol::ICMPV4)
+        || raw_socket_available(Domain::IPV6, Protocol::ICMPV6)
+}
+
+fn icmp_socket_available(domain: Domain, protocol: Protocol) -> bool {
+    Socket::new(domain, Type::DGRAM, Some(protocol)).is_ok()
+}
+
+fn raw_socket_available(domain: Domain, protocol: Protocol) -> bool {
+    Socket::new(domain, Type::RAW, Some(protocol)).is_ok()
+}
+
+/// Elevation hint for a failed operation, or `None` when the failure has
+/// nothing to do with missing privileges (wrong address family, unreachable
+/// network, ...) and pointing the user at administrator rights would be wrong.
+pub fn hint_for(permission_denied: bool) -> Option<String> {
+    if permission_denied {
+        Some(guidance())
+    } else {
+        None
     }
 }
 
@@ -52,5 +86,24 @@ pub fn guidance() -> String {
     #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
     {
         "run with elevated privileges".to_string()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn hint_only_for_permission_errors() {
+        assert!(hint_for(true).is_some());
+        assert!(hint_for(false).is_none());
+    }
+
+    #[test]
+    fn probe_does_not_panic() {
+        // The reported capabilities depend on the host, so only assert that the
+        // probe runs and reports a hint whenever something is missing.
+        let status = probe();
+        assert_eq!(status.hint.is_some(), !(status.icmp && status.raw));
     }
 }

@@ -9,7 +9,7 @@ use std::time::Instant;
 
 use pnet_packet::icmp::IcmpTypes;
 use pnet_packet::icmpv6::Icmpv6Types;
-use surge_ping::{Client, Config, IcmpPacket, PingIdentifier, PingSequence};
+use surge_ping::{IcmpPacket, PingIdentifier, PingSequence};
 
 use crate::config::MtrSettings;
 use crate::control::ProbeHandle;
@@ -61,14 +61,14 @@ async fn mtr_icmp(handle: &ProbeHandle<ProbeEvent>, settings: &MtrSettings, ip: 
             return;
         }
 
-        // One socket with the given TTL per hop.
-        let config = Config::builder().ttl(hop as u32).build();
-        let client = match Client::new(&config) {
+        // One socket with the given TTL per hop, built for the address family of
+        // the target so that IPv6 routes are probed with an IPv6 socket.
+        let client = match icmp::client_for(ip, Some(hop as u32)) {
             Ok(c) => c,
             Err(e) => {
                 handle.send(ProbeEvent::Error {
                     message: format!("failed to open ICMP socket: {e}"),
-                    hint: Some(privilege::guidance()),
+                    hint: privilege::hint_for(e.kind() == std::io::ErrorKind::PermissionDenied),
                 });
                 return;
             }
@@ -107,7 +107,7 @@ async fn mtr_icmp(handle: &ProbeHandle<ProbeEvent>, settings: &MtrSettings, ip: 
                 Err(e) => {
                     handle.send(ProbeEvent::Error {
                         message: format!("ICMP error: {e}"),
-                        hint: Some(privilege::guidance()),
+                        hint: icmp::hint_for_surge_error(&e),
                     });
                     return;
                 }
@@ -164,9 +164,10 @@ async fn mtr_udp(handle: &ProbeHandle<ProbeEvent>, settings: &MtrSettings, ip: I
     {
         // Not built on this platform; mark the arguments as used.
         let _ = (settings, ip);
+        // A missing platform backend is not a privilege problem, so no hint.
         handle.send(ProbeEvent::Error {
             message: "UDP MTR requires Unix raw sockets (Windows support pending)".into(),
-            hint: Some(privilege::guidance()),
+            hint: None,
         });
     }
 
@@ -183,17 +184,16 @@ async fn mtr_udp(handle: &ProbeHandle<ProbeEvent>, settings: &MtrSettings, ip: I
             }
         };
 
-        // Pre-check: raw ICMP socket privileges.
-        if socket2::Socket::new(
+        // Pre-check: the raw ICMP socket the probe loop needs. Report the real
+        // error and only mention elevation when that is what is missing.
+        if let Err(e) = socket2::Socket::new(
             socket2::Domain::IPV4,
             socket2::Type::RAW,
             Some(socket2::Protocol::ICMPV4),
-        )
-        .is_err()
-        {
+        ) {
             handle.send(ProbeEvent::Error {
-                message: "UDP MTR needs a raw ICMP socket (CAP_NET_RAW / root)".into(),
-                hint: Some(privilege::guidance()),
+                message: format!("UDP MTR needs a raw ICMP socket: {e}"),
+                hint: privilege::hint_for(e.kind() == std::io::ErrorKind::PermissionDenied),
             });
             return;
         }
