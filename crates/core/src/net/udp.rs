@@ -4,6 +4,7 @@ use std::time::{Duration, Instant};
 
 use tokio::net::UdpSocket;
 
+use crate::clock;
 use crate::config::PingSettings;
 use crate::control::ProbeHandle;
 use crate::model::ProbeEvent;
@@ -86,6 +87,7 @@ pub async fn run_ping_udp(handle: &ProbeHandle<ProbeEvent>, settings: &PingSetti
                 // A reply from the peer: the host is alive.
                 handle.send(ProbeEvent::Latency(crate::model::ProbeSample {
                     seq,
+                    time: clock::now_string(),
                     rtt_ms: started.elapsed().as_secs_f64() * 1000.0,
                     ttl: None,
                     from: ip.to_string(),
@@ -99,6 +101,7 @@ pub async fn run_ping_udp(handle: &ProbeHandle<ProbeEvent>, settings: &PingSetti
                 {
                     handle.send(ProbeEvent::Latency(crate::model::ProbeSample {
                         seq,
+                        time: clock::now_string(),
                         rtt_ms: started.elapsed().as_secs_f64() * 1000.0,
                         ttl: None,
                         from: ip.to_string(),

@@ -85,6 +85,7 @@ async fn probe_once(start_url: &Url, settings: &HttpSettings, seq: u64) -> HttpR
                 }
                 return HttpResult {
                     seq,
+                    time: crate::clock::now_string(),
                     ok: r.ok,
                     method: r.method,
                     url: r.url,
@@ -101,6 +102,7 @@ async fn probe_once(start_url: &Url, settings: &HttpSettings, seq: u64) -> HttpR
             Err(e) => {
                 return HttpResult {
                     seq,
+                    time: crate::clock::now_string(),
                     ok: false,
                     method: settings.method.clone(),
                     url: url.to_string(),
@@ -119,6 +121,7 @@ async fn probe_once(start_url: &Url, settings: &HttpSettings, seq: u64) -> HttpR
 
     HttpResult {
         seq,
+        time: crate::clock::now_string(),
         ok: false,
         method: settings.method.clone(),
         url: url.to_string(),

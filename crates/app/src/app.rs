@@ -6,6 +6,7 @@ use net_tools_core::net::privilege::PrivilegeStatus;
 use rust_i18n::t;
 
 use crate::tabs::http_ping::HttpPingTab;
+use crate::tabs::ip_insight::IpInsightTab;
 use crate::tabs::mtr::MtrTab;
 use crate::tabs::ping::PingTab;
 use crate::tabs::port_scan::PortScanTab;
@@ -20,6 +21,7 @@ pub enum Tab {
     Mtr,
     Http,
     PortScan,
+    IpInsight,
 }
 
 pub struct App {
@@ -30,6 +32,7 @@ pub struct App {
     pub mtr: MtrTab,
     pub http: HttpPingTab,
     pub portscan: PortScanTab,
+    pub ip_insight: IpInsightTab,
     pub privilege: PrivilegeStatus,
 }
 
@@ -46,6 +49,7 @@ impl App {
             mtr: MtrTab::new(),
             http: HttpPingTab::new(),
             portscan: PortScanTab::new(),
+            ip_insight: IpInsightTab::new(),
             privilege: net_tools_core::net::privilege::probe(),
         }
     }
@@ -140,6 +144,7 @@ impl eframe::App for App {
                 self.tab_button(ui, Tab::Mtr, &t!("tab.mtr"));
                 self.tab_button(ui, Tab::Http, &t!("tab.http"));
                 self.tab_button(ui, Tab::PortScan, &t!("tab.portscan"));
+                self.tab_button(ui, Tab::IpInsight, &t!("tab.ip_insight"));
                 ui.separator();
                 ui.label(t!("common.language"));
                 self.language_selector(ui);
@@ -153,6 +158,7 @@ impl eframe::App for App {
             Tab::Mtr => self.mtr.ui(ui, &mut self.cfg.mtr, &self.rt),
             Tab::Http => self.http.ui(ui, &mut self.cfg.http, &self.rt),
             Tab::PortScan => self.portscan.ui(ui, &mut self.cfg.port_scan, &self.rt),
+            Tab::IpInsight => self.ip_insight.ui(ui, &mut self.cfg.ip_insight, &self.rt),
         });
     }
 

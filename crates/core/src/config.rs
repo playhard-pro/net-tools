@@ -56,8 +56,6 @@ pub struct MtrSettings {
     pub mode: ProbeMode,
     /// Maximum number of hops to probe.
     pub max_hops: u8,
-    /// Number of probes sent per hop.
-    pub probes_per_hop: u8,
     pub udp_port: u16,
 }
 
@@ -67,7 +65,6 @@ impl Default for MtrSettings {
             common: CommonProbe::default(),
             mode: ProbeMode::Icmp,
             max_hops: 30,
-            probes_per_hop: 3,
             udp_port: 33434,
         }
     }
@@ -145,6 +142,25 @@ impl Default for PortScanSettings {
     }
 }
 
+/// Settings for the IP insight tab: a target IP queried against several online
+/// geolocation APIs at once.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IpInsightSettings {
+    /// Target IP address.
+    pub target: String,
+    /// Timeout for a single API request, in milliseconds.
+    pub timeout_ms: u64,
+}
+
+impl Default for IpInsightSettings {
+    fn default() -> Self {
+        Self {
+            target: "1.1.1.1".into(),
+            timeout_ms: 10_000,
+        }
+    }
+}
+
 /// Global application configuration (persisted to disk).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
@@ -153,6 +169,9 @@ pub struct AppConfig {
     pub mtr: MtrSettings,
     pub http: HttpSettings,
     pub port_scan: PortScanSettings,
+    /// Added after the first release, so older config files still load.
+    #[serde(default)]
+    pub ip_insight: IpInsightSettings,
 }
 
 impl Default for AppConfig {
@@ -163,6 +182,7 @@ impl Default for AppConfig {
             mtr: MtrSettings::default(),
             http: HttpSettings::default(),
             port_scan: PortScanSettings::default(),
+            ip_insight: IpInsightSettings::default(),
         }
     }
 }
@@ -181,6 +201,7 @@ mod tests {
         assert_eq!(back.mtr.max_hops, cfg.mtr.max_hops);
         assert_eq!(back.http.method, cfg.http.method);
         assert_eq!(back.port_scan.concurrency, cfg.port_scan.concurrency);
+        assert_eq!(back.ip_insight.target, cfg.ip_insight.target);
     }
 
     #[test]
@@ -192,5 +213,8 @@ mod tests {
         assert!(m.max_hops > 0);
         let ps = PortScanSettings::default();
         assert!(ps.concurrency > 0);
+        let ii = IpInsightSettings::default();
+        assert!(!ii.target.is_empty());
+        assert!(ii.timeout_ms > 0);
     }
 }

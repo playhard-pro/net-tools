@@ -43,6 +43,12 @@ impl MtrTab {
         if self.ctrl.is_active() {
             return;
         }
+        self.restart(s, rt);
+    }
+
+    /// Stop the current task (if any) and start a fresh one. Used by the target
+    /// input to restart on Enter without waiting for a manual stop.
+    pub fn restart(&mut self, s: &MtrSettings, rt: &tokio::runtime::Handle) {
         self.reset();
         let settings = s.clone();
         self.ctrl.start(rt, move |handle| async move {
@@ -54,6 +60,11 @@ impl MtrTab {
         for ev in self.ctrl.drain() {
             match ev {
                 ProbeEvent::Hop(hop) => {
+                    // A reached hop ends the path: drop anything the first,
+                    // fully concurrent round may have discovered beyond it.
+                    if hop.reached {
+                        self.hops.retain(|h| h.hop <= hop.hop);
+                    }
                     if let Some(existing) = self.hops.iter_mut().find(|h| h.hop == hop.hop) {
                         *existing = hop;
                     } else {
@@ -81,6 +92,7 @@ impl MtrTab {
             ui.ctx().request_repaint();
         }
 
+        let mut submit = false;
         egui::CollapsingHeader::new(t!("common.settings"))
             .default_open(true)
             .show(ui, |ui| {
@@ -96,27 +108,22 @@ impl MtrTab {
                         ui.add(egui::DragValue::new(&mut s.max_hops).range(1..=64));
                         ui.end_row();
 
-                        ui.label(t!("common.probes_per_hop"));
-                        ui.add(egui::DragValue::new(&mut s.probes_per_hop).range(1..=20));
-                        ui.end_row();
-
                         if s.mode == net_tools_core::model::ProbeMode::Udp {
                             ui.label(t!("common.udp_port"));
                             ui.add(egui::DragValue::new(&mut s.udp_port).range(1..=65_535));
                             ui.end_row();
                         }
                     });
-                settings::common_probe(ui, &mut s.common);
+                submit = settings::common_probe(ui, &mut s.common);
             });
+        if submit {
+            self.restart(s, rt);
+        }
 
         ui.horizontal(|ui| {
             self.control_row(ui, s, rt);
             state_badge(ui, self.ctrl.state);
         });
-
-        // Result toolbar: placed directly under the controls, above every
-        // result-related widget, so it can never be pushed down.
-        self.toolbar(ui);
 
         if let Some((msg, hint)) = &self.error {
             error_banner(ui, msg, hint.as_deref());
@@ -127,11 +134,16 @@ impl MtrTab {
 
         ui.separator();
 
+        // Result toolbar lives below the divider, together with the result
+        // widgets it acts on.
+        self.toolbar(ui);
+
         let headers = [
             t!("mtr.hop"),
             t!("mtr.addr"),
             t!("mtr.reverse"),
             t!("mtr.loss"),
+            t!("mtr.count"),
             t!("mtr.avg_ms"),
             t!("mtr.best_ms"),
             t!("mtr.worst_ms"),
@@ -143,13 +155,16 @@ impl MtrTab {
                 ui.label(h.hop.to_string());
             });
             row.col(|ui| {
-                ui.label(h.addr.clone().unwrap_or_else(|| "*".into()));
+                ui.label(h.addr_text());
             });
             row.col(|ui| {
-                ui.label(h.reverse.clone().unwrap_or_else(|| "-".into()));
+                ui.label(h.reverse_text());
             });
             row.col(|ui| {
                 ui.label(format!("{:.1}%", h.loss_ratio() * 100.0));
+            });
+            row.col(|ui| {
+                ui.label(format!("{}/{}/{}", h.sent, h.success_count(), h.lost));
             });
             row.col(|ui| {
                 ui.label(h.avg_ms.map_or("-".into(), |v| format!("{:.2}", v)));
@@ -214,14 +229,18 @@ impl MtrTab {
     }
 
     pub fn to_csv(&self) -> String {
-        let mut out = String::from("hop,addr,reverse,loss,avg,best,worst,stdev\n");
+        let mut out =
+            String::from("hop,addr,reverse,loss,sent,success,lost,avg,best,worst,stdev\n");
         for h in &self.hops {
             out.push_str(&format!(
-                "{},{},{},{:.1}%,{},{},{},{}\n",
+                "{},{},{},{:.1}%,{},{},{},{},{},{},{}\n",
                 h.hop,
-                h.addr.clone().unwrap_or_else(|| "*".into()),
-                h.reverse.clone().unwrap_or_else(|| "-".into()),
+                crate::ui::export::csv_field(&h.addr_text()),
+                crate::ui::export::csv_field(&h.reverse_text()),
                 h.loss_ratio() * 100.0,
+                h.sent,
+                h.success_count(),
+                h.lost,
                 h.avg_ms.map_or("-".into(), |v| format!("{:.2}", v)),
                 h.best_ms.map_or("-".into(), |v| format!("{:.2}", v)),
                 h.worst_ms.map_or("-".into(), |v| format!("{:.2}", v)),

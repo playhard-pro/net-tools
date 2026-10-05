@@ -86,8 +86,8 @@ async fn icmp_mtr_loopback() {
     s.common.target = "127.0.0.1".into();
     s.common.ip_version = IpVersion::V4;
     s.common.timeout_ms = 300;
+    s.common.interval_ms = 50;
     s.max_hops = 3;
-    s.probes_per_hop = 2;
 
     let mut ctrl: TaskController<ProbeEvent> = TaskController::new();
     ctrl.start(&tokio::runtime::Handle::current(), move |h| async move {
@@ -139,10 +139,10 @@ async fn udp_mtr_loopback() {
     s.common.target = "127.0.0.1".into();
     s.common.ip_version = IpVersion::V4;
     s.common.timeout_ms = 300;
+    s.common.interval_ms = 50;
     s.mode = net_tools_core::model::ProbeMode::Udp;
     s.udp_port = 39999; // Likely closed.
     s.max_hops = 2;
-    s.probes_per_hop = 2;
 
     let mut ctrl: TaskController<ProbeEvent> = TaskController::new();
     ctrl.start(&tokio::runtime::Handle::current(), move |h| async move {

@@ -46,6 +46,12 @@ impl PortScanTab {
         if self.ctrl.is_active() {
             return;
         }
+        self.restart(s, rt);
+    }
+
+    /// Stop the current task (if any) and start a fresh one. Used by the target
+    /// input to restart on Enter without waiting for a manual stop.
+    pub fn restart(&mut self, s: &PortScanSettings, rt: &tokio::runtime::Handle) {
         self.reset();
         let settings = s.clone();
         self.ctrl.start(rt, move |handle| {
@@ -78,6 +84,7 @@ impl PortScanTab {
             ui.ctx().request_repaint();
         }
 
+        let mut submit = false;
         egui::CollapsingHeader::new(t!("common.settings"))
             .default_open(true)
             .show(ui, |ui| {
@@ -86,7 +93,11 @@ impl PortScanTab {
                     .spacing([12.0, 6.0])
                     .show(ui, |ui| {
                         ui.label(t!("common.targets"));
-                        ui.add(egui::TextEdit::singleline(&mut s.targets).desired_width(240.0));
+                        let targets =
+                            ui.add(egui::TextEdit::singleline(&mut s.targets).desired_width(240.0));
+                        if targets.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+                            submit = true;
+                        }
                         ui.end_row();
 
                         ui.label(t!("common.preset"));
@@ -126,6 +137,9 @@ impl PortScanTab {
                         ui.end_row();
                     });
             });
+        if submit {
+            self.restart(s, rt);
+        }
 
         ui.horizontal(|ui| {
             self.control_row(ui, s, rt);
@@ -135,10 +149,6 @@ impl PortScanTab {
             }
         });
 
-        // Result toolbar: placed directly under the controls, above every
-        // result-related widget, so it can never be pushed down.
-        self.toolbar(ui);
-
         if let Some((msg, hint)) = &self.error {
             error_banner(ui, msg, hint.as_deref());
         }
@@ -147,6 +157,10 @@ impl PortScanTab {
         }
 
         ui.separator();
+
+        // Result toolbar lives below the divider, together with the result
+        // widgets it acts on.
+        self.toolbar(ui);
 
         let headers = [
             t!("common.host"),

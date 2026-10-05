@@ -7,10 +7,13 @@ use net_tools_core::model::{ProbeEvent, ProbeSample};
 use rust_i18n::t;
 
 use crate::ui::common::{error_banner, info_line, state_badge};
-use crate::ui::result_table::table;
+use crate::ui::result_table::table_fixed_rows;
 use crate::ui::settings;
 
-const MAX_SAMPLES: usize = 500;
+/// Upper bound on the records kept for the table, chart and exports.
+const MAX_SAMPLES: usize = 1000;
+/// Number of data rows visible before the table starts scrolling.
+const VISIBLE_ROWS: usize = 10;
 
 pub struct PingTab {
     pub ctrl: TaskController<ProbeEvent>,
@@ -72,6 +75,12 @@ impl PingTab {
         if self.ctrl.is_active() {
             return;
         }
+        self.restart(s, rt);
+    }
+
+    /// Stop the current task (if any) and start a fresh one. Used by the target
+    /// input to restart on Enter without waiting for a manual stop.
+    pub fn restart(&mut self, s: &PingSettings, rt: &tokio::runtime::Handle) {
         self.reset();
         let settings = s.clone();
         self.ctrl.start(rt, move |handle| async move {
@@ -103,10 +112,10 @@ impl PingTab {
                     if self.chart.len() > MAX_SAMPLES {
                         self.chart.remove(0);
                     }
-                    self.samples.push(sample);
-                    if self.samples.len() > MAX_SAMPLES {
-                        self.samples.remove(0);
-                    }
+                    // Newest first: insert at the front and drop the oldest
+                    // records once the cap is reached.
+                    self.samples.insert(0, sample);
+                    self.samples.truncate(MAX_SAMPLES);
                 }
                 ProbeEvent::Timeout { seq } => {
                     self.sent += 1;
@@ -155,6 +164,7 @@ impl PingTab {
         }
 
         // Settings.
+        let mut submit = false;
         egui::CollapsingHeader::new(t!("common.settings"))
             .default_open(true)
             .show(ui, |ui| {
@@ -176,8 +186,11 @@ impl PingTab {
                             ui.end_row();
                         });
                 }
-                settings::common_probe(ui, &mut s.common);
+                submit = settings::common_probe(ui, &mut s.common);
             });
+        if submit {
+            self.restart(s, rt);
+        }
 
         // Control buttons and state.
         ui.horizontal(|ui| {
@@ -191,10 +204,6 @@ impl PingTab {
             ));
         });
 
-        // Result toolbar: placed directly under the controls, above every
-        // result-related widget, so it can never be pushed down.
-        self.toolbar(ui);
-
         if let Some((msg, hint)) = &self.error {
             error_banner(ui, msg, hint.as_deref());
         }
@@ -203,6 +212,10 @@ impl PingTab {
         }
 
         ui.separator();
+
+        // Result toolbar lives below the divider, together with the result
+        // widgets it acts on.
+        self.toolbar(ui);
 
         // Statistics.
         ui.horizontal_wrapped(|ui| {
@@ -224,23 +237,18 @@ impl PingTab {
             ));
         });
 
-        // Chart.
-        if !self.chart.is_empty() {
-            crate::ui::chart::latency_chart(ui, &self.chart, 180.0);
-        }
-
-        // Table.
+        // Table: newest record first, kept to a fixed number of visible rows.
         let headers = [
-            t!("common.seq"),
+            t!("common.time"),
             t!("common.rtt_ms"),
             t!("common.ttl"),
             t!("common.from"),
             t!("common.size"),
         ];
-        table(ui, &headers, self.samples.len(), |i, row| {
+        table_fixed_rows(ui, &headers, self.samples.len(), VISIBLE_ROWS, |i, row| {
             let sample = &self.samples[i];
             row.col(|ui| {
-                ui.label(sample.seq.to_string());
+                ui.label(&sample.time);
             });
             row.col(|ui| {
                 ui.label(format!("{:.2}", sample.rtt_ms));
@@ -255,6 +263,12 @@ impl PingTab {
                 ui.label(format!("{} B", sample.size));
             });
         });
+
+        // Chart sits below the table, with a little breathing room.
+        if !self.chart.is_empty() {
+            ui.add_space(12.0);
+            crate::ui::chart::latency_chart(ui, &self.chart, 180.0);
+        }
     }
 
     fn toolbar(&mut self, ui: &mut egui::Ui) {
@@ -305,10 +319,11 @@ impl PingTab {
     }
 
     pub fn to_csv(&self) -> String {
-        let mut out = String::from("seq,rtt_ms,ttl,from,size\n");
+        let mut out = String::from("time,seq,rtt_ms,ttl,from,size\n");
         for s in &self.samples {
             out.push_str(&format!(
-                "{},{:.2},{},{},{}\n",
+                "{},{},{:.2},{},{},{}\n",
+                crate::ui::export::csv_field(&s.time),
                 s.seq,
                 s.rtt_ms,
                 s.ttl.map_or("-".into(), |v| v.to_string()),

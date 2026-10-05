@@ -11,9 +11,10 @@ different tabs run **simultaneously and independently**.
 | Tab | Description | Probe modes |
 |-----|-------------|-------------|
 | Ping | Continuous probing with a live chart, loss rate and min/avg/max/jitter | ICMP, UDP |
-| MTR | Hop-by-hop routing with loss and avg/best/worst/stdev per hop | ICMP, UDP |
+| MTR | Continuous hop-by-hop routing: all hops are probed in parallel and each is refreshed at the probe interval; multiple responders per hop are listed comma separated | ICMP, UDP |
 | HTTP Ping | Multi-method requests with per-stage timing (DNS/connect/TLS/TTFB/total) | GET/HEAD/POST/PUT/DELETE/OPTIONS/PATCH |
 | Port Scan | TCP connect / SYN half-open / UDP, with banner grabbing | — |
+| IP Insight | Query a target IP against several online geolocation APIs at once; each provider's JSON response is shown as its own table | — |
 
 ### Common settings
 
@@ -27,6 +28,9 @@ different tabs run **simultaneously and independently**.
 Every feature provides **Start / Pause / Stop** controls. Pausing stops issuing
 new probes while keeping existing results; resuming continues.
 
+Pressing **Enter** in a target input stops the running task and immediately
+starts a new one with the edited target.
+
 ### Other
 
 - Bilingual UI (English / Chinese), extensible: adding a language is just a new
@@ -37,6 +41,20 @@ new probes while keeping existing results; resuming continues.
 - Table columns auto-size to fit the latest content.
 - Configuration is saved to the platform config directory and restored on the
   next launch.
+
+## Screenshots
+
+| Ping | MTR |
+|------|-----|
+| ![Ping tab](screenshots/ping.png) | ![MTR tab](screenshots/mtr.png) |
+
+| HTTP Ping | Port Scan |
+|-----------|-----------|
+| ![HTTP Ping tab](screenshots/http.png) | ![Port Scan tab](screenshots/port.png) |
+
+| IP Insight |
+|------------|
+| ![IP Insight tab](screenshots/ip.png) |
 
 ## Build and run
 
@@ -107,16 +125,87 @@ cargo packager -c packager.toml -f app,dmg
 
 Artifacts are written to `dist/`.
 
+## Cross-compilation
+
+Cross-compiling produces the **executable only**. Installers (`.msi`/`.exe`,
+`.app`/`.dmg`) still need the target platform's native packaging tools, so
+releases are built on the native CI runners (see below). The commands below build
+the binary from a Linux host.
+
+### Windows (MSVC, recommended)
+
+[`cargo-xwin`](https://github.com/rust-cross/cargo-xwin) downloads the MSVC CRT
+and Windows SDK automatically, so it needs no Windows installation:
+
+```bash
+# Debian/Ubuntu (clang-cl + lld and cmake/ninja for C dependencies)
+sudo apt-get install -y clang lld llvm cmake ninja-build
+
+rustup target add x86_64-pc-windows-msvc
+cargo install cargo-xwin --locked
+
+# First run downloads the MSVC CRT + Windows SDK (~hundreds of MB)
+cargo xwin build --release --target x86_64-pc-windows-msvc -p net-tools
+# -> target/x86_64-pc-windows-msvc/release/net-tools.exe
+```
+
+Useful options: `--xwin-version <15|16|17|18>`, `--xwin-sdk-version <VER>`,
+`--xwin-crt-version <VER>`; `cargo xwin env` prints the environment for editors.
+
+### Windows (GNU)
+
+```bash
+sudo apt-get install -y mingw-w64
+rustup target add x86_64-pc-windows-gnu
+
+cargo build --release --target x86_64-pc-windows-gnu -p net-tools
+# -> target/x86_64-pc-windows-gnu/release/net-tools.exe
+```
+
+If the linker is not picked up, either add a `.cargo/config.toml`:
+
+```toml
+[target.x86_64-pc-windows-gnu]
+linker = "x86_64-w64-mingw32-gcc"
+ar = "x86_64-w64-mingw32-ar"
+```
+
+or pass it per command:
+
+```bash
+CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER=x86_64-w64-mingw32-gcc \
+CARGO_TARGET_X86_64_PC_WINDOWS_GNU_AR=x86_64-w64-mingw32-ar \
+cargo build --release --target x86_64-pc-windows-gnu -p net-tools
+```
+
+### macOS
+
+Building for macOS from Linux requires the Apple SDK and
+[osxcross](https://github.com/tpoechtrager/osxcross); redistributing the SDK is
+restricted by Apple's license, so building on a Mac (or via CI) is usually
+simpler:
+
+```bash
+rustup target add x86_64-apple-darwin   # or aarch64-apple-darwin
+# point the target linker at osxcross' clang wrapper, then:
+cargo build --release --target x86_64-apple-darwin -p net-tools
+```
+
+### Notes
+
+- The HTTP engine uses `rustls`. Its default `aws-lc-rs` backend is a C library
+  and tends to be the hardest part to cross-compile. If it fails, make sure
+  `cmake`, `ninja` and a target C compiler are installed, or switch the TLS
+  backend to `ring`.
+- Only the host platform's installers can be produced locally with
+  `cargo packager`; use the native CI runners for other platforms.
+
 ## CI and releases
 
-- `.github/workflows/ci.yml`: build, test, clippy and format checks on
-  ubuntu / windows / macos.
+- `.github/workflows/ci.yml`: build, test, clippy (warnings are errors) and format
+  checks on ubuntu / windows / macos.
 - `.github/workflows/release.yml`: on a `v*` tag, build installers on native
   runners and publish them to a GitHub Release.
-
-> Cross-platform builds run on each platform's own CI runner. Local cross
-> compilation from Linux to Windows/macOS requires extra toolchains, so no local
-> cross step is provided.
 
 ## Project layout
 
@@ -125,6 +214,7 @@ crates/core    # probing engines and config models (no UI), independently testab
 crates/app     # egui desktop application
 locales/       # i18n locale files (en / zh-CN, extensible)
 assets/        # icons and the bundled font (assets/fonts/)
+screenshots/   # UI screenshots used in this README
 packager.toml  # cargo-packager configuration
 .github/       # CI / release workflows
 ```

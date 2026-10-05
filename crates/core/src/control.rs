@@ -58,6 +58,11 @@ impl<E: Send + 'static> ProbeHandle<E> {
         self.cancel.is_cancelled()
     }
 
+    /// Resolves as soon as the task is cancelled, for use in `select!`.
+    pub async fn cancelled(&self) {
+        self.cancel.cancelled().await;
+    }
+
     pub fn is_paused(&self) -> bool {
         self.paused.load(Ordering::Relaxed)
     }

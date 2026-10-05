@@ -7,6 +7,7 @@ use std::time::Duration;
 
 use surge_ping::{Client, Config, IcmpPacket, PingIdentifier, PingSequence, ICMP};
 
+use crate::clock;
 use crate::config::PingSettings;
 use crate::control::ProbeHandle;
 use crate::model::{IpVersion, ProbeEvent, ProbeSample};
@@ -155,6 +156,7 @@ async fn ping_address(
                 let (ttl, from) = packet_meta(&packet);
                 handle.send(ProbeEvent::Latency(ProbeSample {
                     seq,
+                    time: clock::now_string(),
                     rtt_ms: dur.as_secs_f64() * 1000.0,
                     ttl,
                     from: from.to_string(),

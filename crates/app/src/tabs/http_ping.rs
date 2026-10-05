@@ -7,10 +7,12 @@ use net_tools_core::model::{HttpResult, ProbeEvent};
 use rust_i18n::t;
 
 use crate::ui::common::{error_banner, info_line, state_badge};
-use crate::ui::result_table::table;
+use crate::ui::result_table::table_fixed_rows;
 use crate::ui::settings;
 
-const MAX_RESULTS: usize = 500;
+const MAX_RESULTS: usize = 1000;
+/// Number of data rows visible before the table starts scrolling.
+const VISIBLE_ROWS: usize = 5;
 
 pub struct HttpPingTab {
     pub ctrl: TaskController<ProbeEvent>,
@@ -48,6 +50,12 @@ impl HttpPingTab {
         if self.ctrl.is_active() {
             return;
         }
+        self.restart(s, rt);
+    }
+
+    /// Stop the current task (if any) and start a fresh one. Used by the URL
+    /// input to restart on Enter without waiting for a manual stop.
+    pub fn restart(&mut self, s: &HttpSettings, rt: &tokio::runtime::Handle) {
         self.reset();
         let settings = s.clone();
         self.ctrl.start(rt, move |handle| async move {
@@ -63,10 +71,10 @@ impl HttpPingTab {
                     if self.chart.len() > MAX_RESULTS {
                         self.chart.remove(0);
                     }
-                    self.results.push(r);
-                    if self.results.len() > MAX_RESULTS {
-                        self.results.remove(0);
-                    }
+                    // Newest first: insert at the front and drop the oldest
+                    // records once the cap is reached.
+                    self.results.insert(0, r);
+                    self.results.truncate(MAX_RESULTS);
                 }
                 ProbeEvent::Info(msg) => {
                     self.info.push(msg);
@@ -88,6 +96,7 @@ impl HttpPingTab {
             ui.ctx().request_repaint();
         }
 
+        let mut submit = false;
         egui::CollapsingHeader::new(t!("common.settings"))
             .default_open(true)
             .show(ui, |ui| {
@@ -96,7 +105,11 @@ impl HttpPingTab {
                     .spacing([12.0, 6.0])
                     .show(ui, |ui| {
                         ui.label(t!("http.url"));
-                        ui.add(egui::TextEdit::singleline(&mut s.target).desired_width(320.0));
+                        let url =
+                            ui.add(egui::TextEdit::singleline(&mut s.target).desired_width(320.0));
+                        if url.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+                            submit = true;
+                        }
                         ui.end_row();
 
                         ui.label(t!("http.method"));
@@ -165,15 +178,14 @@ impl HttpPingTab {
                         ui.end_row();
                     });
             });
+        if submit {
+            self.restart(s, rt);
+        }
 
         ui.horizontal(|ui| {
             self.control_row(ui, s, rt);
             state_badge(ui, self.ctrl.state);
         });
-
-        // Result toolbar: placed directly under the controls, above every
-        // result-related widget, so it can never be pushed down.
-        self.toolbar(ui);
 
         if let Some((msg, hint)) = &self.error {
             error_banner(ui, msg, hint.as_deref());
@@ -184,12 +196,13 @@ impl HttpPingTab {
 
         ui.separator();
 
-        if !self.chart.is_empty() {
-            crate::ui::chart::latency_chart(ui, &self.chart, 150.0);
-        }
+        // Result toolbar lives below the divider, together with the result
+        // widgets it acts on.
+        self.toolbar(ui);
 
+        // Table: newest record first, kept to a fixed number of visible rows.
         let headers = [
-            t!("common.seq"),
+            t!("common.time"),
             t!("http.method"),
             t!("http.status"),
             t!("http.dns_ms"),
@@ -200,10 +213,10 @@ impl HttpPingTab {
             t!("http.body_bytes"),
             t!("http.ok"),
         ];
-        table(ui, &headers, self.results.len(), |i, row| {
+        table_fixed_rows(ui, &headers, self.results.len(), VISIBLE_ROWS, |i, row| {
             let r = &self.results[i];
             row.col(|ui| {
-                ui.label(r.seq.to_string());
+                ui.label(&r.time);
             });
             row.col(|ui| {
                 ui.label(&r.method);
@@ -233,6 +246,12 @@ impl HttpPingTab {
                 ui.label(if r.ok { "✓" } else { "✗" });
             });
         });
+
+        // Chart sits below the table, with a little breathing room.
+        if !self.chart.is_empty() {
+            ui.add_space(12.0);
+            crate::ui::chart::latency_chart(ui, &self.chart, 180.0);
+        }
     }
 
     fn toolbar(&mut self, ui: &mut egui::Ui) {
@@ -284,11 +303,12 @@ impl HttpPingTab {
 
     pub fn to_csv(&self) -> String {
         let mut out = String::from(
-            "seq,method,status,dns_ms,connect_ms,tls_ms,ttfb_ms,total_ms,body_bytes,ok,error\n",
+            "time,seq,method,status,dns_ms,connect_ms,tls_ms,ttfb_ms,total_ms,body_bytes,ok,error\n",
         );
         for r in &self.results {
             out.push_str(&format!(
-                "{},{},{},{:.1},{:.1},{},{:.1},{:.1},{},{},{}\n",
+                "{},{},{},{},{:.1},{:.1},{},{:.1},{:.1},{},{},{}\n",
+                crate::ui::export::csv_field(&r.time),
                 r.seq,
                 r.method,
                 r.status.map_or("-".into(), |v| v.to_string()),

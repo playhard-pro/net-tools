@@ -37,7 +37,7 @@ fn main() -> eframe::Result {
 
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_inner_size([1100.0, 720.0])
+            .with_inner_size([888.0, 800.0])
             .with_min_inner_size([800.0, 560.0])
             .with_title("net-tools"),
         ..Default::default()

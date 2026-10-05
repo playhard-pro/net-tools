@@ -5,6 +5,7 @@ tab:
   mtr: MTR
   http: HTTP Ping
   portscan: Port Scan
+  ip_insight: IP Insight
 state:
   idle: idle
   running: running
@@ -42,7 +43,6 @@ common:
   mode: Mode
   udp_port: UDP port
   max_hops: Max hops
-  probes_per_hop: Probes per hop
   concurrency: Concurrency
   grab_banner: Grab banner
   preset: Preset
@@ -54,6 +54,7 @@ common:
   service: Service
   banner: Banner
   seq: #
+  time: Time
   ttl: TTL
   from: From
   size: Size
@@ -68,6 +69,7 @@ mtr:
   addr: Address
   reverse: Reverse DNS
   loss: Loss
+  count: Sent/Success/Lost
   avg_ms: Avg (ms)
   best_ms: Best (ms)
   worst_ms: Worst (ms)
@@ -89,3 +91,10 @@ http:
   total_ms: Total (ms)
   body_bytes: Bytes
   ok: OK
+ip_insight:
+  query: Query
+  key: Key
+  value: Value
+  pending: pending…
+  http_status: "HTTP %{code}"
+  elapsed: "%{ms} ms"

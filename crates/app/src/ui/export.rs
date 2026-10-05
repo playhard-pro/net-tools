@@ -11,6 +11,41 @@ pub fn save_file(name: &str, ext: &str, content: &str) {
     }
 }
 
+/// Escape one value for CSV. Values containing a separator, a quote or a line
+/// break are quoted, with embedded quotes doubled.
+pub fn csv_field(s: &str) -> String {
+    if s.contains([',', '"', '\n', '\r']) {
+        format!("\"{}\"", s.replace('"', "\"\""))
+    } else {
+        s.to_string()
+    }
+}
+
+/// Split one CSV line into fields, honouring quoted fields.
+fn parse_csv_line(line: &str) -> Vec<String> {
+    let mut fields = Vec::new();
+    let mut current = String::new();
+    let mut in_quotes = false;
+    let mut chars = line.chars().peekable();
+    while let Some(c) = chars.next() {
+        match c {
+            '"' if in_quotes => {
+                if chars.peek() == Some(&'"') {
+                    current.push('"');
+                    chars.next();
+                } else {
+                    in_quotes = false;
+                }
+            }
+            '"' => in_quotes = true,
+            ',' if !in_quotes => fields.push(std::mem::take(&mut current)),
+            _ => current.push(c),
+        }
+    }
+    fields.push(current);
+    fields
+}
+
 /// Convert CSV text into a simple HTML table.
 pub fn csv_to_html(csv: &str) -> String {
     let mut out = String::from(
@@ -19,7 +54,7 @@ pub fn csv_to_html(csv: &str) -> String {
     for (i, line) in csv.lines().enumerate() {
         let tag = if i == 0 { "th" } else { "td" };
         out.push_str("<tr>");
-        for cell in line.split(',') {
+        for cell in parse_csv_line(line) {
             let cell = cell
                 .replace('&', "&amp;")
                 .replace('<', "&lt;")

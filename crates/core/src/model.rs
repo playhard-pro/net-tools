@@ -82,6 +82,8 @@ impl PortPreset {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProbeSample {
     pub seq: u64,
+    /// Local wall-clock time of the probe, down to milliseconds.
+    pub time: String,
     /// Round-trip time in milliseconds.
     pub rtt_ms: f64,
     /// Reply TTL, when available.
@@ -92,15 +94,25 @@ pub struct ProbeSample {
     pub size: usize,
 }
 
+/// One responder observed at an MTR hop.
+///
+/// A single hop can be answered by several routers (load balancing / ECMP), so
+/// a hop owns a list of nodes instead of a single address.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct HopNode {
+    /// Address of the responder.
+    pub addr: String,
+    /// PTR name of `addr`, when reverse DNS is enabled and a name exists.
+    pub reverse: Option<String>,
+}
+
 /// Per-hop statistics for MTR.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct HopStats {
     /// One-based hop index.
     pub hop: u8,
-    /// Address of this hop.
-    pub addr: Option<String>,
-    /// PTR name of this hop.
-    pub reverse: Option<String>,
+    /// Responders seen at this hop, in first-seen order.
+    pub nodes: Vec<HopNode>,
     /// Number of probes sent.
     pub sent: u32,
     /// Number of probes lost.
@@ -124,12 +136,48 @@ impl HopStats {
             self.lost as f64 / self.sent as f64
         }
     }
+
+    /// Number of probes that were answered.
+    pub fn success_count(&self) -> u32 {
+        self.sent.saturating_sub(self.lost)
+    }
+
+    /// All responder addresses as one comma separated string for display. A
+    /// hop without any response is shown as a wildcard.
+    pub fn addr_text(&self) -> String {
+        if self.nodes.is_empty() {
+            "*".to_string()
+        } else {
+            self.nodes
+                .iter()
+                .map(|n| n.addr.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
+        }
+    }
+
+    /// All PTR names as one comma separated string for display. Falls back to a
+    /// dash when no name is known.
+    pub fn reverse_text(&self) -> String {
+        let names: Vec<&str> = self
+            .nodes
+            .iter()
+            .filter_map(|n| n.reverse.as_deref())
+            .collect();
+        if names.is_empty() {
+            "-".to_string()
+        } else {
+            names.join(", ")
+        }
+    }
 }
 
 /// Result of a single HTTP probe.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct HttpResult {
     pub seq: u64,
+    /// Local wall-clock time of the probe, down to milliseconds.
+    pub time: String,
     /// Whether the result matched the expectations (status / keyword).
     pub ok: bool,
     pub method: String,
@@ -199,6 +247,45 @@ pub struct ScanProgress {
     pub open: u64,
 }
 
+/// Result of one IP insight API query.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IpInsightResult {
+    /// Display name of the API provider.
+    pub provider: String,
+    /// Full request URL.
+    pub url: String,
+    /// HTTP status code, when a response was received.
+    pub status: Option<u16>,
+    /// Request duration in milliseconds.
+    pub elapsed_ms: f64,
+    /// Parsed JSON body, when the response contained valid JSON.
+    pub data: Option<serde_json::Value>,
+    /// Raw response body, kept only when it could not be parsed as JSON.
+    pub raw: Option<String>,
+    /// Error message, when the query failed.
+    pub error: Option<String>,
+}
+
+impl IpInsightResult {
+    /// A placeholder for a provider that has not answered yet.
+    pub fn pending(provider: &str) -> Self {
+        Self {
+            provider: provider.to_string(),
+            url: String::new(),
+            status: None,
+            elapsed_ms: 0.0,
+            data: None,
+            raw: None,
+            error: None,
+        }
+    }
+
+    /// Whether the provider is still waiting for a response.
+    pub fn is_pending(&self) -> bool {
+        self.status.is_none() && self.error.is_none()
+    }
+}
+
 /// Unified event streamed from a probe task back to the UI.
 #[derive(Debug, Clone)]
 pub enum ProbeEvent {
@@ -221,6 +308,8 @@ pub enum ProbeEvent {
     Port(PortResult),
     /// Scan progress update.
     ScanProgress(ScanProgress),
+    /// An IP insight API result.
+    IpInsight(IpInsightResult),
     /// The task finished naturally.
     Finished,
 }

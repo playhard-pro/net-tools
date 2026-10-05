@@ -3,7 +3,7 @@
 
 product_name = "net-tools"
 name = "net-tools"
-version = "0.1.0"
+version = "0.1.1"
 identifier = "io.github.net-tools.app"
 description = "Cross-platform network diagnostics toolkit"
 long_description = "A cross-platform GUI for ping, MTR, HTTP ping and port scanning."
