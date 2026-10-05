@@ -1,0 +1,50 @@
+# cargo-deny configuration for net-tools.
+# Run: cargo deny check
+# Docs: https://embarkstudios.github.io/cargo-deny/
+
+[graph]
+# Check every platform's dependencies, since net-tools is cross-platform.
+targets = []
+all-features = true
+
+[advisories]
+# Advisory database (RustSec) is fetched from the default URL.
+# Add IDs here (with a reason) if an advisory must be temporarily ignored.
+ignore = []
+
+[licenses]
+# Licenses accepted for all crates. Keep this list explicit and minimal.
+allow = [
+    "MIT",
+    "MIT-0",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "0BSD",
+    "BSL-1.0",
+    "CC0-1.0",
+    "Unlicense",
+    "Zlib",
+    "OFL-1.1",
+    "Ubuntu-font-1.0",
+    "Unicode-3.0",
+    "MPL-2.0",
+    "CDLA-Permissive-2.0",
+]
+confidence-threshold = 0.9
+
+# The bundled font is embedded in the binary, not a build dependency, so it does
+# not appear here. Its license notice is tracked in assets/fonts/.
+
+[bans]
+# Warn (do not fail) on duplicate crate versions.
+multiple-versions = "warn"
+wildcards = "deny"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

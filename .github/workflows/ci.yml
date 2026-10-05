@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo registry
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build workspace
+        run: cargo build --workspace
+
+      - name: Run tests (core)
+        run: cargo test -p net-tools-core
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Check formatting
+        run: cargo fmt --check
+
+  deny:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run cargo-deny (advisories, licenses, bans, sources)
+        uses: EmbarkStudios/cargo-deny-action@v2
+
+  licenses:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-about
+        run: cargo install cargo-about --locked --features cli
+
+      - name: Verify THIRD_PARTY_LICENSES.md is up to date
+        run: |
+          cargo about generate about.md.hbs -o "$RUNNER_TEMP/third-party-licenses.md"
+          if ! diff -u THIRD_PARTY_LICENSES.md "$RUNNER_TEMP/third-party-licenses.md"; then
+            echo "::error::THIRD_PARTY_LICENSES.md is out of date. Regenerate it with:"
+            echo "::error::  cargo about generate about.md.hbs -o THIRD_PARTY_LICENSES.md"
+            exit 1
+          fi

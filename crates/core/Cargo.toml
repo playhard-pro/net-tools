@@ -1,0 +1,27 @@
+[package]
+name = "net-tools-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+thiserror.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+socket2.workspace = true
+time.workspace = true
+toml.workspace = true
+tracing.workspace = true
+surge-ping = "0.9.1"
+pnet = "0.35.0"
+pnet_packet = "0.35.0"
+hickory-resolver = "0.26.3"
+libc = "0.2"
+reqwest = { version = "0.13", default-features = false, features = ["rustls", "http2", "charset"] }
+rustls = "0.23"
+tokio-rustls = "0.26"
+webpki-roots = "1"
+url = "2"

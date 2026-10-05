@@ -1,0 +1,31 @@
+# Configuration for cargo-about (third-party license listing).
+# Regenerate THIRD_PARTY_LICENSES.md with:
+#   cargo about generate about.md.hbs -o THIRD_PARTY_LICENSES.md
+
+# Pin the platforms so the generated list is identical on any host and covers
+# every platform net-tools supports.
+targets = [
+    "x86_64-unknown-linux-gnu",
+    "x86_64-pc-windows-msvc",
+    "aarch64-apple-darwin",
+]
+
+accepted = [
+    "MIT",
+    "MIT-0",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "0BSD",
+    "BSL-1.0",
+    "CC0-1.0",
+    "Unlicense",
+    "Zlib",
+    "OFL-1.1",
+    "Ubuntu-font-1.0",
+    "Unicode-3.0",
+    "MPL-2.0",
+    "CDLA-Permissive-2.0",
+]

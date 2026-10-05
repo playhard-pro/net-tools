@@ -1,0 +1,86 @@
+app:
+  title: net-tools
+tab:
+  ping: Ping
+  mtr: MTR
+  http: HTTP Ping
+  portscan: 端口扫描
+state:
+  idle: 空闲
+  running: 运行中
+  paused: 已暂停
+  stopping: 停止中…
+  finished: 已完成
+privilege:
+  ok: "原始套接字: 可用"
+  limited: "原始套接字: 受限"
+  copy_cmd: 复制命令
+common:
+  settings: 设置
+  language: 语言
+  start: 开始
+  pause: 暂停
+  resume: 继续
+  stop: 停止
+  clear: 清空
+  copy: 复制
+  copy_all: 复制全部
+  export: 导出
+  target: 目标
+  targets: 目标
+  ip_version: IP 版本
+  timeout_ms: 超时
+  interval_ms: 间隔
+  packet_size: 包大小
+  reverse_dns: 反查域名
+  rtt_ms: RTT（毫秒）
+  mode: 探测方式
+  udp_port: UDP 端口
+  max_hops: 最大跳数
+  probes_per_hop: 每跳次数
+  concurrency: 并发数
+  grab_banner: 抓取 banner
+  preset: 端口预设
+  ports: 端口
+  host: 主机
+  port: 端口
+  protocol: 协议
+  state: 状态
+  service: 服务
+  banner: Banner
+  seq: 序号
+  ttl: TTL
+  from: 来源
+  size: 大小
+ping:
+  stats:
+    min: "最小: %{v}"
+    avg: "平均: %{v}"
+    max: "最大: %{v}"
+    jitter: "抖动: %{v}"
+mtr:
+  hop: 跳
+  addr: 地址
+  reverse: 反查域名
+  loss: 丢包
+  avg_ms: 平均(ms)
+  best_ms: 最优(ms)
+  worst_ms: 最差(ms)
+  stdev_ms: 标准差(ms)
+http:
+  url: URL
+  method: 方法
+  follow_redirects: 跟随重定向
+  verify_tls: 校验 TLS
+  expect_status: 期望状态码
+  expect_keyword: 期望关键字
+  headers: 请求头（每行一条）
+  body: 请求体
+  status: 状态
+  dns_ms: DNS(ms)
+  connect_ms: 连接(ms)
+  tls_ms: TLS(ms)
+  ttfb_ms: TTFB(ms)
+  total_ms: 总耗时(ms)
+  body_bytes: 字节数
+  ok: 是否通过

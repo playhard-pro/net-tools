@@ -1,0 +1,58 @@
+# Rust / Cargo build artifacts
+/target
+**/*.rs.bk
+*.pdb
+
+# Packaged release artifacts
+/dist
+/packaging
+
+# Dependency directories
+node_modules/
+vendor/
+
+# IDE and editor files
+.idea/
+.vscode/
+*.iml
+.fleet/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+logs/
+
+# Temporary and backup files
+*.tmp
+*.temp
+*.bak
+*.backup
+*.orig
+*.rej
+*.patch
+*.diff
+
+# Environment and local config
+.env
+.env.*
+!.env.example
+*.local
+
+# Project planning / agent working files
+AGENTS.md
+PLAN.md

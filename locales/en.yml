@@ -1,0 +1,86 @@
+app:
+  title: net-tools
+tab:
+  ping: Ping
+  mtr: MTR
+  http: HTTP Ping
+  portscan: Port Scan
+state:
+  idle: idle
+  running: running
+  paused: paused
+  stopping: stopping…
+  finished: finished
+privilege:
+  ok: "raw socket: OK"
+  limited: "raw socket: limited"
+  copy_cmd: copy cmd
+common:
+  settings: Settings
+  language: Language
+  start: Start
+  pause: Pause
+  resume: Resume
+  stop: Stop
+  clear: Clear
+  copy: Copy
+  copy_all: Copy all
+  export: Export
+  target: Target
+  targets: Targets
+  ip_version: IP version
+  timeout_ms: Timeout
+  interval_ms: Interval
+  packet_size: Packet size
+  reverse_dns: Reverse DNS
+  rtt_ms: RTT (ms)
+  mode: Mode
+  udp_port: UDP port
+  max_hops: Max hops
+  probes_per_hop: Probes per hop
+  concurrency: Concurrency
+  grab_banner: Grab banner
+  preset: Preset
+  ports: Ports
+  host: Host
+  port: Port
+  protocol: Proto
+  state: State
+  service: Service
+  banner: Banner
+  seq: #
+  ttl: TTL
+  from: From
+  size: Size
+ping:
+  stats:
+    min: "min: %{v}"
+    avg: "avg: %{v}"
+    max: "max: %{v}"
+    jitter: "jitter: %{v}"
+mtr:
+  hop: Hop
+  addr: Address
+  reverse: Reverse DNS
+  loss: Loss
+  avg_ms: Avg (ms)
+  best_ms: Best (ms)
+  worst_ms: Worst (ms)
+  stdev_ms: StDev (ms)
+http:
+  url: URL
+  method: Method
+  follow_redirects: Follow redirects
+  verify_tls: Verify TLS
+  expect_status: Expect status
+  expect_keyword: Expect keyword
+  headers: Headers (one per line)
+  body: Body
+  status: Status
+  dns_ms: DNS (ms)
+  connect_ms: Connect (ms)
+  tls_ms: TLS (ms)
+  ttfb_ms: TTFB (ms)
+  total_ms: Total (ms)
+  body_bytes: Bytes
+  ok: OK

@@ -1,0 +1,53 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            formats: deb,appimage
+            apt_packages: patchelf squashfs-tools file
+          - os: windows-latest
+            formats: wix,nsis
+          - os: macos-latest
+            formats: app,dmg
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install Linux packaging dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ${{ matrix.apt_packages }}
+
+      - name: Install cargo-packager
+        run: cargo install cargo-packager --locked
+
+      - name: Build release binary
+        run: cargo build --release --workspace
+
+      - name: Package installers
+        run: cargo packager -c packager.toml -f ${{ matrix.formats }}
+
+      - name: Upload artifacts
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true

@@ -1,0 +1,25 @@
+# cargo-packager configuration for net-tools.
+# Run: cargo build --release && cargo packager -f <formats>
+
+product_name = "net-tools"
+name = "net-tools"
+version = "0.1.0"
+identifier = "io.github.net-tools.app"
+description = "Cross-platform network diagnostics toolkit"
+long_description = "A cross-platform GUI for ping, MTR, HTTP ping and port scanning."
+homepage = "https://github.com/playhard-pro/net-tools"
+authors = ["net-tools contributors"]
+category = "Utility"
+license_file = "LICENSE"
+resources = ["LICENSE", "THIRD_PARTY_LICENSES.md", "assets/fonts/LICENSE-wqy-microhei.txt", "assets/fonts/APACHE-2.0.txt"]
+
+out_dir = "dist"
+binaries_dir = "target/release"
+icons = ["assets/icon.png"]
+
+[[binaries]]
+path = "net-tools"
+main = true
+
+[deb]
+depends = ["libc6", "libgcc-s1"]
