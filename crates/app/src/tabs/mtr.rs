@@ -1,14 +1,18 @@
 //! MTR tab: hop-by-hop routing over ICMP / UDP.
 
 use eframe::egui;
-use net_tools_core::config::MtrSettings;
+use net_tools_core::config::{InputHistory, MtrSettings};
 use net_tools_core::control::TaskController;
 use net_tools_core::model::{HopStats, ProbeEvent};
 use rust_i18n::t;
 
 use crate::ui::common::{error_banner, info_line, state_badge};
+use crate::ui::history_input;
 use crate::ui::result_table::table;
 use crate::ui::settings;
+
+/// History bucket for the target input.
+const TARGET_HISTORY_KEY: &str = "mtr.target";
 
 pub struct MtrTab {
     pub ctrl: TaskController<ProbeEvent>,
@@ -84,7 +88,13 @@ impl MtrTab {
         }
     }
 
-    pub fn ui(&mut self, ui: &mut egui::Ui, s: &mut MtrSettings, rt: &tokio::runtime::Handle) {
+    pub fn ui(
+        &mut self,
+        ui: &mut egui::Ui,
+        s: &mut MtrSettings,
+        history: &mut InputHistory,
+        rt: &tokio::runtime::Handle,
+    ) {
         self.drain();
         if self.ctrl.is_active() {
             // Keep repainting while a task runs so results and the auto-sized
@@ -114,14 +124,15 @@ impl MtrTab {
                             ui.end_row();
                         }
                     });
-                submit = settings::common_probe(ui, &mut s.common);
+                submit = settings::common_probe(ui, &mut s.common, history, TARGET_HISTORY_KEY);
             });
         if submit {
+            history_input::record_fields(history, &[(TARGET_HISTORY_KEY, &s.common.target)]);
             self.restart(s, rt);
         }
 
         ui.horizontal(|ui| {
-            self.control_row(ui, s, rt);
+            self.control_row(ui, s, history, rt);
             state_badge(ui, self.ctrl.state);
         });
 
@@ -198,11 +209,21 @@ impl MtrTab {
         }
     }
 
-    fn control_row(&mut self, ui: &mut egui::Ui, s: &MtrSettings, rt: &tokio::runtime::Handle) {
+    fn control_row(
+        &mut self,
+        ui: &mut egui::Ui,
+        s: &MtrSettings,
+        history: &mut InputHistory,
+        rt: &tokio::runtime::Handle,
+    ) {
         match self.ctrl.state {
             net_tools_core::control::TaskState::Idle
             | net_tools_core::control::TaskState::Finished => {
                 if ui.button(t!("common.start")).clicked() {
+                    history_input::record_fields(
+                        history,
+                        &[(TARGET_HISTORY_KEY, &s.common.target)],
+                    );
                     self.start(s, rt);
                 }
             }

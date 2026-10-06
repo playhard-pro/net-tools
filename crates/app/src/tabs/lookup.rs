@@ -2,14 +2,17 @@
 //! response as a tree that is fully expanded by default.
 
 use eframe::egui;
-use net_tools_core::config::LookupSettings;
+use net_tools_core::config::{InputHistory, LookupSettings};
 use net_tools_core::control::{TaskController, TaskState};
 use net_tools_core::model::{LookupResult, ProbeEvent};
 use net_tools_core::net::ip_insight::flatten_json;
 use rust_i18n::t;
 
 use crate::ui::common::{error_banner, result_toolbar, state_badge, ToolbarAction};
+use crate::ui::history_input;
 
+/// History bucket for the target input.
+const TARGET_HISTORY_KEY: &str = "lookup.target";
 /// Color used for object keys and container labels.
 const KEY_COLOR: egui::Color32 = egui::Color32::from_rgb(120, 180, 255);
 /// Color used for string values.
@@ -79,7 +82,13 @@ impl LookupTab {
         }
     }
 
-    pub fn ui(&mut self, ui: &mut egui::Ui, s: &mut LookupSettings, rt: &tokio::runtime::Handle) {
+    pub fn ui(
+        &mut self,
+        ui: &mut egui::Ui,
+        s: &mut LookupSettings,
+        history: &mut InputHistory,
+        rt: &tokio::runtime::Handle,
+    ) {
         self.drain();
         if self.ctrl.is_active() {
             // Keep repainting while the request is in flight.
@@ -95,9 +104,13 @@ impl LookupTab {
                     .spacing([12.0, 6.0])
                     .show(ui, |ui| {
                         ui.label(t!("common.target"));
-                        let target =
-                            ui.add(egui::TextEdit::singleline(&mut s.target).desired_width(320.0));
-                        if target.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+                        if history_input::singleline(
+                            ui,
+                            "lookup.target",
+                            &mut s.target,
+                            history,
+                            320.0,
+                        ) {
                             submit = true;
                         }
                         ui.end_row();
@@ -112,11 +125,12 @@ impl LookupTab {
                     });
             });
         if submit {
+            history_input::record_fields(history, &[(TARGET_HISTORY_KEY, &s.target)]);
             self.restart(s, rt);
         }
 
         ui.horizontal(|ui| {
-            self.control_row(ui, s, rt);
+            self.control_row(ui, s, history, rt);
             state_badge(ui, self.ctrl.state);
         });
 
@@ -130,10 +144,17 @@ impl LookupTab {
         self.result_ui(ui);
     }
 
-    fn control_row(&mut self, ui: &mut egui::Ui, s: &LookupSettings, rt: &tokio::runtime::Handle) {
+    fn control_row(
+        &mut self,
+        ui: &mut egui::Ui,
+        s: &LookupSettings,
+        history: &mut InputHistory,
+        rt: &tokio::runtime::Handle,
+    ) {
         match self.ctrl.state {
             TaskState::Idle | TaskState::Finished => {
                 if ui.button(t!("lookup.query")).clicked() {
+                    history_input::record_fields(history, &[(TARGET_HISTORY_KEY, &s.target)]);
                     self.start(s, rt);
                 }
             }

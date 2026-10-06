@@ -1,8 +1,14 @@
 //! Per-feature settings structs and the global application configuration.
 
+use std::collections::BTreeMap;
+
 use serde::{Deserialize, Serialize};
 
 use crate::model::{IpVersion, PortPreset, ProbeMode, ScanMode};
+
+/// Maximum number of remembered values kept for each input field. Older entries
+/// are dropped once this many values are stored.
+const HISTORY_LIMIT: usize = 20;
 
 /// Settings shared by ping and mtr.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -179,6 +185,100 @@ impl Default for LookupSettings {
     }
 }
 
+/// Settings for the DNS tab: a dig-like query and an optional iterative trace.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DnsSettings {
+    /// Domain name, or an IP address when querying PTR records.
+    pub target: String,
+    /// Record type as text, e.g. `A` or `MX`.
+    pub record_type: String,
+    /// Custom DNS server; empty means use the system resolver.
+    pub server: String,
+    /// Timeout for a single query, in milliseconds.
+    pub timeout_ms: u64,
+    /// Use TCP instead of UDP.
+    pub force_tcp: bool,
+    /// Run a full iterative trace from the root servers.
+    pub trace: bool,
+}
+
+impl Default for DnsSettings {
+    fn default() -> Self {
+        Self {
+            target: "example.com".into(),
+            record_type: "A".into(),
+            server: String::new(),
+            timeout_ms: 5000,
+            force_tcp: false,
+            trace: false,
+        }
+    }
+}
+
+/// Recently entered values for the editable text inputs, keyed by a stable
+/// field id such as `ping.target`. Values are stored most recent first.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct InputHistory {
+    #[serde(default)]
+    fields: BTreeMap<String, Vec<String>>,
+    /// Monotonic change counter; not persisted, only used to detect when the
+    /// in-memory history changed and should be written back to disk.
+    #[serde(skip)]
+    revision: u64,
+}
+
+impl InputHistory {
+    /// Values remembered for `key`, most recent first.
+    pub fn entries(&self, key: &str) -> &[String] {
+        self.fields.get(key).map(Vec::as_slice).unwrap_or(&[])
+    }
+
+    /// Remember `value` for `key`. Surrounding whitespace is trimmed, empty
+    /// values are ignored, duplicates move to the front, and the list is
+    /// trimmed to the per-field limit.
+    pub fn record(&mut self, key: &str, value: &str) {
+        let value = value.trim();
+        if value.is_empty() {
+            return;
+        }
+        let list = self.fields.entry(key.to_owned()).or_default();
+        // Nothing to do when the value is already the most recent entry.
+        if list.first().map(String::as_str) == Some(value) {
+            return;
+        }
+        list.retain(|v| v != value);
+        list.insert(0, value.to_owned());
+        list.truncate(HISTORY_LIMIT);
+        self.revision = self.revision.wrapping_add(1);
+    }
+
+    /// Remove a single remembered value at `index` for `key`.
+    pub fn remove(&mut self, key: &str, index: usize) {
+        if let Some(list) = self.fields.get_mut(key) {
+            if index < list.len() {
+                list.remove(index);
+                self.revision = self.revision.wrapping_add(1);
+            }
+        }
+    }
+
+    /// Forget every value remembered for `key`.
+    pub fn clear(&mut self, key: &str) {
+        if let Some(list) = self.fields.get_mut(key) {
+            if !list.is_empty() {
+                list.clear();
+                self.revision = self.revision.wrapping_add(1);
+            }
+        }
+    }
+
+    /// Current change counter. Compare a value captured at the start of a frame
+    /// with the value afterwards to know whether persistence is needed.
+    pub fn revision(&self) -> u64 {
+        self.revision
+    }
+}
+
 /// Global application configuration (persisted to disk).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
@@ -193,6 +293,12 @@ pub struct AppConfig {
     /// Added after the first release, so older config files still load.
     #[serde(default)]
     pub lookup: LookupSettings,
+    /// Recently entered values for the editable text inputs.
+    #[serde(default)]
+    pub history: InputHistory,
+    /// Added after the first release, so older config files still load.
+    #[serde(default)]
+    pub dns: DnsSettings,
 }
 
 impl Default for AppConfig {
@@ -205,6 +311,8 @@ impl Default for AppConfig {
             port_scan: PortScanSettings::default(),
             ip_insight: IpInsightSettings::default(),
             lookup: LookupSettings::default(),
+            history: InputHistory::default(),
+            dns: DnsSettings::default(),
         }
     }
 }
@@ -225,6 +333,42 @@ mod tests {
         assert_eq!(back.port_scan.concurrency, cfg.port_scan.concurrency);
         assert_eq!(back.ip_insight.target, cfg.ip_insight.target);
         assert_eq!(back.lookup.target, cfg.lookup.target);
+        assert_eq!(
+            back.history.entries("ping.target"),
+            cfg.history.entries("ping.target")
+        );
+        assert_eq!(back.dns.record_type, cfg.dns.record_type);
+        assert_eq!(back.dns.force_tcp, cfg.dns.force_tcp);
+    }
+
+    #[test]
+    fn history_records_dedupes_and_caps() {
+        let mut history = InputHistory::default();
+        // Duplicates are moved to the front instead of stored twice.
+        history.record("k", "a");
+        history.record("k", "b");
+        history.record("k", "a");
+        assert_eq!(history.entries("k"), &["a".to_string(), "b".to_string()]);
+        // Whitespace-only values are ignored and values are trimmed.
+        history.record("k", "   ");
+        history.record("k", "  c  ");
+        assert_eq!(history.entries("k")[0], "c");
+        // Repeating more values than the limit keeps only the newest entries.
+        for i in 0..HISTORY_LIMIT + 5 {
+            history.record("k", &format!("v{i}"));
+        }
+        assert_eq!(history.entries("k").len(), HISTORY_LIMIT);
+    }
+
+    #[test]
+    fn history_remove_and_clear() {
+        let mut history = InputHistory::default();
+        history.record("k", "a");
+        history.record("k", "b");
+        history.remove("k", 0);
+        assert_eq!(history.entries("k"), &["a".to_string()]);
+        history.clear("k");
+        assert!(history.entries("k").is_empty());
     }
 
     #[test]

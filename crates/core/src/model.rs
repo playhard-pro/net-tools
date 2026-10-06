@@ -377,6 +377,8 @@ pub enum ProbeEvent {
     IpInsight(IpInsightResult),
     /// An RDAP lookup result.
     Lookup(LookupResult),
+    /// A block of text emitted by the DNS query / trace task.
+    DnsText(String),
     /// The task finished naturally.
     Finished,
 }

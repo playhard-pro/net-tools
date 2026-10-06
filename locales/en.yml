@@ -7,6 +7,7 @@ tab:
   portscan: Port Scan
   ip_insight: IP Insight
   lookup: Lookup
+  dns: DNS
 state:
   idle: idle
   running: running
@@ -30,6 +31,9 @@ common:
   resume: Resume
   stop: Stop
   clear: Clear
+  history: History
+  history_empty: No history yet
+  clear_history: Clear history
   copy: Copy
   copy_all: Copy all
   export: Export
@@ -104,3 +108,13 @@ lookup:
   kind: "type: %{kind}"
   fallback: "No RDAP record for %{original}; showing the nearest registered object"
   not_found: "No RDAP record found"
+dns:
+  query: Query
+  trace: Trace
+  record_type: Record type
+  server: Server
+  server_hint: "host or host:port, e.g. 8.8.8.8 or 1.1.1.1:53"
+  force_tcp: Force TCP
+  trace_mode: Full trace
+  common_types: Common types
+  output: Output

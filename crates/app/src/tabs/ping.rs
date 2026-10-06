@@ -1,12 +1,13 @@
 //! Ping tab: continuous ICMP / UDP probing.
 
 use eframe::egui;
-use net_tools_core::config::PingSettings;
+use net_tools_core::config::{InputHistory, PingSettings};
 use net_tools_core::control::TaskController;
 use net_tools_core::model::{ProbeEvent, ProbeSample};
 use rust_i18n::t;
 
 use crate::ui::common::{error_banner, info_line, state_badge};
+use crate::ui::history_input;
 use crate::ui::result_table::table_fixed_rows;
 use crate::ui::settings;
 
@@ -14,6 +15,8 @@ use crate::ui::settings;
 const MAX_SAMPLES: usize = 1000;
 /// Number of data rows visible before the table starts scrolling.
 const VISIBLE_ROWS: usize = 10;
+/// History bucket for the target input.
+const TARGET_HISTORY_KEY: &str = "ping.target";
 
 pub struct PingTab {
     pub ctrl: TaskController<ProbeEvent>,
@@ -155,7 +158,13 @@ impl PingTab {
         }
     }
 
-    pub fn ui(&mut self, ui: &mut egui::Ui, s: &mut PingSettings, rt: &tokio::runtime::Handle) {
+    pub fn ui(
+        &mut self,
+        ui: &mut egui::Ui,
+        s: &mut PingSettings,
+        history: &mut InputHistory,
+        rt: &tokio::runtime::Handle,
+    ) {
         self.drain();
         if self.ctrl.is_active() {
             // Keep repainting while a task runs so results and the auto-sized
@@ -186,15 +195,16 @@ impl PingTab {
                             ui.end_row();
                         });
                 }
-                submit = settings::common_probe(ui, &mut s.common);
+                submit = settings::common_probe(ui, &mut s.common, history, TARGET_HISTORY_KEY);
             });
         if submit {
+            history_input::record_fields(history, &[(TARGET_HISTORY_KEY, &s.common.target)]);
             self.restart(s, rt);
         }
 
         // Control buttons and state.
         ui.horizontal(|ui| {
-            self.control_row(ui, s, rt);
+            self.control_row(ui, s, history, rt);
             state_badge(ui, self.ctrl.state);
             ui.label(format!(
                 "{} / {} ({}%)",
@@ -288,11 +298,21 @@ impl PingTab {
         }
     }
 
-    fn control_row(&mut self, ui: &mut egui::Ui, s: &PingSettings, rt: &tokio::runtime::Handle) {
+    fn control_row(
+        &mut self,
+        ui: &mut egui::Ui,
+        s: &PingSettings,
+        history: &mut InputHistory,
+        rt: &tokio::runtime::Handle,
+    ) {
         match self.ctrl.state {
             net_tools_core::control::TaskState::Idle
             | net_tools_core::control::TaskState::Finished => {
                 if ui.button(t!("common.start")).clicked() {
+                    history_input::record_fields(
+                        history,
+                        &[(TARGET_HISTORY_KEY, &s.common.target)],
+                    );
                     self.start(s, rt);
                 }
             }

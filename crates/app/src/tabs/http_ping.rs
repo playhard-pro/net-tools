@@ -1,14 +1,20 @@
 //! HTTP Ping tab: multiple methods with per-stage timing.
 
 use eframe::egui;
-use net_tools_core::config::HttpSettings;
+use net_tools_core::config::{HttpSettings, InputHistory};
 use net_tools_core::control::TaskController;
 use net_tools_core::model::{HttpResult, ProbeEvent};
 use rust_i18n::t;
 
 use crate::ui::common::{error_banner, info_line, state_badge};
+use crate::ui::history_input;
 use crate::ui::result_table::table_fixed_rows;
 use crate::ui::settings;
+
+/// History buckets for the editable inputs.
+const URL_HISTORY_KEY: &str = "http.target";
+const HEADERS_HISTORY_KEY: &str = "http.headers";
+const BODY_HISTORY_KEY: &str = "http.body";
 
 const MAX_RESULTS: usize = 1000;
 /// Number of data rows visible before the table starts scrolling.
@@ -88,7 +94,13 @@ impl HttpPingTab {
         }
     }
 
-    pub fn ui(&mut self, ui: &mut egui::Ui, s: &mut HttpSettings, rt: &tokio::runtime::Handle) {
+    pub fn ui(
+        &mut self,
+        ui: &mut egui::Ui,
+        s: &mut HttpSettings,
+        history: &mut InputHistory,
+        rt: &tokio::runtime::Handle,
+    ) {
         self.drain();
         if self.ctrl.is_active() {
             // Keep repainting while a task runs so results and the auto-sized
@@ -105,9 +117,13 @@ impl HttpPingTab {
                     .spacing([12.0, 6.0])
                     .show(ui, |ui| {
                         ui.label(t!("http.url"));
-                        let url =
-                            ui.add(egui::TextEdit::singleline(&mut s.target).desired_width(320.0));
-                        if url.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+                        if history_input::singleline(
+                            ui,
+                            URL_HISTORY_KEY,
+                            &mut s.target,
+                            history,
+                            320.0,
+                        ) {
                             submit = true;
                         }
                         ui.end_row();
@@ -158,18 +174,24 @@ impl HttpPingTab {
                         ui.end_row();
 
                         ui.label(t!("http.headers"));
-                        ui.add(
-                            egui::TextEdit::multiline(&mut s.headers)
-                                .desired_rows(2)
-                                .desired_width(320.0),
+                        history_input::multiline(
+                            ui,
+                            HEADERS_HISTORY_KEY,
+                            &mut s.headers,
+                            history,
+                            320.0,
+                            2,
                         );
                         ui.end_row();
 
                         ui.label(t!("http.body"));
-                        ui.add(
-                            egui::TextEdit::multiline(&mut s.body)
-                                .desired_rows(2)
-                                .desired_width(320.0),
+                        history_input::multiline(
+                            ui,
+                            BODY_HISTORY_KEY,
+                            &mut s.body,
+                            history,
+                            320.0,
+                            2,
                         );
                         ui.end_row();
 
@@ -179,11 +201,19 @@ impl HttpPingTab {
                     });
             });
         if submit {
+            history_input::record_fields(
+                history,
+                &[
+                    (URL_HISTORY_KEY, &s.target),
+                    (HEADERS_HISTORY_KEY, &s.headers),
+                    (BODY_HISTORY_KEY, &s.body),
+                ],
+            );
             self.restart(s, rt);
         }
 
         ui.horizontal(|ui| {
-            self.control_row(ui, s, rt);
+            self.control_row(ui, s, history, rt);
             state_badge(ui, self.ctrl.state);
         });
 
@@ -271,11 +301,25 @@ impl HttpPingTab {
         }
     }
 
-    fn control_row(&mut self, ui: &mut egui::Ui, s: &HttpSettings, rt: &tokio::runtime::Handle) {
+    fn control_row(
+        &mut self,
+        ui: &mut egui::Ui,
+        s: &HttpSettings,
+        history: &mut InputHistory,
+        rt: &tokio::runtime::Handle,
+    ) {
         match self.ctrl.state {
             net_tools_core::control::TaskState::Idle
             | net_tools_core::control::TaskState::Finished => {
                 if ui.button(t!("common.start")).clicked() {
+                    history_input::record_fields(
+                        history,
+                        &[
+                            (URL_HISTORY_KEY, &s.target),
+                            (HEADERS_HISTORY_KEY, &s.headers),
+                            (BODY_HISTORY_KEY, &s.body),
+                        ],
+                    );
                     self.start(s, rt);
                 }
             }

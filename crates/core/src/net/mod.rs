@@ -1,6 +1,7 @@
 //! Network probing modules.
 
 pub mod dns;
+pub mod dns_tool;
 pub mod http;
 pub mod icmp;
 pub mod ip_insight;

@@ -1,22 +1,30 @@
 //! Settings panel: reusable widgets for common probe settings.
 
 use eframe::egui;
-use net_tools_core::config::CommonProbe;
+use net_tools_core::config::{CommonProbe, InputHistory};
 use net_tools_core::model::{IpVersion, PortPreset, ProbeMode, ScanMode};
 use rust_i18n::t;
+
+use super::history_input;
 
 /// Render the common settings shared by ping and mtr. Returns `true` when the
 /// target input received an Enter key press, so the caller can restart the task
 /// with the new target.
-pub fn common_probe(ui: &mut egui::Ui, c: &mut CommonProbe) -> bool {
+///
+/// `key` identifies the target field's history bucket.
+pub fn common_probe(
+    ui: &mut egui::Ui,
+    c: &mut CommonProbe,
+    history: &mut InputHistory,
+    key: &str,
+) -> bool {
     let mut submit = false;
     egui::Grid::new("common_probe_grid")
         .num_columns(2)
         .spacing([12.0, 6.0])
         .show(ui, |ui| {
             ui.label(t!("common.target"));
-            let target = ui.add(egui::TextEdit::singleline(&mut c.target).desired_width(240.0));
-            if target.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+            if history_input::singleline(ui, key, &mut c.target, history, 240.0) {
                 submit = true;
             }
             ui.end_row();

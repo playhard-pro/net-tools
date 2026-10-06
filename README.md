@@ -16,6 +16,7 @@ different tabs run **simultaneously and independently**.
 | Port Scan | TCP connect / SYN half-open / UDP, with banner grabbing | — |
 | IP Insight | Query a target IP against several online geolocation APIs at once; each provider's JSON response is shown as its own table | — |
 | Lookup | Query a domain or IP address through RDAP; the registration data is shown as a fully expanded JSON tree, with jCard contact data parsed into readable fields and automatic fallback to the parent domain when a subdomain has no record | — |
+| DNS | dig-like queries for a chosen record type (optional custom server, UDP with TCP fallback), plus a full iterative trace from the root servers; results are shown as text | — |
 
 ### Common settings
 
@@ -53,9 +54,13 @@ starts a new one with the edited target.
 |-----------|-----------|
 | ![HTTP Ping tab](screenshots/http.png) | ![Port Scan tab](screenshots/port.png) |
 
-| IP Insight |
-|------------|
-| ![IP Insight tab](screenshots/ip.png) |
+| IP Insight | Lookup |
+|------------|--------|
+| ![IP Insight tab](screenshots/ip.png) | ![Lookup tab](screenshots/lookup.png) |
+
+| DNS |
+|-----|
+| ![DNS tab](screenshots/dns.png) |
 
 ## Build and run
 

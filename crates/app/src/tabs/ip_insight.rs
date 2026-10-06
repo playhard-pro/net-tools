@@ -2,14 +2,18 @@
 //! each provider's JSON response as its own key/value table.
 
 use eframe::egui;
-use net_tools_core::config::IpInsightSettings;
+use net_tools_core::config::{InputHistory, IpInsightSettings};
 use net_tools_core::control::{TaskController, TaskState};
 use net_tools_core::model::{IpInsightResult, ProbeEvent};
 use net_tools_core::net::ip_insight::{flatten_json, IP_API_PROVIDERS};
 use rust_i18n::t;
 
 use crate::ui::common::{error_banner, result_toolbar, state_badge, ToolbarAction};
+use crate::ui::history_input;
 use crate::ui::result_table::key_value_table;
+
+/// History bucket for the target input.
+const TARGET_HISTORY_KEY: &str = "ip_insight.target";
 
 pub struct IpInsightTab {
     pub ctrl: TaskController<ProbeEvent>,
@@ -80,6 +84,7 @@ impl IpInsightTab {
         &mut self,
         ui: &mut egui::Ui,
         s: &mut IpInsightSettings,
+        history: &mut InputHistory,
         rt: &tokio::runtime::Handle,
     ) {
         self.drain();
@@ -97,9 +102,13 @@ impl IpInsightTab {
                     .spacing([12.0, 6.0])
                     .show(ui, |ui| {
                         ui.label(t!("common.target"));
-                        let target =
-                            ui.add(egui::TextEdit::singleline(&mut s.target).desired_width(240.0));
-                        if target.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+                        if history_input::singleline(
+                            ui,
+                            "ip_insight.target",
+                            &mut s.target,
+                            history,
+                            240.0,
+                        ) {
                             submit = true;
                         }
                         ui.end_row();
@@ -114,11 +123,12 @@ impl IpInsightTab {
                     });
             });
         if submit {
+            history_input::record_fields(history, &[(TARGET_HISTORY_KEY, &s.target)]);
             self.restart(s, rt);
         }
 
         ui.horizontal(|ui| {
-            self.control_row(ui, s, rt);
+            self.control_row(ui, s, history, rt);
             state_badge(ui, self.ctrl.state);
         });
 
@@ -138,11 +148,13 @@ impl IpInsightTab {
         &mut self,
         ui: &mut egui::Ui,
         s: &IpInsightSettings,
+        history: &mut InputHistory,
         rt: &tokio::runtime::Handle,
     ) {
         match self.ctrl.state {
             TaskState::Idle | TaskState::Finished => {
                 if ui.button(t!("ip_insight.query")).clicked() {
+                    history_input::record_fields(history, &[(TARGET_HISTORY_KEY, &s.target)]);
                     self.start(s, rt);
                 }
             }

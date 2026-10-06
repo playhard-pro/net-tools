@@ -5,6 +5,7 @@ use net_tools_core::config::AppConfig;
 use net_tools_core::net::privilege::PrivilegeStatus;
 use rust_i18n::t;
 
+use crate::tabs::dns::DnsTab;
 use crate::tabs::http_ping::HttpPingTab;
 use crate::tabs::ip_insight::IpInsightTab;
 use crate::tabs::lookup::LookupTab;
@@ -24,6 +25,7 @@ pub enum Tab {
     PortScan,
     IpInsight,
     Lookup,
+    Dns,
 }
 
 pub struct App {
@@ -36,6 +38,7 @@ pub struct App {
     pub portscan: PortScanTab,
     pub ip_insight: IpInsightTab,
     pub lookup: LookupTab,
+    pub dns: DnsTab,
     pub privilege: PrivilegeStatus,
 }
 
@@ -54,6 +57,7 @@ impl App {
             portscan: PortScanTab::new(),
             ip_insight: IpInsightTab::new(),
             lookup: LookupTab::new(),
+            dns: DnsTab::new(),
             privilege: net_tools_core::net::privilege::probe(),
         }
     }
@@ -150,6 +154,7 @@ impl eframe::App for App {
                 self.tab_button(ui, Tab::PortScan, &t!("tab.portscan"));
                 self.tab_button(ui, Tab::IpInsight, &t!("tab.ip_insight"));
                 self.tab_button(ui, Tab::Lookup, &t!("tab.lookup"));
+                self.tab_button(ui, Tab::Dns, &t!("tab.dns"));
                 ui.separator();
                 ui.label(t!("common.language"));
                 self.language_selector(ui);
@@ -158,14 +163,42 @@ impl eframe::App for App {
             });
         });
 
+        // Capture the history revision before rendering so edits made by the
+        // input widgets can be written to disk immediately afterwards.
+        let history_revision = self.cfg.history.revision();
+
         egui::CentralPanel::default().show(ui, |ui| match self.tab {
-            Tab::Ping => self.ping.ui(ui, &mut self.cfg.ping, &self.rt),
-            Tab::Mtr => self.mtr.ui(ui, &mut self.cfg.mtr, &self.rt),
-            Tab::Http => self.http.ui(ui, &mut self.cfg.http, &self.rt),
-            Tab::PortScan => self.portscan.ui(ui, &mut self.cfg.port_scan, &self.rt),
-            Tab::IpInsight => self.ip_insight.ui(ui, &mut self.cfg.ip_insight, &self.rt),
-            Tab::Lookup => self.lookup.ui(ui, &mut self.cfg.lookup, &self.rt),
+            Tab::Ping => self
+                .ping
+                .ui(ui, &mut self.cfg.ping, &mut self.cfg.history, &self.rt),
+            Tab::Mtr => self
+                .mtr
+                .ui(ui, &mut self.cfg.mtr, &mut self.cfg.history, &self.rt),
+            Tab::Http => self
+                .http
+                .ui(ui, &mut self.cfg.http, &mut self.cfg.history, &self.rt),
+            Tab::PortScan => {
+                self.portscan
+                    .ui(ui, &mut self.cfg.port_scan, &mut self.cfg.history, &self.rt)
+            }
+            Tab::IpInsight => self.ip_insight.ui(
+                ui,
+                &mut self.cfg.ip_insight,
+                &mut self.cfg.history,
+                &self.rt,
+            ),
+            Tab::Lookup => {
+                self.lookup
+                    .ui(ui, &mut self.cfg.lookup, &mut self.cfg.history, &self.rt)
+            }
+            Tab::Dns => self
+                .dns
+                .ui(ui, &mut self.cfg.dns, &mut self.cfg.history, &self.rt),
         });
+
+        if self.cfg.history.revision() != history_revision {
+            crate::config_store::save(&self.cfg);
+        }
     }
 
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {

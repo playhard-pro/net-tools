@@ -1,14 +1,19 @@
 //! Port scan tab: TCP connect / SYN / UDP with banner grabbing.
 
 use eframe::egui;
-use net_tools_core::config::PortScanSettings;
+use net_tools_core::config::{InputHistory, PortScanSettings};
 use net_tools_core::control::TaskController;
 use net_tools_core::model::{PortResult, PortState, ProbeEvent, ScanProgress};
 use rust_i18n::t;
 
 use crate::ui::common::{error_banner, info_line, state_badge};
+use crate::ui::history_input;
 use crate::ui::result_table::table;
 use crate::ui::settings;
+
+/// History buckets for the editable inputs.
+const TARGETS_HISTORY_KEY: &str = "portscan.targets";
+const PORTS_HISTORY_KEY: &str = "portscan.ports";
 
 pub struct PortScanTab {
     pub ctrl: TaskController<ProbeEvent>,
@@ -76,7 +81,13 @@ impl PortScanTab {
         }
     }
 
-    pub fn ui(&mut self, ui: &mut egui::Ui, s: &mut PortScanSettings, rt: &tokio::runtime::Handle) {
+    pub fn ui(
+        &mut self,
+        ui: &mut egui::Ui,
+        s: &mut PortScanSettings,
+        history: &mut InputHistory,
+        rt: &tokio::runtime::Handle,
+    ) {
         self.drain();
         if self.ctrl.is_active() {
             // Keep repainting while a task runs so results and the auto-sized
@@ -93,9 +104,13 @@ impl PortScanTab {
                     .spacing([12.0, 6.0])
                     .show(ui, |ui| {
                         ui.label(t!("common.targets"));
-                        let targets =
-                            ui.add(egui::TextEdit::singleline(&mut s.targets).desired_width(240.0));
-                        if targets.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+                        if history_input::singleline(
+                            ui,
+                            TARGETS_HISTORY_KEY,
+                            &mut s.targets,
+                            history,
+                            240.0,
+                        ) {
                             submit = true;
                         }
                         ui.end_row();
@@ -105,7 +120,13 @@ impl PortScanTab {
                         ui.end_row();
 
                         ui.label(t!("common.ports"));
-                        ui.add(egui::TextEdit::singleline(&mut s.ports).desired_width(240.0));
+                        history_input::singleline(
+                            ui,
+                            PORTS_HISTORY_KEY,
+                            &mut s.ports,
+                            history,
+                            240.0,
+                        );
                         ui.end_row();
 
                         ui.label(t!("common.mode"));
@@ -138,11 +159,18 @@ impl PortScanTab {
                     });
             });
         if submit {
+            history_input::record_fields(
+                history,
+                &[
+                    (TARGETS_HISTORY_KEY, &s.targets),
+                    (PORTS_HISTORY_KEY, &s.ports),
+                ],
+            );
             self.restart(s, rt);
         }
 
         ui.horizontal(|ui| {
-            self.control_row(ui, s, rt);
+            self.control_row(ui, s, history, rt);
             state_badge(ui, self.ctrl.state);
             if let Some(p) = &self.progress {
                 ui.label(format!("{} / {} ({})", p.scanned, p.total, p.open));
@@ -225,12 +253,20 @@ impl PortScanTab {
         &mut self,
         ui: &mut egui::Ui,
         s: &PortScanSettings,
+        history: &mut InputHistory,
         rt: &tokio::runtime::Handle,
     ) {
         match self.ctrl.state {
             net_tools_core::control::TaskState::Idle
             | net_tools_core::control::TaskState::Finished => {
                 if ui.button(t!("common.start")).clicked() {
+                    history_input::record_fields(
+                        history,
+                        &[
+                            (TARGETS_HISTORY_KEY, &s.targets),
+                            (PORTS_HISTORY_KEY, &s.ports),
+                        ],
+                    );
                     self.start(s, rt);
                 }
             }

@@ -7,6 +7,7 @@ tab:
   portscan: 端口扫描
   ip_insight: IP 洞察
   lookup: 注册查询
+  dns: DNS
 state:
   idle: 空闲
   running: 运行中
@@ -30,6 +31,9 @@ common:
   resume: 继续
   stop: 停止
   clear: 清空
+  history: 历史记录
+  history_empty: 暂无历史记录
+  clear_history: 清空历史
   copy: 复制
   copy_all: 复制全部
   export: 导出
@@ -104,3 +108,13 @@ lookup:
   kind: "类型: %{kind}"
   fallback: "%{original} 没有 RDAP 记录；已展示距离最近的已注册对象"
   not_found: "未找到 RDAP 记录"
+dns:
+  query: 查询
+  trace: 跟踪
+  record_type: 记录类型
+  server: 服务器
+  server_hint: "支持 IP 或 IP:端口，如 8.8.8.8 或 1.1.1.1:53"
+  force_tcp: 强制 TCP
+  trace_mode: 完整跟踪
+  common_types: 常用类型
+  output: 输出
