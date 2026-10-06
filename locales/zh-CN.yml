@@ -6,6 +6,7 @@ tab:
   http: HTTP Ping
   portscan: 端口扫描
   ip_insight: IP 洞察
+  lookup: 注册查询
 state:
   idle: 空闲
   running: 运行中
@@ -98,3 +99,8 @@ ip_insight:
   pending: 查询中…
   http_status: "HTTP %{code}"
   elapsed: "%{ms} 毫秒"
+lookup:
+  query: 查询
+  kind: "类型: %{kind}"
+  fallback: "%{original} 没有 RDAP 记录；已展示距离最近的已注册对象"
+  not_found: "未找到 RDAP 记录"

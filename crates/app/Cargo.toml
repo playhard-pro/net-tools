@@ -21,3 +21,7 @@ rfd = "0.17.2"
 clap = "4.6.7"
 dirs = "7.0.0"
 rust-i18n = "4.2.4"
+
+[build-dependencies]
+# Embeds the application icon into the Windows executable (see build.rs).
+winresource = "0.1"

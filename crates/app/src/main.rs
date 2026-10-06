@@ -35,11 +35,18 @@ fn main() -> eframe::Result {
     let handle = rt.handle().clone();
     let _keep_alive = rt;
 
+    // Runtime window icon, also used by the taskbar / dock while running.
+    // The icon embedded in the executable (Windows) and packaged installers is
+    // configured separately in `build.rs` and `packager.toml`.
+    let icon = eframe::icon_data::from_png_bytes(include_bytes!("../../../assets/icon.png"))
+        .expect("bundled icon.png is not a valid PNG");
+
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([888.0, 800.0])
             .with_min_inner_size([800.0, 560.0])
-            .with_title("net-tools"),
+            .with_title("net-tools")
+            .with_icon(icon),
         ..Default::default()
     };
 

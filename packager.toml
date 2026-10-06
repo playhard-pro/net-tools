@@ -15,7 +15,9 @@ resources = ["LICENSE", "THIRD_PARTY_LICENSES.md", "assets/fonts/LICENSE-wqy-mic
 
 out_dir = "dist"
 binaries_dir = "target/release"
-icons = ["assets/icon.png"]
+# Windows needs a real .ico (also embedded into the executable by build.rs);
+# Linux and macOS derive their icons from the PNG.
+icons = ["assets/icon.ico", "assets/icon.png"]
 
 [[binaries]]
 path = "net-tools"
@@ -23,3 +25,8 @@ main = true
 
 [deb]
 depends = ["libc6", "libgcc-s1"]
+
+[nsis]
+# Icon of the installer executable itself; the installed app icon comes from
+# the executable resource and the shared `icons` list.
+installer_icon = "assets/icon.ico"

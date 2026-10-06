@@ -8,4 +8,5 @@ pub mod mtr;
 pub mod ports;
 pub mod portscan;
 pub mod privilege;
+pub mod rdap;
 pub mod udp;

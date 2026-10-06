@@ -6,6 +6,7 @@ tab:
   http: HTTP Ping
   portscan: Port Scan
   ip_insight: IP Insight
+  lookup: Lookup
 state:
   idle: idle
   running: running
@@ -98,3 +99,8 @@ ip_insight:
   pending: pending…
   http_status: "HTTP %{code}"
   elapsed: "%{ms} ms"
+lookup:
+  query: Query
+  kind: "type: %{kind}"
+  fallback: "No RDAP record for %{original}; showing the nearest registered object"
+  not_found: "No RDAP record found"

@@ -33,6 +33,10 @@ ehthumbs.db
 Thumbs.db
 desktop.ini
 
+# Python caches (scripts/)
+__pycache__/
+*.pyc
+
 # Logs
 *.log
 logs/

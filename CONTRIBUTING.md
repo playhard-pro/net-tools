@@ -38,6 +38,7 @@ crates/core    # probing engines and config models (no UI), independently testab
 crates/app     # egui desktop application (tabs and widgets)
 locales/       # i18n locale files (en / zh-CN, extensible)
 assets/        # icons and the bundled CJK font
+scripts/       # helper scripts (icon generation)
 packager.toml  # cargo-packager configuration
 deny.toml      # cargo-deny configuration
 ```
@@ -55,6 +56,18 @@ cargo test --workspace          # unit + integration tests
 cargo install cargo-deny --locked
 cargo deny check
 ```
+
+### Application icon
+
+`assets/icon.png` is the master icon (an 8-bit RGBA PNG). The Windows `.ico` is
+generated from it and committed:
+
+```bash
+python3 scripts/generate_icons.py
+```
+
+Run this whenever the master icon changes. See the README section
+"Application icon" for where each file is used.
 
 ### Tests
 

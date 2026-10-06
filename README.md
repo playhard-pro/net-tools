@@ -15,6 +15,7 @@ different tabs run **simultaneously and independently**.
 | HTTP Ping | Multi-method requests with per-stage timing (DNS/connect/TLS/TTFB/total) | GET/HEAD/POST/PUT/DELETE/OPTIONS/PATCH |
 | Port Scan | TCP connect / SYN half-open / UDP, with banner grabbing | — |
 | IP Insight | Query a target IP against several online geolocation APIs at once; each provider's JSON response is shown as its own table | — |
+| Lookup | Query a domain or IP address through RDAP; the registration data is shown as a fully expanded JSON tree, with jCard contact data parsed into readable fields and automatic fallback to the parent domain when a subdomain has no record | — |
 
 ### Common settings
 
@@ -125,6 +126,36 @@ cargo packager -c packager.toml -f app,dmg
 
 Artifacts are written to `dist/`.
 
+### Application icon
+
+The single source of truth is `assets/icon.png` (a non-interlaced 8-bit RGBA
+PNG). To change the application icon:
+
+```bash
+# 1. Replace the master image (must be a non-interlaced 8-bit RGBA PNG).
+cp new-icon.png assets/icon.png
+
+# 2. Regenerate the derived Windows icon.
+python3 scripts/generate_icons.py   # writes assets/icon.ico from assets/icon.png
+
+# 3. Rebuild and, to refresh installers, repackage.
+cargo build --release
+cargo packager -c packager.toml -f deb,appimage   # or wix,nsis / app,dmg
+```
+
+`assets/icon.ico` is committed, so step 2 only needs to run when the master PNG
+changes.
+
+Where the icon is used:
+
+- **Runtime window / taskbar (while running)**: `assets/icon.png`, loaded in
+  `crates/app/src/main.rs`.
+- **Windows executable / Explorer / NSIS shortcuts**: `assets/icon.ico`, embedded
+  by `crates/app/build.rs` (`winresource`).
+- **Packaged installers**: `packager.toml` lists `assets/icon.ico` and
+  `assets/icon.png`; Linux uses the PNG, macOS derives its `.icns` from the PNG,
+  and WiX uses the `.ico` for the desktop shortcut and Add/Remove Programs icon.
+
 ## Cross-compilation
 
 Cross-compiling produces the **executable only**. Installers (`.msi`/`.exe`,
@@ -214,6 +245,7 @@ crates/core    # probing engines and config models (no UI), independently testab
 crates/app     # egui desktop application
 locales/       # i18n locale files (en / zh-CN, extensible)
 assets/        # icons and the bundled font (assets/fonts/)
+scripts/       # helper scripts (icon generation)
 screenshots/   # UI screenshots used in this README
 packager.toml  # cargo-packager configuration
 .github/       # CI / release workflows

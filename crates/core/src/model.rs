@@ -286,6 +286,71 @@ impl IpInsightResult {
     }
 }
 
+/// Result of a single RDAP lookup.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LookupResult {
+    /// Target that actually produced this response (may be a parent domain when
+    /// the original target returned no data).
+    pub target: String,
+    /// Original user supplied target (domain or IP).
+    pub original_target: String,
+    /// Object kind: `domain` or `ip`.
+    pub kind: String,
+    /// URL of the authoritative RDAP response after redirects.
+    pub url: String,
+    /// HTTP status code, when a response was received.
+    pub status: Option<u16>,
+    /// Request duration in milliseconds.
+    pub elapsed_ms: f64,
+    /// Parsed RDAP JSON document, when the response contained valid JSON.
+    pub data: Option<serde_json::Value>,
+    /// Raw response body, kept only when it could not be parsed as JSON.
+    pub raw: Option<String>,
+    /// Error message, when the query failed.
+    pub error: Option<String>,
+}
+
+impl LookupResult {
+    /// Build a failed result. The HTTP status is kept when a response was
+    /// received, so callers can still tell a "not found" apart from a transport
+    /// failure even when the body could not be read.
+    pub fn failed(
+        target: &str,
+        kind: &str,
+        url: &str,
+        status: Option<u16>,
+        elapsed_ms: f64,
+        message: String,
+    ) -> Self {
+        Self {
+            target: target.to_string(),
+            original_target: target.to_string(),
+            kind: kind.to_string(),
+            url: url.to_string(),
+            status,
+            elapsed_ms,
+            data: None,
+            raw: None,
+            error: Some(message),
+        }
+    }
+
+    /// Build a "not found" result (HTTP 404 without a usable body).
+    pub fn not_found(target: &str, kind: &str, url: &str, elapsed_ms: f64) -> Self {
+        Self {
+            target: target.to_string(),
+            original_target: target.to_string(),
+            kind: kind.to_string(),
+            url: url.to_string(),
+            status: Some(404),
+            elapsed_ms,
+            data: None,
+            raw: None,
+            error: None,
+        }
+    }
+}
+
 /// Unified event streamed from a probe task back to the UI.
 #[derive(Debug, Clone)]
 pub enum ProbeEvent {
@@ -310,6 +375,8 @@ pub enum ProbeEvent {
     ScanProgress(ScanProgress),
     /// An IP insight API result.
     IpInsight(IpInsightResult),
+    /// An RDAP lookup result.
+    Lookup(LookupResult),
     /// The task finished naturally.
     Finished,
 }

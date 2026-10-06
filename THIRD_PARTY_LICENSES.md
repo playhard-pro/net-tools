@@ -13,7 +13,7 @@ cargo about generate about.md.hbs -o THIRD_PARTY_LICENSES.md
 
 ## Overview
 
-- **MIT License** (428)
+- **MIT License** (433)
 - **Unicode License v3** (19)
 - **Apache License 2.0** (17)
 - **ISC License** (5)
@@ -4824,6 +4824,35 @@ DEALINGS IN THE SOFTWARE.
 
 Used by:
 
+- num_threads 0.1.7 — https://github.com/jhpratt/num_threads
+
+```text
+Copyright (c) 2021 Jacob Pratt
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+```
+
+### MIT License
+
+Used by:
+
 - atspi-common 0.13.0 — https://github.com/odilia-app/atspi
 - atspi-proxies 0.13.0 — https://github.com/odilia-app/atspi
 - atspi 0.29.0 — https://github.com/odilia-app/atspi
@@ -5224,7 +5253,9 @@ Used by:
 - is_terminal_polyfill 1.70.2 — https://github.com/polyfill-rs/is_terminal_polyfill
 - once_cell_polyfill 1.70.2 — https://github.com/polyfill-rs/once_cell_polyfill
 - serde_spanned 0.6.9 — https://github.com/toml-rs/toml
+- serde_spanned 1.1.1 — https://github.com/toml-rs/toml
 - toml 0.8.23 — https://github.com/toml-rs/toml
+- toml 1.1.6+spec-1.1.0 — https://github.com/toml-rs/toml
 - toml_datetime 0.6.11 — https://github.com/toml-rs/toml
 - toml_datetime 1.1.1+spec-1.1.0 — https://github.com/toml-rs/toml
 - toml_edit 0.22.27 — https://github.com/toml-rs/toml
@@ -5289,6 +5320,7 @@ SOFTWARE.
 Used by:
 
 - time-core 0.1.9 — https://github.com/time-rs/time
+- time-macros 0.2.32 — https://github.com/time-rs/time
 - time 0.3.55 — https://github.com/time-rs/time
 
 ```text
@@ -5392,6 +5424,41 @@ Used by:
 
 ```text
 Copyright (c) Ulrik Sverdrup "bluss" 2015-2023
+
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+
+```
+
+### MIT License
+
+Used by:
+
+- winresource 0.1.31 — https://github.com/BenjaminRi/winresource
+
+```text
+Copyright 2016 Max Resch
 
 Permission is hereby granted, free of charge, to any
 person obtaining a copy of this software and associated
@@ -6466,8 +6533,8 @@ SOFTWARE.
 
 Used by:
 
-- net-tools 0.1.0
-- net-tools-core 0.1.0
+- net-tools 0.1.1 — https://github.com/playhard-pro/net-tools
+- net-tools-core 0.1.1
 - accesskit 0.24.1 — https://github.com/AccessKit/accesskit
 - accesskit_atspi_common 0.18.1 — https://github.com/AccessKit/accesskit
 - accesskit_consumer 0.35.0 — https://github.com/AccessKit/accesskit

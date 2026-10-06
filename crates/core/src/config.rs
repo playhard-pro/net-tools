@@ -161,6 +161,24 @@ impl Default for IpInsightSettings {
     }
 }
 
+/// Settings for the Lookup tab: a single domain or IP queried through RDAP.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LookupSettings {
+    /// Target domain name or IP address.
+    pub target: String,
+    /// Timeout for the RDAP request, in milliseconds.
+    pub timeout_ms: u64,
+}
+
+impl Default for LookupSettings {
+    fn default() -> Self {
+        Self {
+            target: "example.com".into(),
+            timeout_ms: 15_000,
+        }
+    }
+}
+
 /// Global application configuration (persisted to disk).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
@@ -172,6 +190,9 @@ pub struct AppConfig {
     /// Added after the first release, so older config files still load.
     #[serde(default)]
     pub ip_insight: IpInsightSettings,
+    /// Added after the first release, so older config files still load.
+    #[serde(default)]
+    pub lookup: LookupSettings,
 }
 
 impl Default for AppConfig {
@@ -183,6 +204,7 @@ impl Default for AppConfig {
             http: HttpSettings::default(),
             port_scan: PortScanSettings::default(),
             ip_insight: IpInsightSettings::default(),
+            lookup: LookupSettings::default(),
         }
     }
 }
@@ -202,6 +224,7 @@ mod tests {
         assert_eq!(back.http.method, cfg.http.method);
         assert_eq!(back.port_scan.concurrency, cfg.port_scan.concurrency);
         assert_eq!(back.ip_insight.target, cfg.ip_insight.target);
+        assert_eq!(back.lookup.target, cfg.lookup.target);
     }
 
     #[test]
@@ -216,5 +239,8 @@ mod tests {
         let ii = IpInsightSettings::default();
         assert!(!ii.target.is_empty());
         assert!(ii.timeout_ms > 0);
+        let lk = LookupSettings::default();
+        assert!(!lk.target.is_empty());
+        assert!(lk.timeout_ms > 0);
     }
 }
