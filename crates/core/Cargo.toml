@@ -26,3 +26,12 @@ rustls = "0.23"
 tokio-rustls = "0.26"
 webpki-roots = "1"
 url = "2"
+
+[target.'cfg(windows)'.dependencies]
+# Used by the ICMPv6 engine to read the reply hop limit via WSARecvMsg, which
+# socket2 and tokio do not expose.
+windows-sys = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_Networking_WinSock",
+    "Win32_System_IO",
+] }

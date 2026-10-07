@@ -6,7 +6,7 @@
 
 use std::io;
 use std::net::IpAddr;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", windows))]
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -170,6 +170,17 @@ async fn ping_address_any(
         }
     }
 
+    #[cfg(windows)]
+    {
+        // Only IPv6 needs the extra engine: it is the family whose hop limit
+        // surge-ping cannot report. Fall back if the socket cannot be set up.
+        if let IpAddr::V6(v6) = ip {
+            if let Ok(engine) = crate::net::windows_icmp::open() {
+                return ping_address_windows(handle, settings, v6, engine).await;
+            }
+        }
+    }
+
     let client = match client_for(ip, None) {
         Ok(c) => c,
         Err(e) => {
@@ -211,6 +222,75 @@ async fn ping_address_linux(
         let probe_seq = seq as u16;
         let result = tokio::task::spawn_blocking(move || {
             crate::net::linux_icmp::probe(&socket, ip, probe_seq, &payload, timeout, false)
+        })
+        .await;
+
+        let reply = match result {
+            Ok(Ok(reply)) => reply,
+            Ok(Err(e)) => {
+                return PingOutcome::Failed(ProbeFailure {
+                    message: format!("ICMP send/receive error: {e}"),
+                    privileged: e.kind() == io::ErrorKind::PermissionDenied,
+                });
+            }
+            Err(_) => {
+                return PingOutcome::Failed(ProbeFailure {
+                    message: "ICMP probe task panicked".into(),
+                    privileged: false,
+                });
+            }
+        };
+
+        match reply {
+            Some(reply) => handle.send(ProbeEvent::Latency(ProbeSample {
+                seq,
+                time: clock::now_string(),
+                rtt_ms: reply.rtt.as_secs_f64() * 1000.0,
+                ttl: reply.ttl,
+                from: reply.from.to_string(),
+                size: settings.common.packet_size + 8,
+            })),
+            None => handle.send(ProbeEvent::Timeout { seq }),
+        }
+
+        seq = seq.wrapping_add(1);
+        if handle
+            .sleep(Duration::from_millis(settings.common.interval_ms))
+            .await
+        {
+            return PingOutcome::Cancelled;
+        }
+    }
+}
+
+/// Probe one IPv6 address through the Windows engine so the reply TTL is
+/// reported.
+#[cfg(windows)]
+async fn ping_address_windows(
+    handle: &ProbeHandle<ProbeEvent>,
+    settings: &PingSettings,
+    ip: std::net::Ipv6Addr,
+    engine: crate::net::windows_icmp::Engine,
+) -> PingOutcome {
+    let engine = Arc::new(engine);
+    let payload = Arc::new(vec![0x61u8; settings.common.packet_size]);
+    let timeout = Duration::from_millis(settings.common.timeout_ms);
+    let mut seq: u64 = 0;
+
+    loop {
+        if handle.is_cancelled() {
+            return PingOutcome::Cancelled;
+        }
+        handle.wait_if_paused().await;
+        if handle.is_cancelled() {
+            return PingOutcome::Cancelled;
+        }
+
+        let engine = engine.clone();
+        let payload = payload.clone();
+        let probe_seq = seq as u16;
+        let result = tokio::task::spawn_blocking(move || {
+            crate::net::windows_icmp::probe(&engine, ip, probe_seq, &payload, timeout)
         })
         .await;
 

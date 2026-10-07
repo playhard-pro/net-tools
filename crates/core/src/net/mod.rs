@@ -13,3 +13,5 @@ pub mod portscan;
 pub mod privilege;
 pub mod rdap;
 pub mod udp;
+#[cfg(windows)]
+pub(crate) mod windows_icmp;
