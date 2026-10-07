@@ -46,6 +46,18 @@ jobs:
       - name: Package installers
         run: cargo packager -c packager.toml -f ${{ matrix.formats }}
 
+      # cargo-packager always appends the WiX language identifier to the MSI
+      # filename (e.g. `_en-US`) and offers no option to omit it, so strip it
+      # before publishing. Only the MSI files are affected.
+      - name: Strip WiX language suffix from MSI
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Get-ChildItem -Path dist -Filter '*_en-US.msi' | ForEach-Object {
+            $target = $_.Name -replace '_en-US', ''
+            Rename-Item -LiteralPath $_.FullName -NewName $target
+          }
+
       - name: Upload artifacts
         uses: softprops/action-gh-release@v2
         with:

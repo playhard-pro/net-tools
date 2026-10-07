@@ -131,6 +131,16 @@ cargo packager -c packager.toml -f app,dmg
 
 Artifacts are written to `dist/`.
 
+> **MSI file name:** cargo-packager appends the WiX language identifier to the
+> MSI file name (for example `_en-US`) and has no option to omit it. Rename the
+> file after packaging if you want a cleaner name. On Windows PowerShell:
+>
+> ```powershell
+> Get-ChildItem dist -Filter '*_en-US.msi' | Rename-Item -NewName { $_.Name -replace '_en-US', '' }
+> ```
+>
+> The release workflow does this automatically before uploading artifacts.
+
 ### Application icon
 
 The single source of truth is `assets/icon.png` (a non-interlaced 8-bit RGBA
