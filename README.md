@@ -264,7 +264,7 @@ crates/core    # probing engines and config models (no UI), independently testab
 crates/app     # egui desktop application
 locales/       # i18n locale files (en / zh-CN, extensible)
 assets/        # icons and the bundled font (assets/fonts/)
-scripts/       # helper scripts (icon generation, Windows packaging)
+scripts/       # helper scripts (icon generation, Windows packaging, artifact renaming)
 screenshots/   # UI screenshots used in this README
 packager.toml  # cargo-packager configuration
 .github/       # CI / release workflows

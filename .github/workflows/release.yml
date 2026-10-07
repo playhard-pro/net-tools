@@ -69,6 +69,12 @@ jobs:
         if: runner.os != 'Windows'
         run: cargo packager -c packager.toml -f ${{ matrix.formats }}
 
+      # cargo-packager omits the target OS from its file names, so add it here
+      # to match the Windows archive naming scheme.
+      - name: Add platform identifier to package names
+        if: runner.os != 'Windows'
+        run: bash scripts/rename_artifacts.sh ${{ matrix.platform }}
+
       # Windows is distributed as a plain archive instead of an installer so
       # that the executable can still be started with administrator rights,
       # which the network probing features require.
