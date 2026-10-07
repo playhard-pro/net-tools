@@ -42,6 +42,9 @@ confidence-threshold = 0.9
 # Warn (do not fail) on duplicate crate versions.
 multiple-versions = "warn"
 wildcards = "deny"
+# Internal workspace crates are referenced by path only and are never
+# published, so their path dependencies are allowed to omit a version.
+allow-wildcard-paths = true
 
 [sources]
 unknown-registry = "deny"
