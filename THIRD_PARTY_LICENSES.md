@@ -6532,8 +6532,8 @@ SOFTWARE.
 
 Used by:
 
-- net-tools 0.2.1 — https://github.com/playhard-pro/net-tools
-- net-tools-core 0.2.1
+- net-tools 0.2.2 — https://github.com/playhard-pro/net-tools
+- net-tools-core 0.2.2
 - accesskit 0.24.1 — https://github.com/AccessKit/accesskit
 - accesskit_atspi_common 0.18.1 — https://github.com/AccessKit/accesskit
 - accesskit_consumer 0.35.0 — https://github.com/AccessKit/accesskit
