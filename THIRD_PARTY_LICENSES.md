@@ -13,7 +13,7 @@ cargo about generate about.md.hbs -o THIRD_PARTY_LICENSES.md
 
 ## Overview
 
-- **MIT License** (432)
+- **MIT License** (430)
 - **Unicode License v3** (19)
 - **Apache License 2.0** (17)
 - **ISC License** (5)
@@ -6532,8 +6532,6 @@ SOFTWARE.
 
 Used by:
 
-- net-tools 0.2.4 — https://github.com/playhard-pro/net-tools
-- net-tools-core 0.2.4
 - accesskit 0.24.1 — https://github.com/AccessKit/accesskit
 - accesskit_atspi_common 0.18.1 — https://github.com/AccessKit/accesskit
 - accesskit_consumer 0.35.0 — https://github.com/AccessKit/accesskit

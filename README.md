@@ -139,9 +139,9 @@ Artifacts are written to `dist/`. Each architecture is built and packaged on a
 matching native runner, so `cargo packager` always sees a host build.
 
 > **arm64 runners:** the release matrix uses `ubuntu-24.04-arm`,
-> `windows-11-arm` and `macos-15-arm64`. These are free for public
-> repositories; private repositories need a plan / larger runner that offers
-> them.
+> `windows-11-arm` and `macos-15` (the bare label is the arm64 image). These
+> are free for public repositories; private repositories need a plan / larger
+> runner that offers them.
 
 ### Application icon
 
@@ -257,6 +257,18 @@ cargo build --release --target aarch64-apple-darwin -p net-tools
   Silicon macOS (.app / .dmg) on native runners, then publish them to a single
   GitHub Release.
 
+To cut a release, bump the version and push a matching tag:
+
+```bash
+scripts/bump_version.sh 0.2.5   # updates Cargo.toml, packager.toml, Cargo.lock
+git commit -am "Bump version to 0.2.5"
+git tag v0.2.5
+git push origin main v0.2.5
+```
+
+The workspace `Cargo.toml` is the single source of truth for the version;
+member crates inherit it and the packaging scripts read it back from there.
+
 ## Project layout
 
 ```
@@ -264,7 +276,7 @@ crates/core    # probing engines and config models (no UI), independently testab
 crates/app     # egui desktop application
 locales/       # i18n locale files (en / zh-CN, extensible)
 assets/        # icons and the bundled font (assets/fonts/)
-scripts/       # helper scripts (icon generation, Windows packaging, artifact renaming)
+scripts/       # helper scripts (icon generation, Windows packaging, artifact renaming, version bumping)
 screenshots/   # UI screenshots used in this README
 packager.toml  # cargo-packager configuration
 .github/       # CI / release workflows

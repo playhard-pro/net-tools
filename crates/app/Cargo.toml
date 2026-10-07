@@ -3,12 +3,13 @@ name = "net-tools"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+publish.workspace = true
 authors.workspace = true
 homepage.workspace = true
 repository.workspace = true
 
 [dependencies]
-net-tools-core = { path = "../core", version = "0.2.4" }
+net-tools-core = { path = "../core" }
 anyhow.workspace = true
 serde.workspace = true
 serde_json.workspace = true

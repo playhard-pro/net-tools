@@ -29,3 +29,9 @@ accepted = [
     "MPL-2.0",
     "CDLA-Permissive-2.0",
 ]
+
+# The workspace crates are marked `publish = false`, so they never reach a
+# registry. Exclude them from the third-party list; otherwise the generated
+# file changes on every version bump.
+[private]
+ignore = true
