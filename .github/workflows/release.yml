@@ -35,7 +35,10 @@ jobs:
             platform: windows
             arch: arm64
             windows_arch: arm64
-          - os: macos-15-arm64
+          # The bare `macos-15` label points at the arm64 image. The `-arm64`
+          # suffix used by the runner-images directory name is not a valid
+          # workflow label and leaves the job queued forever.
+          - os: macos-15
             platform: macos
             arch: aarch64
             formats: app,dmg
