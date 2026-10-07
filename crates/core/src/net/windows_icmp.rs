@@ -244,7 +244,7 @@ mod tests {
     fn alignment_rounds_up_to_pointer() {
         let align = mem::size_of::<usize>();
         assert_eq!(aligned(align), align);
-        assert!(aligned(align + 1) >= align + 1);
+        assert!(aligned(align + 1) > align);
         assert_eq!(aligned(align + 1) % align, 0);
     }
 }
