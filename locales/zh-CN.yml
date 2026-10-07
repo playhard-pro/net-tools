@@ -1,5 +1,15 @@
 app:
   title: net-tools
+about:
+  button: 关于
+  title: 关于 net-tools
+  version: "版本："
+  author: "作者："
+  email: "邮箱："
+  homepage: "主页："
+  repository: "仓库："
+  license: "许可证："
+  close: 关闭
 tab:
   ping: Ping
   mtr: MTR

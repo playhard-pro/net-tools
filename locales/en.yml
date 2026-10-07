@@ -1,5 +1,15 @@
 app:
   title: net-tools
+about:
+  button: About
+  title: About net-tools
+  version: "Version:"
+  author: "Author:"
+  email: "Email:"
+  homepage: "Homepage:"
+  repository: "Repository:"
+  license: "License:"
+  close: Close
 tab:
   ping: Ping
   mtr: MTR

@@ -6,6 +6,8 @@ members = ["crates/core", "crates/app"]
 version = "0.2.0"
 edition = "2021"
 license = "MIT"
+authors = ["playhard.pro <rex@playhard.pro>"]
+homepage = "https://github.com/playhard-pro"
 repository = "https://github.com/playhard-pro/net-tools"
 
 [workspace.dependencies]

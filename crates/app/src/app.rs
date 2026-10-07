@@ -17,6 +17,16 @@ use crate::tabs::port_scan::PortScanTab;
 /// link and the published package metadata cannot drift apart.
 const PROJECT_URL: &str = env!("CARGO_PKG_REPOSITORY");
 
+/// Package version shown in the About dialog. Taken from the manifest so it
+/// always matches the published version.
+const PROJECT_VERSION: &str = env!("CARGO_PKG_VERSION");
+
+/// Author shown in the About dialog. Taken from the manifest.
+const PROJECT_AUTHORS: &str = env!("CARGO_PKG_AUTHORS");
+
+/// Author homepage shown as a link in the About dialog.
+const PROJECT_HOMEPAGE: &str = env!("CARGO_PKG_HOMEPAGE");
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Tab {
     Ping,
@@ -40,6 +50,8 @@ pub struct App {
     pub lookup: LookupTab,
     pub dns: DnsTab,
     pub privilege: PrivilegeStatus,
+    /// Whether the About dialog is currently open.
+    pub show_about: bool,
 }
 
 impl App {
@@ -59,6 +71,7 @@ impl App {
             lookup: LookupTab::new(),
             dns: DnsTab::new(),
             privilege: net_tools_core::net::privilege::probe(),
+            show_about: false,
         }
     }
 
@@ -129,6 +142,56 @@ impl App {
             }
         }
     }
+
+    /// About dialog: version, author, contact links and license. Values are read
+    /// from the package manifest so they cannot drift from the published metadata.
+    fn about_dialog(&mut self, ctx: &egui::Context) {
+        let mut close = false;
+        // Author entries follow the `Name <email>` form; fall back to the whole
+        // string when no address is present, so the field is never blank.
+        let email = PROJECT_AUTHORS
+            .split_once('<')
+            .and_then(|(_, rest)| rest.split_once('>'))
+            .map_or(PROJECT_AUTHORS, |(addr, _)| addr);
+        let modal = egui::Modal::new(egui::Id::new("about_dialog")).show(ctx, |ui| {
+            ui.set_width(360.0);
+            ui.heading(t!("about.title"));
+            ui.add_space(4.0);
+            ui.label(format!("{} {}", t!("about.version"), PROJECT_VERSION));
+            ui.label(format!("{} {}", t!("about.author"), PROJECT_AUTHORS));
+            ui.horizontal(|ui| {
+                ui.label(t!("about.email"));
+                ui.add(egui::Hyperlink::from_label_and_url(
+                    email,
+                    format!("mailto:{email}"),
+                ));
+            });
+            ui.horizontal(|ui| {
+                ui.label(t!("about.homepage"));
+                ui.add(egui::Hyperlink::from_label_and_url(
+                    PROJECT_HOMEPAGE,
+                    PROJECT_HOMEPAGE,
+                ));
+            });
+            ui.horizontal(|ui| {
+                ui.label(t!("about.repository"));
+                ui.add(egui::Hyperlink::from_label_and_url(
+                    PROJECT_URL,
+                    PROJECT_URL,
+                ));
+            });
+            ui.label(format!("{} MIT", t!("about.license")));
+            ui.add_space(8.0);
+            ui.separator();
+            if ui.button(t!("about.close")).clicked() {
+                close = true;
+            }
+        });
+        // Also close when the backdrop is clicked or Escape is pressed.
+        if close || modal.should_close() {
+            self.show_about = false;
+        }
+    }
 }
 
 fn language_display_name(code: &str) -> String {
@@ -160,6 +223,10 @@ impl eframe::App for App {
                 self.language_selector(ui);
                 ui.separator();
                 self.privilege_badge(ui);
+                ui.separator();
+                if ui.small_button(t!("about.button")).clicked() {
+                    self.show_about = true;
+                }
             });
         });
 
@@ -198,6 +265,10 @@ impl eframe::App for App {
 
         if self.cfg.history.revision() != history_revision {
             crate::config_store::save(&self.cfg);
+        }
+
+        if self.show_about {
+            self.about_dialog(ui.ctx());
         }
     }
 

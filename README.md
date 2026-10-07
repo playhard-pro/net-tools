@@ -279,6 +279,13 @@ cargo deny check
 Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) for the
 development setup, coding conventions and pull request checklist.
 
+## Author / Contact
+
+- Author: playhard.pro
+- Email: rex@playhard.pro
+- GitHub: <https://github.com/playhard-pro>
+- Repository: <https://github.com/playhard-pro/net-tools>
+
 ## Third-party licenses
 
 - **WenQuanYi Micro Hei** (`assets/fonts/wqy-microhei.ttc`) — Apache License 2.0.
