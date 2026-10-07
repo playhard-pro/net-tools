@@ -47,6 +47,10 @@ fn main() -> eframe::Result {
             .with_min_inner_size([800.0, 560.0])
             .with_title("net-tools")
             .with_icon(icon),
+        // Center the window on the primary monitor at startup so the position
+        // is deterministic instead of being chosen by the window manager.
+        // Note: not supported on Wayland, where the compositor decides placement.
+        centered: true,
         ..Default::default()
     };
 
