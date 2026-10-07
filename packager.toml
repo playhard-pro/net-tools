@@ -3,7 +3,7 @@
 
 product_name = "net-tools"
 name = "net-tools"
-version = "0.2.0"
+version = "0.2.1"
 identifier = "io.github.net-tools.app"
 description = "Cross-platform network diagnostics toolkit"
 long_description = "A cross-platform GUI for ping, MTR, HTTP ping and port scanning."
@@ -25,8 +25,3 @@ main = true
 
 [deb]
 depends = ["libc6", "libgcc-s1"]
-
-[nsis]
-# Icon of the installer executable itself; the installed app icon comes from
-# the executable resource and the shared `icons` list.
-installer_icon = "assets/icon.ico"

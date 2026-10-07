@@ -114,32 +114,34 @@ matching authorization command. The hint is only shown for real permission
 errors, so a DNS or address-family problem never sends you looking for
 administrator rights.
 
-## Packaging installers
+## Packaging
 
-Using [cargo-packager](https://github.com/crabnebula-dev/cargo-packager):
+Linux and macOS packages are produced with
+[cargo-packager](https://github.com/crabnebula-dev/cargo-packager); Windows is
+shipped as a plain zip so that the executable can be started with administrator
+rights (the raw-socket probes need them). Releases are built for x86_64 and
+arm64 on Linux and Windows, and for Apple Silicon (arm64) only on macOS.
 
 ```bash
 cargo install cargo-packager --locked
 cargo build --release
-# Linux
+
+# Linux (x86_64 and arm64)
 cargo packager -c packager.toml -f deb,appimage   # needs patchelf squashfs-tools file
-# Windows
-cargo packager -c packager.toml -f wix,nsis
-# macOS
+# macOS (Apple Silicon)
 cargo packager -c packager.toml -f app,dmg
+# Windows (x86_64 and arm64) — executable + license texts
+pwsh scripts/package_windows.ps1 -Arch x64
+pwsh scripts/package_windows.ps1 -Arch arm64
 ```
 
-Artifacts are written to `dist/`.
+Artifacts are written to `dist/`. Each architecture is built and packaged on a
+matching native runner, so `cargo packager` always sees a host build.
 
-> **MSI file name:** cargo-packager appends the WiX language identifier to the
-> MSI file name (for example `_en-US`) and has no option to omit it. Rename the
-> file after packaging if you want a cleaner name. On Windows PowerShell:
->
-> ```powershell
-> Get-ChildItem dist -Filter '*_en-US.msi' | Rename-Item -NewName { $_.Name -replace '_en-US', '' }
-> ```
->
-> The release workflow does this automatically before uploading artifacts.
+> **arm64 runners:** the release matrix uses `ubuntu-24.04-arm`,
+> `windows-11-arm` and `macos-15-arm64`. These are free for public
+> repositories; private repositories need a plan / larger runner that offers
+> them.
 
 ### Application icon
 
@@ -153,30 +155,30 @@ cp new-icon.png assets/icon.png
 # 2. Regenerate the derived Windows icon.
 python3 scripts/generate_icons.py   # writes assets/icon.ico from assets/icon.png
 
-# 3. Rebuild and, to refresh installers, repackage.
+# 3. Rebuild and, to refresh packages, repackage.
 cargo build --release
-cargo packager -c packager.toml -f deb,appimage   # or wix,nsis / app,dmg
+cargo packager -c packager.toml -f deb,appimage   # or app,dmg
 ```
 
 `assets/icon.ico` is committed, so step 2 only needs to run when the master PNG
-changes.
+changes. The Windows archive script copies the executable with this embedded
+icon; Linux and macOS packages list both files in `packager.toml`.
 
 Where the icon is used:
 
 - **Runtime window / taskbar (while running)**: `assets/icon.png`, loaded in
   `crates/app/src/main.rs`.
-- **Windows executable / Explorer / NSIS shortcuts**: `assets/icon.ico`, embedded
-  by `crates/app/build.rs` (`winresource`).
-- **Packaged installers**: `packager.toml` lists `assets/icon.ico` and
-  `assets/icon.png`; Linux uses the PNG, macOS derives its `.icns` from the PNG,
-  and WiX uses the `.ico` for the desktop shortcut and Add/Remove Programs icon.
+- **Windows executable / Explorer**: `assets/icon.ico`, embedded by
+  `crates/app/build.rs` (`winresource`).
+- **Packages**: `packager.toml` lists `assets/icon.ico` and `assets/icon.png`;
+  Linux uses the PNG and macOS derives its `.icns` from the PNG.
 
 ## Cross-compilation
 
-Cross-compiling produces the **executable only**. Installers (`.msi`/`.exe`,
-`.app`/`.dmg`) still need the target platform's native packaging tools, so
-releases are built on the native CI runners (see below). The commands below build
-the binary from a Linux host.
+Cross-compiling produces the **executable only**. Packages still need the target
+platform's native tooling (cargo-packager for Linux/macOS, PowerShell for the
+Windows zip), so releases are built on native CI runners (see below). The
+commands below build the binary from a Linux host.
 
 ### Windows (MSVC, recommended)
 
@@ -232,9 +234,9 @@ restricted by Apple's license, so building on a Mac (or via CI) is usually
 simpler:
 
 ```bash
-rustup target add x86_64-apple-darwin   # or aarch64-apple-darwin
+rustup target add aarch64-apple-darwin   # the only target used for releases
 # point the target linker at osxcross' clang wrapper, then:
-cargo build --release --target x86_64-apple-darwin -p net-tools
+cargo build --release --target aarch64-apple-darwin -p net-tools
 ```
 
 ### Notes
@@ -243,15 +245,17 @@ cargo build --release --target x86_64-apple-darwin -p net-tools
   and tends to be the hardest part to cross-compile. If it fails, make sure
   `cmake`, `ninja` and a target C compiler are installed, or switch the TLS
   backend to `ring`.
-- Only the host platform's installers can be produced locally with
+- Only the host platform's packages can be produced locally with
   `cargo packager`; use the native CI runners for other platforms.
 
 ## CI and releases
 
 - `.github/workflows/ci.yml`: build, test, clippy (warnings are errors) and format
   checks on ubuntu / windows / macos.
-- `.github/workflows/release.yml`: on a `v*` tag, build installers on native
-  runners and publish them to a GitHub Release.
+- `.github/workflows/release.yml`: on a `v*` tag, build and package x86_64 and
+  arm64 Linux (.deb / .AppImage), x86_64 and arm64 Windows (.zip) and Apple
+  Silicon macOS (.app / .dmg) on native runners, then publish them to a single
+  GitHub Release.
 
 ## Project layout
 
@@ -260,7 +264,7 @@ crates/core    # probing engines and config models (no UI), independently testab
 crates/app     # egui desktop application
 locales/       # i18n locale files (en / zh-CN, extensible)
 assets/        # icons and the bundled font (assets/fonts/)
-scripts/       # helper scripts (icon generation)
+scripts/       # helper scripts (icon generation, Windows packaging)
 screenshots/   # UI screenshots used in this README
 packager.toml  # cargo-packager configuration
 .github/       # CI / release workflows
@@ -303,7 +307,7 @@ development setup, coding conventions and pull request checklist.
   project redistributes it under Apache-2.0. Attribution is in
   `assets/fonts/LICENSE-wqy-microhei.txt` and the license text in
   `assets/fonts/APACHE-2.0.txt`. Both files are also shipped inside the
-  generated installers.
+  generated packages (including the Windows zip).
 
 Rust dependencies are licensed under their respective terms (predominantly
 MIT / Apache-2.0). A complete, generated list of every dependency and its

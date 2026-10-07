@@ -9,17 +9,35 @@ permissions:
   contents: write
 
 jobs:
-  package:
+  # Build and package on native runners only. Cross-compilation is avoided
+  # because cargo-packager resolves the bundled binaries from `target/release`,
+  # which only exists for a host (non `--target`) build.
+  build:
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
+            platform: linux
+            arch: x86_64
+            formats: deb,appimage
+            apt_packages: patchelf squashfs-tools file
+          - os: ubuntu-24.04-arm
+            platform: linux
+            arch: arm64
             formats: deb,appimage
             apt_packages: patchelf squashfs-tools file
           - os: windows-latest
-            formats: wix,nsis
-          - os: macos-latest
+            platform: windows
+            arch: x64
+            windows_arch: x64
+          - os: windows-11-arm
+            platform: windows
+            arch: arm64
+            windows_arch: arm64
+          - os: macos-15-arm64
+            platform: macos
+            arch: aarch64
             formats: app,dmg
     runs-on: ${{ matrix.os }}
     steps:
@@ -38,28 +56,49 @@ jobs:
           sudo apt-get install -y ${{ matrix.apt_packages }}
 
       - name: Install cargo-packager
+        if: runner.os != 'Windows'
         run: cargo install cargo-packager --locked
 
       - name: Build release binary
         run: cargo build --release --workspace
 
-      - name: Package installers
+      - name: Package Linux / macOS installers
+        if: runner.os != 'Windows'
         run: cargo packager -c packager.toml -f ${{ matrix.formats }}
 
-      # cargo-packager always appends the WiX language identifier to the MSI
-      # filename (e.g. `_en-US`) and offers no option to omit it, so strip it
-      # before publishing. Only the MSI files are affected.
-      - name: Strip WiX language suffix from MSI
+      # Windows is distributed as a plain archive instead of an installer so
+      # that the executable can still be started with administrator rights,
+      # which the network probing features require.
+      - name: Package Windows archive
         if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          Get-ChildItem -Path dist -Filter '*_en-US.msi' | ForEach-Object {
-            $target = $_.Name -replace '_en-US', ''
-            Rename-Item -LiteralPath $_.FullName -NewName $target
-          }
+        run: pwsh scripts/package_windows.ps1 -Arch ${{ matrix.windows_arch }} -OutDir dist
 
-      - name: Upload artifacts
+      - name: Upload packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: pkg-${{ matrix.platform }}-${{ matrix.arch }}
+          path: |
+            dist/*.deb
+            dist/*.AppImage
+            dist/*.dmg
+            dist/*.zip
+          if-no-files-found: error
+
+  # Single publishing job so that concurrent matrix jobs cannot race while
+  # creating the GitHub Release.
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all packages
+        uses: actions/download-artifact@v4
+        with:
+          pattern: pkg-*
+          merge-multiple: true
+          path: artifacts
+
+      - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/*
+          files: artifacts/*
           generate_release_notes: true

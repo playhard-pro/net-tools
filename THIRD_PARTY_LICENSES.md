@@ -13,7 +13,7 @@ cargo about generate about.md.hbs -o THIRD_PARTY_LICENSES.md
 
 ## Overview
 
-- **MIT License** (433)
+- **MIT License** (432)
 - **Unicode License v3** (19)
 - **Apache License 2.0** (17)
 - **ISC License** (5)
@@ -2293,7 +2293,6 @@ Used by:
 - openssl-probe 0.2.1 — https://github.com/rustls/openssl-probe
 - pkg-config 0.3.34 — https://github.com/rust-lang/pkg-config-rs
 - scoped-tls 1.0.1 — https://github.com/alexcrichton/scoped-tls
-- socket2 0.5.10 — https://github.com/rust-lang/socket2
 - socket2 0.6.5 — https://github.com/rust-lang/socket2
 
 ```text
@@ -6533,8 +6532,8 @@ SOFTWARE.
 
 Used by:
 
-- net-tools 0.2.0 — https://github.com/playhard-pro/net-tools
-- net-tools-core 0.2.0
+- net-tools 0.2.1 — https://github.com/playhard-pro/net-tools
+- net-tools-core 0.2.1
 - accesskit 0.24.1 — https://github.com/AccessKit/accesskit
 - accesskit_atspi_common 0.18.1 — https://github.com/AccessKit/accesskit
 - accesskit_consumer 0.35.0 — https://github.com/AccessKit/accesskit
