@@ -62,6 +62,82 @@ starts a new one with the edited target.
 |-----|
 | ![DNS tab](screenshots/dns.png) |
 
+## Download and run
+
+Pre-built packages are published on the
+[GitHub Releases](https://github.com/playhard-pro/net-tools/releases) page. Open
+the latest release, download the file that matches your operating system and CPU
+architecture, and follow the notes below. You do **not** need Rust or any build
+tooling.
+
+### Which file do I need?
+
+| OS | Architecture | File | Notes |
+|----|--------------|------|-------|
+| Linux | x86_64 / amd64 | `net-tools_<version>_linux_amd64.deb` | Debian, Ubuntu, Mint and derivatives |
+| Linux | x86_64 / amd64 | `net-tools_<version>_linux_amd64.AppImage` | Any distribution, portable single file |
+| Linux | arm64 / aarch64 | `net-tools_<version>_linux_arm64.deb` | Debian/Ubuntu on ARM |
+| Linux | arm64 / aarch64 | `net-tools_<version>_linux_arm64.AppImage` | Any distribution on ARM |
+| Windows | x64 (64-bit Intel/AMD) | `net-tools_<version>_windows_x64.zip` | Windows 10 / 11 |
+| Windows | arm64 | `net-tools_<version>_windows_arm64.zip` | Windows on ARM |
+| macOS | Apple Silicon (arm64) | `net-tools_<version>_macos_aarch64.dmg` | M-series Macs; Intel Macs are not built |
+
+`<version>` is the release version, for example `0.2.4`.
+
+How to check your architecture:
+
+- **Linux / macOS**: run `uname -m` — `x86_64` is 64-bit Intel/AMD, `aarch64`
+  (macOS may print `arm64`) is ARM.
+- **Windows**: open *Settings → System → About* and look at **System type**.
+
+### Package formats (Linux)
+
+- **`.deb`** installs system-wide and registers with your package manager (so it
+  can be upgraded or removed the usual way). Install it with
+  `sudo apt install ./net-tools_<version>_linux_amd64.deb` (or `dpkg -i`, then
+  `sudo apt-get -f install` to pull in missing dependencies), then start
+  `net-tools` from your application menu or a terminal. The package declares only
+  the base C runtime, so you may also need the GUI libraries listed under
+  [Linux runtime dependencies](#linux-runtime-dependencies) if they are missing.
+- **`.AppImage`** is a single portable executable that needs no installation and
+  works on most distributions. Make it executable and run it:
+
+  ```bash
+  chmod +x net-tools_<version>_linux_amd64.AppImage
+  ./net-tools_<version>_linux_amd64.AppImage
+  ```
+
+  AppImages need FUSE; if launching fails with a FUSE error, either install your
+  distribution's `libfuse2` package or run
+  `./net-tools_<version>_linux_amd64.AppImage --appimage-extract-and-run`.
+
+### Windows (zip)
+
+Windows is shipped as a portable zip instead of an installer, so the executable
+can be started with administrator rights, which the raw-socket probes need.
+Extract the whole archive to a folder you can write to, then run
+`net-tools.exe`. For full functionality, right-click it and choose **Run as
+administrator** (see [Privileges](#privileges-unprivileged-best-effort)). Windows
+SmartScreen may warn because the binary is not code-signed; choose *More info →
+Run anyway* if you trust the source.
+
+### macOS (dmg / app)
+
+The `.dmg` contains the `net-tools.app` bundle. Open the disk image, drag
+`net-tools.app` into *Applications*, then launch it. The app is not signed or
+notarized, so Gatekeeper blocks the first launch: right-click the app and choose
+**Open**, or allow it under *System Settings → Privacy & Security*. Raw-socket
+features require running it with administrator rights (`sudo`), as described in
+[Privileges](#privileges-unprivileged-best-effort).
+
+### First run
+
+All features start unprivileged except the raw-socket probes; the status bar at
+the top tells you which capability is missing and the `copy cmd` button offers
+the matching authorization command. See
+[Privileges](#privileges-unprivileged-best-effort) for details and the per-OS
+capability table.
+
 ## Build and run
 
 ```bash
