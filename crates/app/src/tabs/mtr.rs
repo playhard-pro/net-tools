@@ -3,10 +3,11 @@
 use eframe::egui;
 use net_tools_core::config::{InputHistory, MtrSettings};
 use net_tools_core::control::TaskController;
-use net_tools_core::model::{HopStats, ProbeEvent};
+use net_tools_core::model::{HopStats, ProbeEvent, ProbeMode};
+use net_tools_core::net::privilege::PrivilegeStatus;
 use rust_i18n::t;
 
-use crate::ui::common::{error_banner, info_line, state_badge};
+use crate::ui::common::{error_banner, info_line, privilege_note, state_badge};
 use crate::ui::history_input;
 use crate::ui::result_table::table;
 use crate::ui::settings;
@@ -94,6 +95,7 @@ impl MtrTab {
         s: &mut MtrSettings,
         history: &mut InputHistory,
         rt: &tokio::runtime::Handle,
+        privilege: &PrivilegeStatus,
     ) {
         self.drain();
         if self.ctrl.is_active() {
@@ -129,6 +131,17 @@ impl MtrTab {
         if submit {
             history_input::record_fields(history, &[(TARGET_HISTORY_KEY, &s.common.target)]);
             self.restart(s, rt);
+        }
+
+        // UDP MTR needs a raw socket, so warn only when that mode is selected
+        // and the capability is missing (Unix only: Windows has no backend).
+        if s.mode == ProbeMode::Udp && cfg!(unix) {
+            privilege_note(
+                ui,
+                privilege.raw,
+                privilege,
+                &t!("privilege.needs_raw_udp_mtr"),
+            );
         }
 
         ui.horizontal(|ui| {

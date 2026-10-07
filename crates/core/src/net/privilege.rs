@@ -7,9 +7,10 @@ use socket2::{Domain, Protocol, Socket, Type};
 #[derive(Debug, Clone, Default)]
 pub struct PrivilegeStatus {
     /// Whether an ICMP probe can open its socket. Linux offers ICMP to
-    /// unprivileged users through the ICMP datagram ("ping") socket, so this is
-    /// commonly true for a normal user; on platforms without that socket the
-    /// engines fall back to a raw socket and need elevation.
+    /// unprivileged users through the ICMP datagram ("ping") socket, which the
+    /// dedicated Linux engine uses, so this is commonly true for a normal user;
+    /// on platforms without that socket the engines fall back to a raw socket
+    /// and need elevation.
     pub icmp: bool,
     /// Whether a raw socket can be created, which the SYN scan and the UDP MTR
     /// mode require.
@@ -32,9 +33,10 @@ pub fn probe() -> PrivilegeStatus {
 
 /// Whether the ICMP engines can open a socket.
 ///
-/// This mirrors what surge-ping does: try the ICMP datagram ("ping") socket
-/// first and only fall back to a raw socket, so the report matches the socket
-/// the probes really use instead of always demanding raw-socket privileges.
+/// Both the Linux datagram engine and surge-ping try the ICMP datagram
+/// ("ping") socket first and only fall back to a raw socket, so the report
+/// matches the socket the probes really use instead of always demanding
+/// raw-socket privileges.
 fn can_icmp() -> bool {
     icmp_socket_available(Domain::IPV4, Protocol::ICMPV4)
         || icmp_socket_available(Domain::IPV6, Protocol::ICMPV6)
@@ -43,7 +45,8 @@ fn can_icmp() -> bool {
 }
 
 /// Whether a raw socket can be created, which the SYN scan (raw TCP) and the
-/// UDP MTR mode (raw ICMP) need.
+/// UDP MTR mode (raw ICMP) need. Neither ICMP ping nor ICMP MTR needs it on
+/// Linux, where the datagram socket is enough.
 fn can_raw() -> bool {
     raw_socket_available(Domain::IPV4, Protocol::TCP)
         || raw_socket_available(Domain::IPV4, Protocol::ICMPV4)

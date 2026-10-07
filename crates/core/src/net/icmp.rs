@@ -1,8 +1,13 @@
-//! ICMP probing (ping). Based on surge-ping: cross-platform and, on Linux,
-//! unprivileged via the ICMP ping socket.
+//! ICMP probing (ping).
+//!
+//! Linux uses the dedicated unprivileged datagram-socket engine
+//! ([`crate::net::linux_icmp`]), which is the only path that can report the
+//! reply TTL there. Everywhere else, and as a fallback, surge-ping is used.
 
 use std::io;
 use std::net::IpAddr;
+#[cfg(target_os = "linux")]
+use std::sync::Arc;
 use std::time::Duration;
 
 use surge_ping::{Client, Config, IcmpPacket, PingIdentifier, PingSequence, ICMP};
@@ -36,6 +41,36 @@ enum PingOutcome {
 pub(crate) fn client_for(ip: IpAddr, ttl: Option<u32>) -> io::Result<Client> {
     let kind = if ip.is_ipv6() { ICMP::V6 } else { ICMP::V4 };
     let mut builder = Config::builder().kind(kind);
+    // On Unix, prefer a raw socket for IPv4. The Linux ping datagram socket
+    // hides the outer IP header, so surge-ping cannot report the reply TTL from
+    // it; a raw socket exposes that header. surge-ping falls back to the
+    // datagram socket when raw is not permitted, which keeps unprivileged ping
+    // working (only without a TTL). IPv6 is left on the default socket because
+    // its raw messages carry no header here either.
+    #[cfg(unix)]
+    if ip.is_ipv4() {
+        builder = builder.sock_type_hint(socket2::Type::RAW);
+    }
+    if let Some(ttl) = ttl {
+        builder = builder.ttl(ttl);
+    }
+    Client::new(&builder.build())
+}
+
+/// Build an ICMP client for traceroute (MTR) that explicitly requests a raw
+/// socket.
+///
+/// Traceroute works by reading the ICMP time-exceeded messages sent by
+/// intermediate routers. On Unix the unprivileged ping datagram socket does not
+/// deliver those errors as normal received data, so a client built through
+/// [`client_for`] would only ever see the final echo reply and no hops in
+/// between. surge-ping falls back to a datagram socket when raw is unavailable,
+/// so callers must confirm the socket type they actually got.
+pub(crate) fn trace_client_for(ip: IpAddr, ttl: Option<u32>) -> io::Result<Client> {
+    let kind = if ip.is_ipv6() { ICMP::V6 } else { ICMP::V4 };
+    let mut builder = Config::builder()
+        .kind(kind)
+        .sock_type_hint(socket2::Type::RAW);
     if let Some(ttl) = ttl {
         builder = builder.ttl(ttl);
     }
@@ -101,17 +136,7 @@ pub async fn run_ping_icmp(handle: &ProbeHandle<ProbeEvent>, settings: &PingSett
     // probed in this environment does not hide one that can.
     let mut last_failure: Option<ProbeFailure> = None;
     for ip in addrs {
-        let client = match client_for(ip, None) {
-            Ok(c) => c,
-            Err(e) => {
-                last_failure = Some(ProbeFailure {
-                    message: format!("failed to open ICMP socket for {ip}: {e}"),
-                    privileged: e.kind() == io::ErrorKind::PermissionDenied,
-                });
-                continue;
-            }
-        };
-        match ping_address(handle, settings, &client, ip).await {
+        match ping_address_any(handle, settings, ip).await {
             PingOutcome::Cancelled => {
                 handle.send(ProbeEvent::Finished);
                 return;
@@ -129,8 +154,108 @@ pub async fn run_ping_icmp(handle: &ProbeHandle<ProbeEvent>, settings: &PingSett
     handle.send(ProbeEvent::Finished);
 }
 
-/// Probe a single address until the probe is cancelled or the socket fails.
-async fn ping_address(
+/// Probe a single address, preferring the unprivileged Linux engine.
+async fn ping_address_any(
+    handle: &ProbeHandle<ProbeEvent>,
+    settings: &PingSettings,
+    ip: IpAddr,
+) -> PingOutcome {
+    #[cfg(target_os = "linux")]
+    {
+        // The datagram ICMP socket is what lets Linux report the reply TTL
+        // without elevation. Fall back to the surge-ping client only when the
+        // socket cannot be opened at all (e.g. a restricted ping_group_range).
+        if let Ok(socket) = crate::net::linux_icmp::open(ip, None, false) {
+            return ping_address_linux(handle, settings, ip, socket).await;
+        }
+    }
+
+    let client = match client_for(ip, None) {
+        Ok(c) => c,
+        Err(e) => {
+            return PingOutcome::Failed(ProbeFailure {
+                message: format!("failed to open ICMP socket for {ip}: {e}"),
+                privileged: e.kind() == io::ErrorKind::PermissionDenied,
+            });
+        }
+    };
+    ping_address_surge(handle, settings, &client, ip).await
+}
+
+/// Probe a single address through the unprivileged Linux engine.
+#[cfg(target_os = "linux")]
+async fn ping_address_linux(
+    handle: &ProbeHandle<ProbeEvent>,
+    settings: &PingSettings,
+    ip: IpAddr,
+    socket: socket2::Socket,
+) -> PingOutcome {
+    let socket = Arc::new(socket);
+    let payload = Arc::new(vec![0x61u8; settings.common.packet_size]);
+    let timeout = Duration::from_millis(settings.common.timeout_ms);
+    let mut seq: u64 = 0;
+
+    loop {
+        if handle.is_cancelled() {
+            return PingOutcome::Cancelled;
+        }
+        handle.wait_if_paused().await;
+        if handle.is_cancelled() {
+            return PingOutcome::Cancelled;
+        }
+
+        // The blocking probe is kept short (bounded by the timeout) so the
+        // cancellation and pause checks above stay responsive.
+        let socket = socket.clone();
+        let payload = payload.clone();
+        let probe_seq = seq as u16;
+        let result = tokio::task::spawn_blocking(move || {
+            crate::net::linux_icmp::probe(&socket, ip, probe_seq, &payload, timeout, false)
+        })
+        .await;
+
+        let reply = match result {
+            Ok(Ok(reply)) => reply,
+            Ok(Err(e)) => {
+                return PingOutcome::Failed(ProbeFailure {
+                    message: format!("ICMP send/receive error: {e}"),
+                    privileged: e.kind() == io::ErrorKind::PermissionDenied,
+                });
+            }
+            Err(_) => {
+                return PingOutcome::Failed(ProbeFailure {
+                    message: "ICMP probe task panicked".into(),
+                    privileged: false,
+                });
+            }
+        };
+
+        match reply {
+            Some(reply) => handle.send(ProbeEvent::Latency(ProbeSample {
+                seq,
+                time: clock::now_string(),
+                rtt_ms: reply.rtt.as_secs_f64() * 1000.0,
+                ttl: reply.ttl,
+                from: reply.from.to_string(),
+                size: settings.common.packet_size + 8,
+            })),
+            None => handle.send(ProbeEvent::Timeout { seq }),
+        }
+
+        seq = seq.wrapping_add(1);
+        if handle
+            .sleep(Duration::from_millis(settings.common.interval_ms))
+            .await
+        {
+            return PingOutcome::Cancelled;
+        }
+    }
+}
+
+/// Probe a single address through surge-ping until cancelled or the socket
+/// fails. Used outside Linux and as a fallback when the datagram socket is not
+/// available.
+async fn ping_address_surge(
     handle: &ProbeHandle<ProbeEvent>,
     settings: &PingSettings,
     client: &Client,
@@ -205,7 +330,10 @@ fn ident() -> u16 {
 fn packet_meta(packet: &IcmpPacket) -> (Option<u8>, IpAddr) {
     match packet {
         IcmpPacket::V4(p) => (p.get_ttl(), IpAddr::V4(p.get_source())),
-        IcmpPacket::V6(p) => (Some(p.get_max_hop_limit()), IpAddr::V6(p.get_source())),
+        // surge-ping never populates the IPv6 hop limit, so report it as
+        // unavailable instead of a misleading zero. The Linux engine reads the
+        // real value from the socket control data.
+        IcmpPacket::V6(p) => (None, IpAddr::V6(p.get_source())),
     }
 }
 

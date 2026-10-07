@@ -28,11 +28,14 @@ privilege:
   ok: "权限: 可用"
   partial: "权限: 部分可用"
   limited: "权限: 受限"
-  icmp_ok: "ICMP 探测: 可用"
-  icmp_limited: "ICMP 探测: 无法创建套接字（需要提权）"
-  raw_ok: "原始套接字: 可用"
-  raw_limited: "原始套接字: 不可用（需要提权）"
+  icmp_ok: "ICMP ping / MTR: 可用"
+  icmp_limited: "ICMP ping / MTR: 不可用（需要提权）"
+  raw_ok: "UDP MTR / SYN 扫描: 可用"
+  raw_limited: "UDP MTR / SYN 扫描: 需要提权"
   copy_cmd: 复制命令
+  needs_icmp: "ICMP 探测无法创建套接字，请以提权方式运行："
+  needs_raw_udp_mtr: "UDP MTR 需要原始套接字，请以提权方式运行："
+  needs_raw_syn: "SYN 扫描需要原始套接字，请以提权方式运行："
 common:
   settings: 设置
   language: 语言

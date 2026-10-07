@@ -235,19 +235,30 @@ impl eframe::App for App {
         let history_revision = self.cfg.history.revision();
 
         egui::CentralPanel::default().show(ui, |ui| match self.tab {
-            Tab::Ping => self
-                .ping
-                .ui(ui, &mut self.cfg.ping, &mut self.cfg.history, &self.rt),
-            Tab::Mtr => self
-                .mtr
-                .ui(ui, &mut self.cfg.mtr, &mut self.cfg.history, &self.rt),
+            Tab::Ping => self.ping.ui(
+                ui,
+                &mut self.cfg.ping,
+                &mut self.cfg.history,
+                &self.rt,
+                &self.privilege,
+            ),
+            Tab::Mtr => self.mtr.ui(
+                ui,
+                &mut self.cfg.mtr,
+                &mut self.cfg.history,
+                &self.rt,
+                &self.privilege,
+            ),
             Tab::Http => self
                 .http
                 .ui(ui, &mut self.cfg.http, &mut self.cfg.history, &self.rt),
-            Tab::PortScan => {
-                self.portscan
-                    .ui(ui, &mut self.cfg.port_scan, &mut self.cfg.history, &self.rt)
-            }
+            Tab::PortScan => self.portscan.ui(
+                ui,
+                &mut self.cfg.port_scan,
+                &mut self.cfg.history,
+                &self.rt,
+                &self.privilege,
+            ),
             Tab::IpInsight => self.ip_insight.ui(
                 ui,
                 &mut self.cfg.ip_insight,

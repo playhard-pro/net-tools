@@ -3,10 +3,11 @@
 use eframe::egui;
 use net_tools_core::config::{InputHistory, PingSettings};
 use net_tools_core::control::TaskController;
-use net_tools_core::model::{ProbeEvent, ProbeSample};
+use net_tools_core::model::{ProbeEvent, ProbeMode, ProbeSample};
+use net_tools_core::net::privilege::PrivilegeStatus;
 use rust_i18n::t;
 
-use crate::ui::common::{error_banner, info_line, state_badge};
+use crate::ui::common::{error_banner, info_line, privilege_note, state_badge};
 use crate::ui::history_input;
 use crate::ui::result_table::table_fixed_rows;
 use crate::ui::settings;
@@ -164,6 +165,7 @@ impl PingTab {
         s: &mut PingSettings,
         history: &mut InputHistory,
         rt: &tokio::runtime::Handle,
+        privilege: &PrivilegeStatus,
     ) {
         self.drain();
         if self.ctrl.is_active() {
@@ -200,6 +202,12 @@ impl PingTab {
         if submit {
             history_input::record_fields(history, &[(TARGET_HISTORY_KEY, &s.common.target)]);
             self.restart(s, rt);
+        }
+
+        // ICMP ping needs an ICMP socket. On Linux that is normally available
+        // unprivileged, so this only shows on restricted hosts.
+        if s.mode == ProbeMode::Icmp {
+            privilege_note(ui, privilege.icmp, privilege, &t!("privilege.needs_icmp"));
         }
 
         // Control buttons and state.

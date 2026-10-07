@@ -28,11 +28,14 @@ privilege:
   ok: "privileges: OK"
   partial: "privileges: partial"
   limited: "privileges: limited"
-  icmp_ok: "ICMP probe: available"
-  icmp_limited: "ICMP probe: cannot open a socket (elevation required)"
-  raw_ok: "raw socket: available"
-  raw_limited: "raw socket: unavailable (elevation required)"
+  icmp_ok: "ICMP ping / MTR: available"
+  icmp_limited: "ICMP ping / MTR: unavailable (elevation required)"
+  raw_ok: "UDP MTR / SYN scan: available"
+  raw_limited: "UDP MTR / SYN scan: requires elevation"
   copy_cmd: copy cmd
+  needs_icmp: "ICMP probing needs a socket. Run with elevation:"
+  needs_raw_udp_mtr: "UDP MTR needs a raw socket. Run with elevation:"
+  needs_raw_syn: "SYN scan needs a raw socket. Run with elevation:"
 common:
   settings: Settings
   language: Language

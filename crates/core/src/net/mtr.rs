@@ -212,14 +212,140 @@ fn classify(packet: &IcmpPacket) -> (bool, IpAddr) {
     }
 }
 
+/// ICMP MTR dispatch: use the unprivileged Linux engine when its datagram
+/// socket is available, otherwise fall back to the raw surge-ping path.
 async fn mtr_icmp(handle: &ProbeHandle<ProbeEvent>, settings: &MtrSettings, ip: IpAddr) {
+    #[cfg(target_os = "linux")]
+    {
+        if crate::net::linux_icmp::can_open(ip) {
+            mtr_icmp_linux(handle, settings, ip).await;
+            return;
+        }
+    }
+    mtr_icmp_surge(handle, settings, ip).await;
+}
+
+/// ICMP MTR through the unprivileged Linux datagram socket.
+#[cfg(target_os = "linux")]
+async fn mtr_icmp_linux(handle: &ProbeHandle<ProbeEvent>, settings: &MtrSettings, ip: IpAddr) {
+    use crate::net::linux_icmp;
+
+    let max_hops = settings.max_hops.max(1);
+
+    // One socket per hop: the TTL is a per-socket setting and the kernel routes
+    // each hop's errors by the socket identifier it assigned.
+    let mut sockets = Vec::with_capacity(max_hops as usize);
+    for hop in 1..=max_hops {
+        match linux_icmp::open(ip, Some(hop as u32), true) {
+            Ok(socket) => sockets.push(Arc::new(socket)),
+            Err(e) => {
+                handle.send(ProbeEvent::Error {
+                    message: format!("failed to open ICMP socket: {e}"),
+                    hint: privilege::hint_for(e.kind() == std::io::ErrorKind::PermissionDenied),
+                });
+                return;
+            }
+        }
+    }
+
+    let payload = Arc::new(vec![0x6du8; settings.common.packet_size]);
+    let timeout = Duration::from_millis(settings.common.timeout_ms);
+    let interval = Duration::from_millis(settings.common.interval_ms);
+
+    let mut accums: Vec<HopAccum> = (1..=max_hops).map(HopAccum::new).collect();
+    let mut reverse: HashMap<IpAddr, Option<String>> = HashMap::new();
+    let mut target_hop: Option<u8> = None;
+    let mut seq: u16 = 0;
+
+    loop {
+        if handle.is_cancelled() {
+            return;
+        }
+        handle.wait_if_paused().await;
+        if handle.is_cancelled() {
+            return;
+        }
+
+        let active = target_hop.unwrap_or(max_hops);
+        let started = Instant::now();
+        let mut set = JoinSet::new();
+
+        for hop in 1..=active {
+            seq = seq.wrapping_add(1);
+            let socket = sockets[hop as usize - 1].clone();
+            let payload = payload.clone();
+            let probe_seq = seq;
+            set.spawn_blocking(move || {
+                let result = linux_icmp::probe(&socket, ip, probe_seq, &payload, timeout, true);
+                (hop, result)
+            });
+        }
+
+        let mut reached_hop: Option<u8> = None;
+        while let Some(joined) = set.join_next().await {
+            if handle.is_cancelled() {
+                return;
+            }
+            match joined {
+                Ok((hop, Ok(Some(reply)))) => {
+                    if reply.reached {
+                        reached_hop = Some(reached_hop.map_or(hop, |h| h.min(hop)));
+                    }
+                    accums[hop as usize - 1].record(HopProbe::reply(
+                        reply.reached,
+                        reply.from,
+                        reply.rtt,
+                    ));
+                }
+                Ok((hop, Ok(None))) => accums[hop as usize - 1].record(HopProbe::timeout()),
+                Ok((_hop, Err(e))) => {
+                    handle.send(ProbeEvent::Error {
+                        message: format!("ICMP error: {e}"),
+                        hint: privilege::hint_for(e.kind() == std::io::ErrorKind::PermissionDenied),
+                    });
+                    return;
+                }
+                Err(_) => {
+                    handle.send(ProbeEvent::Error {
+                        message: "ICMP probe task panicked".into(),
+                        hint: None,
+                    });
+                    return;
+                }
+            }
+        }
+
+        // Once the destination is reached, stop growing the path and only keep
+        // refreshing the hops up to it.
+        if let Some(hop) = reached_hop {
+            target_hop = Some(target_hop.map_or(hop, |t| t.min(hop)));
+        }
+        let active = target_hop.unwrap_or(max_hops) as usize;
+
+        if settings.common.reverse_dns {
+            resolve_reverse(&accums[..active], &mut reverse).await;
+        }
+        for acc in &accums[..active] {
+            handle.send(ProbeEvent::Hop(acc.stats(&reverse)));
+        }
+
+        let elapsed = started.elapsed();
+        if elapsed < interval && handle.sleep(interval - elapsed).await {
+            return;
+        }
+    }
+}
+
+/// ICMP MTR through a raw socket with surge-ping. Used outside Linux and as a
+/// fallback when the Linux datagram socket is unavailable.
+async fn mtr_icmp_surge(handle: &ProbeHandle<ProbeEvent>, settings: &MtrSettings, ip: IpAddr) {
     let max_hops = settings.max_hops.max(1);
 
     // One client per hop: surge-ping sets the TTL on the socket, so each hop
     // needs its own socket.
     let mut clients: Vec<Client> = Vec::with_capacity(max_hops as usize);
     for hop in 1..=max_hops {
-        match icmp::client_for(ip, Some(hop as u32)) {
+        match icmp::trace_client_for(ip, Some(hop as u32)) {
             Ok(c) => clients.push(c),
             Err(e) => {
                 handle.send(ProbeEvent::Error {
@@ -229,6 +355,19 @@ async fn mtr_icmp(handle: &ProbeHandle<ProbeEvent>, settings: &MtrSettings, ip: 
                 return;
             }
         }
+    }
+
+    // Reading the routers' ICMP time-exceeded messages requires a raw socket.
+    // surge-ping silently falls back to the ping datagram socket when raw is
+    // not permitted, and that socket hides the intermediate replies, so an
+    // unprivileged run would show a route with no hops. Fail loudly instead of
+    // producing an empty trace.
+    if clients[0].get_socket().get_type() != socket2::Type::RAW {
+        handle.send(ProbeEvent::Error {
+            message: "ICMP MTR requires a raw socket to see intermediate routers".into(),
+            hint: Some(privilege::guidance()),
+        });
+        return;
     }
 
     let payload = Arc::new(vec![0x6du8; settings.common.packet_size]);
@@ -458,7 +597,7 @@ fn udp_probe_v4(
     use socket2::{Domain, Protocol, SockAddr, Socket, Type};
 
     let udp = Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP)).ok()?;
-    udp.set_ttl(ttl).ok()?;
+    udp.set_ttl_v4(ttl).ok()?;
     let dst: std::net::SocketAddr = (target, port).into();
     udp.connect(&SockAddr::from(dst)).ok()?;
     let local_port = udp.local_addr().ok()?.as_socket_ipv4().map(|s| s.port())?;

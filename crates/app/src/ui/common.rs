@@ -2,6 +2,7 @@
 
 use eframe::egui;
 use net_tools_core::control::TaskState;
+use net_tools_core::net::privilege::PrivilegeStatus;
 use rust_i18n::t;
 
 /// Colored task-state badge.
@@ -19,6 +20,34 @@ pub fn state_badge(ui: &mut egui::Ui, state: TaskState) {
         .inner_margin(egui::Margin::symmetric(8, 3))
         .show(ui, |ui| {
             ui.colored_label(color, text);
+        });
+}
+
+/// Inline note for a mode whose capability is currently unavailable.
+///
+/// Renders nothing when `available` is true, so callers can show it
+/// unconditionally for the relevant mode. The copyable elevation command comes
+/// from the privilege status.
+pub fn privilege_note(ui: &mut egui::Ui, available: bool, status: &PrivilegeStatus, message: &str) {
+    if available {
+        return;
+    }
+    egui::Frame::new()
+        .fill(egui::Color32::from_rgb(64, 56, 12))
+        .corner_radius(4.0)
+        .inner_margin(egui::Margin::same(8))
+        .show(ui, |ui| {
+            ui.colored_label(egui::Color32::from_rgb(240, 205, 120), message);
+            if let Some(hint) = &status.hint {
+                ui.horizontal(|ui| {
+                    ui.label(
+                        egui::RichText::new(hint)
+                            .color(egui::Color32::from_rgb(255, 220, 170))
+                            .monospace(),
+                    );
+                    copy_button(ui, hint);
+                });
+            }
         });
 }
 

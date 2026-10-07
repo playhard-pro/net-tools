@@ -300,3 +300,32 @@ async fn udp_scan_closed_port() {
         "expected port {port} closed (ICMP unreachable), got {events:?}"
     );
 }
+
+/// On Linux the datagram ICMP engine reports the reply TTL without elevation.
+#[cfg(target_os = "linux")]
+#[tokio::test]
+async fn linux_icmp_ping_reports_ttl() {
+    let s = settings("127.0.0.1", 0);
+    let mut ctrl: TaskController<ProbeEvent> = TaskController::new();
+    ctrl.start(&tokio::runtime::Handle::current(), move |h| async move {
+        icmp::run_ping_icmp(&h, &s).await
+    });
+
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    ctrl.stop();
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    let events = ctrl.drain();
+
+    let ttls: Vec<Option<u8>> = events
+        .iter()
+        .filter_map(|e| match e {
+            ProbeEvent::Latency(sample) => Some(sample.ttl),
+            _ => None,
+        })
+        .collect();
+    assert!(!ttls.is_empty(), "expected a reply, got {events:?}");
+    assert!(
+        ttls.iter().all(|ttl| ttl.is_some()),
+        "expected a TTL on every Linux reply, got {ttls:?}"
+    );
+}

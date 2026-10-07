@@ -3,10 +3,11 @@
 use eframe::egui;
 use net_tools_core::config::{InputHistory, PortScanSettings};
 use net_tools_core::control::TaskController;
-use net_tools_core::model::{PortResult, PortState, ProbeEvent, ScanProgress};
+use net_tools_core::model::{PortResult, PortState, ProbeEvent, ScanMode, ScanProgress};
+use net_tools_core::net::privilege::PrivilegeStatus;
 use rust_i18n::t;
 
-use crate::ui::common::{error_banner, info_line, state_badge};
+use crate::ui::common::{error_banner, info_line, privilege_note, state_badge};
 use crate::ui::history_input;
 use crate::ui::result_table::table;
 use crate::ui::settings;
@@ -87,6 +88,7 @@ impl PortScanTab {
         s: &mut PortScanSettings,
         history: &mut InputHistory,
         rt: &tokio::runtime::Handle,
+        privilege: &PrivilegeStatus,
     ) {
         self.drain();
         if self.ctrl.is_active() {
@@ -167,6 +169,11 @@ impl PortScanTab {
                 ],
             );
             self.restart(s, rt);
+        }
+
+        // SYN scanning needs a raw socket and is Linux-only, so only warn there.
+        if s.mode == ScanMode::Syn && cfg!(target_os = "linux") {
+            privilege_note(ui, privilege.raw, privilege, &t!("privilege.needs_raw_syn"));
         }
 
         ui.horizontal(|ui| {
