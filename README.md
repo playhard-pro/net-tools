@@ -101,7 +101,7 @@ tooling.
 | Windows | arm64 | `net-tools_<version>_windows_arm64.zip` | Windows on ARM |
 | macOS | Apple Silicon (arm64) | `net-tools_<version>_macos_aarch64.dmg` | M-series Macs; Intel Macs are not built |
 
-`<version>` is the release version, for example `0.2.5`.
+`<version>` is the release version, for example `0.2.6`.
 
 How to check your architecture:
 
@@ -355,10 +355,10 @@ cargo build --release --target aarch64-apple-darwin -p net-tools
 To cut a release, bump the version and push a matching tag:
 
 ```bash
-scripts/bump_version.sh 0.2.5   # updates Cargo.toml, packager.toml, Cargo.lock
-git commit -am "Bump version to 0.2.5"
-git tag v0.2.5
-git push origin main v0.2.5
+scripts/bump_version.sh 0.2.6   # updates Cargo.toml, packager.toml, Cargo.lock
+git commit -am "Bump version to 0.2.6"
+git tag v0.2.6
+git push origin main v0.2.6
 ```
 
 The workspace `Cargo.toml` is the single source of truth for the version;
