@@ -101,7 +101,7 @@ tooling.
 | Windows | arm64 | `net-tools_<version>_windows_arm64.zip` | Windows on ARM |
 | macOS | Apple Silicon (arm64) | `net-tools_<version>_macos_aarch64.dmg` | M-series Macs; Intel Macs are not built |
 
-`<version>` is the release version, for example `0.2.4`.
+`<version>` is the release version, for example `0.2.5`.
 
 How to check your architecture:
 
