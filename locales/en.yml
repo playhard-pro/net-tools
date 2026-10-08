@@ -88,6 +88,7 @@ mtr:
   reverse: Reverse DNS
   loss: Loss
   count: Sent/Success/Lost
+  last_ms: Last (ms)
   avg_ms: Avg (ms)
   best_ms: Best (ms)
   worst_ms: Worst (ms)

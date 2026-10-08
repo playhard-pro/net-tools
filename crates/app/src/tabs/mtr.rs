@@ -168,6 +168,7 @@ impl MtrTab {
             t!("mtr.reverse"),
             t!("mtr.loss"),
             t!("mtr.count"),
+            t!("mtr.last_ms"),
             t!("mtr.avg_ms"),
             t!("mtr.best_ms"),
             t!("mtr.worst_ms"),
@@ -189,6 +190,9 @@ impl MtrTab {
             });
             row.col(|ui| {
                 ui.label(format!("{}/{}/{}", h.sent, h.success_count(), h.lost));
+            });
+            row.col(|ui| {
+                ui.label(h.last_ms.map_or("-".into(), |v| format!("{:.2}", v)));
             });
             row.col(|ui| {
                 ui.label(h.avg_ms.map_or("-".into(), |v| format!("{:.2}", v)));
@@ -264,10 +268,10 @@ impl MtrTab {
 
     pub fn to_csv(&self) -> String {
         let mut out =
-            String::from("hop,addr,reverse,loss,sent,success,lost,avg,best,worst,stdev\n");
+            String::from("hop,addr,reverse,loss,sent,success,lost,last,avg,best,worst,stdev\n");
         for h in &self.hops {
             out.push_str(&format!(
-                "{},{},{},{:.1}%,{},{},{},{},{},{},{}\n",
+                "{},{},{},{:.1}%,{},{},{},{},{},{},{},{}\n",
                 h.hop,
                 crate::ui::export::csv_field(&h.addr_text()),
                 crate::ui::export::csv_field(&h.reverse_text()),
@@ -275,6 +279,7 @@ impl MtrTab {
                 h.sent,
                 h.success_count(),
                 h.lost,
+                h.last_ms.map_or("-".into(), |v| format!("{:.2}", v)),
                 h.avg_ms.map_or("-".into(), |v| format!("{:.2}", v)),
                 h.best_ms.map_or("-".into(), |v| format!("{:.2}", v)),
                 h.worst_ms.map_or("-".into(), |v| format!("{:.2}", v)),
