@@ -10,8 +10,8 @@ long_description = "A cross-platform GUI for ping, MTR, HTTP ping and port scann
 homepage = "https://github.com/playhard-pro"
 authors = ["playhard.pro <rex@playhard.pro>"]
 category = "Utility"
-license_file = "LICENSE"
-resources = ["LICENSE", "THIRD_PARTY_LICENSES.md", "assets/fonts/LICENSE-wqy-microhei.txt", "assets/fonts/APACHE-2.0.txt"]
+license_file = "LICENSE-MIT"
+resources = ["LICENSE-MIT", "LICENSE-APACHE", "THIRD_PARTY_LICENSES.md", "assets/fonts/LICENSE-wqy-microhei.txt", "assets/fonts/APACHE-2.0.txt"]
 
 out_dir = "dist"
 binaries_dir = "target/release"

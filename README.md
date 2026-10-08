@@ -1,6 +1,6 @@
 # net-tools
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: MIT OR Apache-2.0](https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-blue.svg)](#license)
 
 A cross-platform (Windows / macOS / Linux) desktop network diagnostics tool built
 with Rust and egui. Each network feature lives in its own tab, and probes in
@@ -21,7 +21,7 @@ device performance testing.
    responsibility of the user. The project author accepts no liability for any
    loss or penalty caused by improper or illegal use of this tool.
 3. This project is provided "as is", without warranty of any kind; see the
-   project LICENSE (MIT).
+   project LICENSE (MIT OR Apache-2.0).
 4. If you do not accept this disclaimer, please do not use this project's code
    or programs.
 
@@ -423,5 +423,7 @@ with [cargo-about](https://github.com/EmbarkStudios/cargo-about).
 
 ## License
 
-net-tools is released under the MIT License — see [LICENSE](LICENSE). The
-bundled font remains under Apache-2.0 as described above.
+net-tools is released under the dual-license terms **MIT OR Apache-2.0**; you
+may use it under either license, at your option. See [LICENSE-MIT](LICENSE-MIT)
+and [LICENSE-APACHE](LICENSE-APACHE). The bundled font remains under Apache-2.0
+as described above.

@@ -5,7 +5,7 @@ members = ["crates/core", "crates/app"]
 [workspace.package]
 version = "0.2.5"
 edition = "2021"
-license = "MIT"
+license = "MIT OR Apache-2.0"
 publish = false
 authors = ["playhard.pro <rex@playhard.pro>"]
 homepage = "https://github.com/playhard-pro"

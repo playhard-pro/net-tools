@@ -45,7 +45,8 @@ Copy-Item -Force (Join-Path $root "target/release/net-tools.exe") `
     (Join-Path $staging "net-tools.exe")
 
 $licenseFiles = @(
-    "LICENSE",
+    "LICENSE-MIT",
+    "LICENSE-APACHE",
     "THIRD_PARTY_LICENSES.md",
     "assets/fonts/LICENSE-wqy-microhei.txt",
     "assets/fonts/APACHE-2.0.txt"

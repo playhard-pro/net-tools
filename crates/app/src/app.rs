@@ -27,6 +27,10 @@ const PROJECT_AUTHORS: &str = env!("CARGO_PKG_AUTHORS");
 /// Author homepage shown as a link in the About dialog.
 const PROJECT_HOMEPAGE: &str = env!("CARGO_PKG_HOMEPAGE");
 
+/// SPDX license expression shown in the About dialog. Taken from the manifest
+/// so the dialog and the published package metadata cannot drift apart.
+const PROJECT_LICENSE: &str = env!("CARGO_PKG_LICENSE");
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Tab {
     Ping,
@@ -180,7 +184,7 @@ impl App {
                     PROJECT_URL,
                 ));
             });
-            ui.label(format!("{} MIT", t!("about.license")));
+            ui.label(format!("{} {}", t!("about.license"), PROJECT_LICENSE));
             ui.add_space(8.0);
             ui.separator();
             if ui.button(t!("about.close")).clicked() {

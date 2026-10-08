@@ -144,5 +144,6 @@ Please include:
 ## License of contributions
 
 By submitting a contribution you agree that it is licensed under the project's
-[MIT License](LICENSE), and that you have the right to do so. Bundled third-party
-assets keep their own licenses (see the README "Third-party licenses" section).
+dual [MIT OR Apache-2.0](README.md#license) terms, and that you have the right
+to do so. Bundled third-party assets keep their own licenses (see the README
+"Third-party licenses" section).
