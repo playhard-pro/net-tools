@@ -3155,7 +3155,7 @@ Used by:
 
 - hyper-rustls 0.27.10 — https://github.com/rustls/hyper-rustls
 - rustls-native-certs 0.8.4 — https://github.com/rustls/rustls-native-certs
-- rustls 0.23.45 — https://github.com/rustls/rustls
+- rustls 0.23.46 — https://github.com/rustls/rustls
 
 ```text
 Copyright (c) 2016 Joseph Birr-Pixton <jpixton@gmail.com>
@@ -5166,10 +5166,10 @@ Used by:
 
 - zbus 5.19.0 — https://github.com/z-galaxy/zbus/
 - zbus_macros 5.19.0 — https://github.com/z-galaxy/zbus/
-- zbus_names 4.3.4 — https://github.com/z-galaxy/zbus/
+- zbus_names 4.3.5 — https://github.com/z-galaxy/zbus/
 - zbus_xml 5.2.1 — https://github.com/z-galaxy/zbus/
-- zvariant 5.15.0 — https://github.com/z-galaxy/zbus/
-- zvariant_derive 5.15.0 — https://github.com/z-galaxy/zbus/
+- zvariant 5.15.1 — https://github.com/z-galaxy/zbus/
+- zvariant_derive 5.15.1 — https://github.com/z-galaxy/zbus/
 
 ```text
 Copyright (c) 2024 Zeeshan Ali Khan & zbus contributors
