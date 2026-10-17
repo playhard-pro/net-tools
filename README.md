@@ -27,16 +27,16 @@ device performance testing.
 
 ## Features
 
-| Tab | Description | Probe modes |
-|-----|-------------|-------------|
-| Ping | Continuous probing with a live chart, loss rate and min/avg/max/jitter | ICMP, UDP |
-| MTR | Continuous hop-by-hop routing: all hops are probed in parallel and each is refreshed at the probe interval; multiple responders per hop are listed comma separated | ICMP, UDP |
-| HTTP Ping | Multi-method requests with per-stage timing (DNS/connect/TLS/TTFB/total) | GET/HEAD/POST/PUT/DELETE/OPTIONS/PATCH |
-| Port Scan | TCP connect / SYN half-open / UDP, with banner grabbing | — |
-| IP Insight | Query a target IP against several online geolocation APIs at once; each provider's JSON response is shown as its own table | — |
-| Lookup | Query a domain or IP address through RDAP; the registration data is shown as a fully expanded JSON tree, with jCard contact data parsed into readable fields and automatic fallback to the parent domain when a subdomain has no record | — |
-| DNS | dig-like queries for a chosen record type (optional custom server, UDP with TCP fallback), plus a full iterative trace from the root servers; results are shown as text | — |
-| NTP | SNTP query with a live analog clock, local and UTC time to milliseconds, and technical metrics such as stratum, offset, delay, root delay/dispersion, precision and reference ID; offers pinned presets and custom servers, and can update the system clock after confirmation (Windows requests UAC elevation automatically) | SNTP / UDP |
+| Tab | Description |
+|-----|-------------|
+| Ping | Continuous probing with a live chart, loss rate and min/avg/max/jitter |
+| MTR | Continuous hop-by-hop routing: all hops are probed in parallel and each is refreshed at the probe interval; multiple responders per hop are listed comma separated |
+| HTTP Ping | Multi-method requests with per-stage timing (DNS/connect/TLS/TTFB/total) |
+| Port Scan | TCP connect / SYN half-open / UDP, with banner grabbing |
+| IP Insight | Query a target IP against several online geolocation APIs at once; each provider's JSON response is shown as its own table |
+| Lookup | Query a domain or IP address through RDAP; the registration data is shown as a fully expanded JSON tree, with jCard contact data parsed into readable fields and automatic fallback to the parent domain when a subdomain has no record |
+| DNS | dig-like queries for a chosen record type (optional custom server, UDP with TCP fallback), plus a full iterative trace from the root servers; results are shown as text |
+| NTP | SNTP query with a live analog clock, local and UTC time to milliseconds, and technical metrics such as stratum, offset, delay, root delay/dispersion, precision and reference ID; offers pinned presets and custom servers, and can update the system clock after confirmation (Windows requests UAC elevation automatically) |
 
 Every feature provides **Start / Pause / Stop** controls. Pausing stops issuing
 new probes while keeping existing results; resuming continues.

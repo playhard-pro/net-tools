@@ -220,11 +220,6 @@ impl eframe::App for App {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         egui::Panel::top("top_bar").show(ui, |ui| {
             ui.horizontal(|ui| {
-                ui.add(egui::Hyperlink::from_label_and_url(
-                    egui::RichText::new(t!("app.title")).heading(),
-                    PROJECT_URL,
-                ));
-                ui.separator();
                 self.tab_button(ui, Tab::Ping, &t!("tab.ping"));
                 self.tab_button(ui, Tab::Mtr, &t!("tab.mtr"));
                 self.tab_button(ui, Tab::Http, &t!("tab.http"));
