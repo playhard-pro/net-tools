@@ -8,6 +8,7 @@ pub mod ip_insight;
 #[cfg(target_os = "linux")]
 pub(crate) mod linux_icmp;
 pub mod mtr;
+pub mod ntp;
 pub mod ports;
 pub mod portscan;
 pub mod privilege;

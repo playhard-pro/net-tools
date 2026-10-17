@@ -17,6 +17,7 @@ tokio.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 toml.workspace = true
+time.workspace = true
 eframe = { version = "0.36", default-features = false, features = ["accesskit", "default_fonts", "glow", "links", "wayland", "x11"] }
 egui_extras = "0.36.2"
 egui_plot = "0.37.0"

@@ -18,6 +18,7 @@ tab:
   ip_insight: IP Insight
   lookup: Lookup
   dns: DNS
+  ntp: NTP
 state:
   idle: idle
   running: running
@@ -47,6 +48,9 @@ common:
   history: History
   history_empty: No history yet
   clear_history: Clear history
+  presets: Presets
+  no_custom_history: No custom servers yet
+  cancel: Cancel
   copy: Copy
   copy_all: Copy all
   export: Export
@@ -132,3 +136,28 @@ dns:
   trace_mode: Full trace
   common_types: Common types
   output: Output
+ntp:
+  query: Query
+  set_time: Set time
+  set_time_disabled: Query a synchronized server first
+  querying: querying…
+  elevation_pending: waiting for administrator approval…
+  target_hint: "host or host:port; the presets are always available"
+  empty: Query an NTP server to show the live clock
+  local_time: Local time
+  system_time: System time
+  ntp_time: NTP time
+  delta: Difference
+  source: Source
+  confirm_title: Set the system clock?
+  confirm_warning: "The NTP response is not authenticated. Continue only if you trust this network and the selected server."
+  confirm_apply: Set time
+  time_set_ok: System time updated from the NTP result.
+  time_set_failed: The system time could not be updated.
+  leap_synchronized: synchronized
+  leap_add: leap second pending (add)
+  leap_delete: leap second pending (delete)
+  leap_unsynchronized: unsynchronized
+  metrics_line_one: "server %{server} · stratum %{stratum} · %{leap} · NTPv%{version}"
+  metrics_line_two: "offset %{offset} ms · delay %{delay} ms · root delay %{root_delay} ms · root dispersion %{root_dispersion} ms"
+  metrics_line_three: "precision %{precision} s · reference %{reference_id} · reference time %{reference_time} UTC · query %{elapsed} ms"

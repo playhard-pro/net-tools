@@ -26,6 +26,33 @@ pub fn singleline(
     history: &mut InputHistory,
     width: f32,
 ) -> bool {
+    singleline_impl(ui, key, &[], text, history, width)
+}
+
+/// Single-line text input whose drop-down always offers a fixed set of
+/// presets in addition to the editable history.
+///
+/// Presets are supplied by the caller and are never stored in the history, so
+/// clearing the history cannot remove them.
+pub fn singleline_with_presets(
+    ui: &mut egui::Ui,
+    key: &str,
+    presets: &[&str],
+    text: &mut String,
+    history: &mut InputHistory,
+    width: f32,
+) -> bool {
+    singleline_impl(ui, key, presets, text, history, width)
+}
+
+fn singleline_impl(
+    ui: &mut egui::Ui,
+    key: &str,
+    presets: &[&str],
+    text: &mut String,
+    history: &mut InputHistory,
+    width: f32,
+) -> bool {
     let mut submit = false;
     ui.horizontal(|ui| {
         let edit = ui.add(egui::TextEdit::singleline(text).desired_width(width));
@@ -34,7 +61,7 @@ pub fn singleline(
         if edit.lost_focus() {
             submit = ui.input(|i| i.key_pressed(egui::Key::Enter));
         }
-        history_button(ui, key, text, history);
+        history_button(ui, key, presets, text, history);
     });
     submit
 }
@@ -54,7 +81,7 @@ pub fn multiline(
                 .desired_rows(rows)
                 .desired_width(width),
         );
-        history_button(ui, key, text, history);
+        history_button(ui, key, &[], text, history);
     });
 }
 
@@ -66,8 +93,15 @@ pub fn record_fields(history: &mut InputHistory, fields: &[(&str, &str)]) {
     }
 }
 
-/// Drop-down toggle button anchored to the pop-up that lists the history.
-fn history_button(ui: &mut egui::Ui, key: &str, text: &mut String, history: &mut InputHistory) {
+/// Drop-down toggle button anchored to the pop-up that lists the presets and
+/// the history.
+fn history_button(
+    ui: &mut egui::Ui,
+    key: &str,
+    presets: &[&str],
+    text: &mut String,
+    history: &mut InputHistory,
+) {
     // Scope the auto-generated ids by field key so multiple buttons never
     // collide and the open state stays attached to the right field.
     ui.push_id(("history", key), |ui| {
@@ -77,26 +111,57 @@ fn history_button(ui: &mut egui::Ui, key: &str, text: &mut String, history: &mut
             // closed explicitly when an entry is picked or cleared.
             .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
             .width(POPUP_WIDTH)
-            .show(|ui| history_menu(ui, key, text, history));
+            .show(|ui| history_menu(ui, key, presets, text, history));
     });
 }
 
 /// Contents of the history pop-up for one field.
-fn history_menu(ui: &mut egui::Ui, key: &str, text: &mut String, history: &mut InputHistory) {
+fn history_menu(
+    ui: &mut egui::Ui,
+    key: &str,
+    presets: &[&str],
+    text: &mut String,
+    history: &mut InputHistory,
+) {
+    // Presets are pinned entries: they are always shown and have no delete
+    // action, so they can never be removed from the list.
+    if !presets.is_empty() {
+        ui.weak(t!("common.presets"));
+        for preset in presets {
+            if ui.selectable_label(text == preset, *preset).clicked() {
+                *text = (*preset).to_string();
+                ui.close();
+            }
+        }
+        ui.separator();
+    }
+
     // Work on a snapshot so the list stays readable while the delete button
-    // mutates the stored history.
-    let entries = history.entries(key).to_vec();
+    // mutates the stored history. Presets are filtered out even if an older
+    // configuration recorded one of them.
+    let entries: Vec<(usize, String)> = history
+        .entries(key)
+        .iter()
+        .enumerate()
+        .filter(|(_, entry)| !presets.contains(&entry.as_str()))
+        .map(|(index, entry)| (index, entry.clone()))
+        .collect();
     if entries.is_empty() {
-        ui.weak(t!("common.history_empty"));
+        if presets.is_empty() {
+            ui.weak(t!("common.history_empty"));
+        } else {
+            ui.weak(t!("common.no_custom_history"));
+        }
         return;
     }
 
+    ui.weak(t!("common.history"));
     let mut remove = None;
     egui::ScrollArea::vertical()
         .max_height(POPUP_MAX_HEIGHT)
         .show(ui, |ui| {
             ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Truncate);
-            for (index, entry) in entries.iter().enumerate() {
+            for (index, entry) in entries {
                 ui.horizontal(|ui| {
                     let delete_width = ui.spacing().interact_size.y;
                     let label_width =
@@ -104,7 +169,7 @@ fn history_menu(ui: &mut egui::Ui, key: &str, text: &mut String, history: &mut I
                             .max(40.0);
                     let label = ui.add_sized(
                         [label_width, ui.spacing().interact_size.y],
-                        egui::Button::selectable(false, display_value(entry)),
+                        egui::Button::selectable(false, display_value(&entry)),
                     );
                     if label.clicked() {
                         *text = entry.clone();

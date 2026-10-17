@@ -17,6 +17,12 @@ use eframe::egui;
 i18n!("../../locales", fallback = "en");
 
 fn main() -> eframe::Result {
+    // An elevated helper only writes the system clock and exits without opening
+    // the UI. Normal launches fall through to the application below.
+    if let Some(code) = net_tools_core::system_time::handle_elevation_request() {
+        std::process::exit(code);
+    }
+
     // Logging.
     let filter = tracing_subscriber::EnvFilter::try_from_default_env()
         .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));

@@ -76,7 +76,8 @@ pub fn hint_for(permission_denied: bool) -> Option<String> {
 pub fn guidance() -> String {
     #[cfg(target_os = "linux")]
     {
-        "sudo setcap cap_net_raw+ep \"$(readlink -f \"$(which net-tools)\")\"".to_string()
+        "sudo setcap cap_net_raw,cap_sys_time+ep \"$(readlink -f \"$(which net-tools)\")\""
+            .to_string()
     }
     #[cfg(target_os = "macos")]
     {

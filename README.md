@@ -36,21 +36,35 @@ device performance testing.
 | IP Insight | Query a target IP against several online geolocation APIs at once; each provider's JSON response is shown as its own table | — |
 | Lookup | Query a domain or IP address through RDAP; the registration data is shown as a fully expanded JSON tree, with jCard contact data parsed into readable fields and automatic fallback to the parent domain when a subdomain has no record | — |
 | DNS | dig-like queries for a chosen record type (optional custom server, UDP with TCP fallback), plus a full iterative trace from the root servers; results are shown as text | — |
-
-### Common settings
-
-- Target (host name or IP address)
-- IPv4 / IPv6 / auto resolution
-- Timeout
-- Probe interval
-- Packet size
-- PTR reverse lookup (whether to resolve the domain name for an IP)
+| NTP | SNTP query with a live analog clock, local and UTC time to milliseconds, and technical metrics such as stratum, offset, delay, root delay/dispersion, precision and reference ID; offers pinned presets and custom servers, and can update the system clock after confirmation (Windows requests UAC elevation automatically) | SNTP / UDP |
 
 Every feature provides **Start / Pause / Stop** controls. Pausing stops issuing
 new probes while keeping existing results; resuming continues.
 
 Pressing **Enter** in a target input stops the running task and immediately
 starts a new one with the edited target.
+
+### NTP and system time
+
+- The target drop-down always lists the built-in NTP servers; these presets
+  cannot be removed or cleared. Custom servers are remembered separately and
+  can be deleted from the history.
+- A query sends one SNTP request and retries once automatically after a
+  failure. The live clock then runs from a monotonic anchor, so it keeps
+  ticking without querying the server again.
+- The centered result view shows an analog local-time clock, the local and UTC
+  time to milliseconds, and the server metrics underneath. Switching to another
+  tab clears the result and stops the clock repaint loop.
+- **Set time** writes the current NTP result to the operating system clock only
+  after a confirmation dialog. It requires elevated privileges on every
+  platform: root or `CAP_SYS_TIME` on Linux, `sudo` on macOS, and an
+  administrator token on Windows. On Windows the application requests UAC
+  approval automatically and uses an elevated helper instance to query the
+  selected server again and apply the fresh result, so the main window does not
+  need to be restarted and the applied time is not delayed by the approval
+  prompt.
+- SNTP responses are not authenticated. Only use **Set time** on a network and
+  server you trust; the confirmation dialog warns about this as well.
 
 ### Other
 
@@ -77,9 +91,9 @@ starts a new one with the edited target.
 |------------|--------|
 | ![IP Insight tab](screenshots/ip.png) | ![Lookup tab](screenshots/lookup.png) |
 
-| DNS |
-|-----|
-| ![DNS tab](screenshots/dns.png) |
+| DNS | NTP |
+|-----|-----|
+| ![DNS tab](screenshots/dns.png) | ![NTP tab](screenshots/ntp.png) |
 
 ## Download and run
 
@@ -190,12 +204,15 @@ ICMP, SYN scan, UDP MTR) show a clear message with guidance when unavailable:
 
 ### Granting privileges
 
-- **Linux**: prefer granting only the raw-socket capability instead of running as
-  root:
+- **Linux**: prefer granting only the raw-socket and clock capabilities instead
+  of running as root:
 
   ```bash
-  sudo setcap cap_net_raw+ep "$(readlink -f "$(which net-tools)")"
+  sudo setcap cap_net_raw,cap_sys_time+ep "$(readlink -f "$(which net-tools)")"
   ```
+
+  `cap_sys_time` is only needed by the NTP tab's **Set time** action; the
+  network probes need `cap_net_raw`.
 
   or simply `sudo ./net-tools`.
 - **macOS**: `sudo ./net-tools`.

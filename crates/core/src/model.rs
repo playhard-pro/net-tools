@@ -351,6 +351,36 @@ impl LookupResult {
     }
 }
 
+/// Result of a single NTP query.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NtpResult {
+    /// Target server as entered by the user.
+    pub target: String,
+    /// Resolved server address including the port.
+    pub server_addr: String,
+    pub stratum: u8,
+    /// Leap indicator field (0 = synchronized, 3 = unsynchronized).
+    pub leap: u8,
+    pub version: u8,
+    pub mode: u8,
+    /// log2 of the server clock precision in seconds.
+    pub precision: i8,
+    pub root_delay_ms: f64,
+    pub root_dispersion_ms: f64,
+    pub reference_id: String,
+    /// Reference timestamp formatted as UTC.
+    pub reference_time: String,
+    /// Estimated server-minus-local clock offset in milliseconds.
+    pub offset_ms: f64,
+    /// Round-trip delay in milliseconds.
+    pub delay_ms: f64,
+    /// Estimated server Unix time at the moment the response was received.
+    /// The UI adds elapsed monotonic time to keep the clock running.
+    pub server_time_unix: f64,
+    /// Time spent on the request in milliseconds.
+    pub elapsed_ms: f64,
+}
+
 /// Unified event streamed from a probe task back to the UI.
 #[derive(Debug, Clone)]
 pub enum ProbeEvent {
@@ -379,6 +409,8 @@ pub enum ProbeEvent {
     Lookup(LookupResult),
     /// A block of text emitted by the DNS query / trace task.
     DnsText(String),
+    /// An NTP query result.
+    Ntp(NtpResult),
     /// The task finished naturally.
     Finished,
 }

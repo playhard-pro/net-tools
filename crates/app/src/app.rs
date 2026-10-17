@@ -10,6 +10,7 @@ use crate::tabs::http_ping::HttpPingTab;
 use crate::tabs::ip_insight::IpInsightTab;
 use crate::tabs::lookup::LookupTab;
 use crate::tabs::mtr::MtrTab;
+use crate::tabs::ntp::NtpTab;
 use crate::tabs::ping::PingTab;
 use crate::tabs::port_scan::PortScanTab;
 
@@ -40,6 +41,7 @@ pub enum Tab {
     IpInsight,
     Lookup,
     Dns,
+    Ntp,
 }
 
 pub struct App {
@@ -53,6 +55,7 @@ pub struct App {
     pub ip_insight: IpInsightTab,
     pub lookup: LookupTab,
     pub dns: DnsTab,
+    pub ntp: NtpTab,
     pub privilege: PrivilegeStatus,
     /// Whether the About dialog is currently open.
     pub show_about: bool,
@@ -74,6 +77,7 @@ impl App {
             ip_insight: IpInsightTab::new(),
             lookup: LookupTab::new(),
             dns: DnsTab::new(),
+            ntp: NtpTab::new(),
             privilege: net_tools_core::net::privilege::probe(),
             show_about: false,
         }
@@ -82,6 +86,12 @@ impl App {
     fn tab_button(&mut self, ui: &mut egui::Ui, tab: Tab, label: &str) {
         let selected = self.tab == tab;
         if ui.selectable_label(selected, label).clicked() {
+            // Leaving the NTP tab drops its live result and stops a query that
+            // is still running, so the clock does not keep repainting and no
+            // pointless probe continues in the background.
+            if self.tab == Tab::Ntp && tab != Tab::Ntp {
+                self.ntp.clear_on_hide();
+            }
             self.tab = tab;
         }
     }
@@ -222,6 +232,7 @@ impl eframe::App for App {
                 self.tab_button(ui, Tab::IpInsight, &t!("tab.ip_insight"));
                 self.tab_button(ui, Tab::Lookup, &t!("tab.lookup"));
                 self.tab_button(ui, Tab::Dns, &t!("tab.dns"));
+                self.tab_button(ui, Tab::Ntp, &t!("tab.ntp"));
                 ui.separator();
                 ui.label(t!("common.language"));
                 self.language_selector(ui);
@@ -276,6 +287,9 @@ impl eframe::App for App {
             Tab::Dns => self
                 .dns
                 .ui(ui, &mut self.cfg.dns, &mut self.cfg.history, &self.rt),
+            Tab::Ntp => self
+                .ntp
+                .ui(ui, &mut self.cfg.ntp, &mut self.cfg.history, &self.rt),
         });
 
         if self.cfg.history.revision() != history_revision {

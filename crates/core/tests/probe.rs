@@ -336,3 +336,149 @@ async fn linux_icmp_ping_reports_ttl() {
         "expected a TTL on every Linux reply, got {ttls:?}"
     );
 }
+
+// ---------------------------------------------------------------------------
+// NTP
+// ---------------------------------------------------------------------------
+
+use std::time::{SystemTime, UNIX_EPOCH};
+
+use net_tools_core::config::NtpSettings;
+use net_tools_core::net::ntp::{NtpPacket, NtpTimestamp};
+
+/// Build a minimal valid server response for the request contained in `buf`.
+fn ntp_response(buf: &[u8]) -> Vec<u8> {
+    let request = NtpPacket::parse(buf).expect("client request is too short");
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs_f64();
+    let t3 = NtpTimestamp::from_unix_seconds(now);
+    let t2 = t3;
+    let mut packet = [0u8; 48];
+    // Leap 0, version 4, mode 4 (server).
+    packet[0] = 0x24;
+    packet[1] = 2;
+    packet[3] = 0xEC;
+    packet[12..16].copy_from_slice(b"LOCL");
+    packet[16..24].copy_from_slice(&t3.to_bytes());
+    packet[24..32].copy_from_slice(&request.transmit_timestamp.to_bytes());
+    packet[32..40].copy_from_slice(&t2.to_bytes());
+    packet[40..48].copy_from_slice(&t3.to_bytes());
+    packet.to_vec()
+}
+
+/// Wait until the controller has no active task anymore, then return its events.
+async fn wait_and_drain(ctrl: &mut TaskController<ProbeEvent>) -> Vec<ProbeEvent> {
+    for _ in 0..100 {
+        tokio::time::sleep(Duration::from_millis(20)).await;
+        if !ctrl.is_active() {
+            break;
+        }
+    }
+    ctrl.drain()
+}
+
+#[tokio::test]
+async fn ntp_query_loopback() {
+    let server = tokio::net::UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    let addr = server.local_addr().unwrap();
+    let srv = tokio::spawn(async move {
+        let mut buf = [0u8; 1024];
+        if let Ok((n, peer)) = server.recv_from(&mut buf).await {
+            let response = ntp_response(&buf[..n]);
+            let _ = server.send_to(&response, peer).await;
+        }
+    });
+
+    let settings = NtpSettings {
+        target: format!("127.0.0.1:{}", addr.port()),
+        timeout_ms: 300,
+    };
+    let mut ctrl: TaskController<ProbeEvent> = TaskController::new();
+    ctrl.start(&tokio::runtime::Handle::current(), move |h| async move {
+        net_tools_core::net::ntp::run_query(&h, &settings).await
+    });
+
+    let events = wait_and_drain(&mut ctrl).await;
+    let result = events
+        .iter()
+        .find_map(|e| match e {
+            ProbeEvent::Ntp(r) => Some(r),
+            _ => None,
+        })
+        .unwrap_or_else(|| panic!("expected an NTP result, got {events:?}"));
+    assert_eq!(result.stratum, 2);
+    assert!(result.server_time_unix > 0.0);
+    assert!(result.delay_ms >= 0.0);
+    srv.abort();
+}
+
+#[tokio::test]
+async fn ntp_query_retries_once_then_succeeds() {
+    let server = tokio::net::UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    let addr = server.local_addr().unwrap();
+    let srv = tokio::spawn(async move {
+        let mut buf = [0u8; 1024];
+        // Ignore the first request, answer the retry.
+        let _ = server.recv_from(&mut buf).await;
+        if let Ok((n, peer)) = server.recv_from(&mut buf).await {
+            let response = ntp_response(&buf[..n]);
+            let _ = server.send_to(&response, peer).await;
+        }
+    });
+
+    let settings = NtpSettings {
+        target: format!("127.0.0.1:{}", addr.port()),
+        timeout_ms: 100,
+    };
+    let mut ctrl: TaskController<ProbeEvent> = TaskController::new();
+    ctrl.start(&tokio::runtime::Handle::current(), move |h| async move {
+        net_tools_core::net::ntp::run_query(&h, &settings).await
+    });
+
+    let events = wait_and_drain(&mut ctrl).await;
+    assert!(
+        events.iter().any(|e| matches!(e, ProbeEvent::Ntp(_))),
+        "expected the retry to succeed, got {events:?}"
+    );
+    assert!(
+        !events.iter().any(|e| matches!(e, ProbeEvent::Error { .. })),
+        "no error should be reported after a successful retry, got {events:?}"
+    );
+    srv.abort();
+}
+
+#[tokio::test]
+async fn ntp_query_reports_error_after_both_attempts() {
+    let server = tokio::net::UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    let addr = server.local_addr().unwrap();
+    let srv = tokio::spawn(async move {
+        // Consume both requests without answering.
+        let mut buf = [0u8; 1024];
+        let _ = server.recv_from(&mut buf).await;
+        let _ = server.recv_from(&mut buf).await;
+    });
+
+    let settings = NtpSettings {
+        target: format!("127.0.0.1:{}", addr.port()),
+        timeout_ms: 100,
+    };
+    let mut ctrl: TaskController<ProbeEvent> = TaskController::new();
+    ctrl.start(&tokio::runtime::Handle::current(), move |h| async move {
+        net_tools_core::net::ntp::run_query(&h, &settings).await
+    });
+
+    let events = wait_and_drain(&mut ctrl).await;
+    assert!(
+        events.iter().any(
+            |e| matches!(e, ProbeEvent::Error { message, .. } if message.contains("did not answer"))
+        ),
+        "expected a timeout error after both attempts, got {events:?}"
+    );
+    assert!(
+        !events.iter().any(|e| matches!(e, ProbeEvent::Ntp(_))),
+        "expected no result, got {events:?}"
+    );
+    srv.abort();
+}

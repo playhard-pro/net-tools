@@ -18,6 +18,7 @@ tab:
   ip_insight: IP 洞察
   lookup: 注册查询
   dns: DNS
+  ntp: NTP
 state:
   idle: 空闲
   running: 运行中
@@ -47,6 +48,9 @@ common:
   history: 历史记录
   history_empty: 暂无历史记录
   clear_history: 清空历史
+  presets: 预置
+  no_custom_history: 暂无自定义服务器
+  cancel: 取消
   copy: 复制
   copy_all: 复制全部
   export: 导出
@@ -132,3 +136,28 @@ dns:
   trace_mode: 完整跟踪
   common_types: 常用类型
   output: 输出
+ntp:
+  query: 查询
+  set_time: 校时
+  set_time_disabled: 请先查询一个已同步的服务器
+  querying: 查询中…
+  elevation_pending: 等待管理员授权…
+  target_hint: "支持域名或域名:端口；预置服务器始终可用"
+  empty: 查询 NTP 服务器后显示动态时钟
+  local_time: 本地时间
+  system_time: 系统时间
+  ntp_time: NTP 时间
+  delta: 时间偏差
+  source: 时间来源
+  confirm_title: 确认修改系统时间？
+  confirm_warning: "NTP 响应未经过认证。仅在你信任当前网络和服务器时才继续。"
+  confirm_apply: 确认校时
+  time_set_ok: 已根据 NTP 结果更新系统时间。
+  time_set_failed: 无法更新系统时间。
+  leap_synchronized: 已同步
+  leap_add: 待插入闰秒
+  leap_delete: 待删除闰秒
+  leap_unsynchronized: 未同步
+  metrics_line_one: "服务器 %{server} · 层级 %{stratum} · %{leap} · NTPv%{version}"
+  metrics_line_two: "偏差 %{offset} 毫秒 · 延迟 %{delay} 毫秒 · 根延迟 %{root_delay} 毫秒 · 根色散 %{root_dispersion} 毫秒"
+  metrics_line_three: "精度 %{precision} 秒 · 参考标识 %{reference_id} · 参考时间 %{reference_time} UTC · 查询耗时 %{elapsed} 毫秒"

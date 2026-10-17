@@ -215,6 +215,24 @@ impl Default for DnsSettings {
     }
 }
 
+/// Settings for the NTP tab: a single SNTP query against a chosen server.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NtpSettings {
+    /// NTP server host name or address, optionally with a port.
+    pub target: String,
+    /// Timeout for one query attempt, in milliseconds.
+    pub timeout_ms: u64,
+}
+
+impl Default for NtpSettings {
+    fn default() -> Self {
+        Self {
+            target: "time.cloudflare.com".into(),
+            timeout_ms: 3000,
+        }
+    }
+}
+
 /// Recently entered values for the editable text inputs, keyed by a stable
 /// field id such as `ping.target`. Values are stored most recent first.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -299,6 +317,9 @@ pub struct AppConfig {
     /// Added after the first release, so older config files still load.
     #[serde(default)]
     pub dns: DnsSettings,
+    /// Added after the first release, so older config files still load.
+    #[serde(default)]
+    pub ntp: NtpSettings,
 }
 
 impl Default for AppConfig {
@@ -313,6 +334,7 @@ impl Default for AppConfig {
             lookup: LookupSettings::default(),
             history: InputHistory::default(),
             dns: DnsSettings::default(),
+            ntp: NtpSettings::default(),
         }
     }
 }
@@ -339,6 +361,8 @@ mod tests {
         );
         assert_eq!(back.dns.record_type, cfg.dns.record_type);
         assert_eq!(back.dns.force_tcp, cfg.dns.force_tcp);
+        assert_eq!(back.ntp.target, cfg.ntp.target);
+        assert_eq!(back.ntp.timeout_ms, cfg.ntp.timeout_ms);
     }
 
     #[test]
@@ -386,5 +410,8 @@ mod tests {
         let lk = LookupSettings::default();
         assert!(!lk.target.is_empty());
         assert!(lk.timeout_ms > 0);
+        let ntp = NtpSettings::default();
+        assert!(!ntp.target.is_empty());
+        assert!(ntp.timeout_ms > 0);
     }
 }
