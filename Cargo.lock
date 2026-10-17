@@ -2521,7 +2521,7 @@ dependencies = [
 
 [[package]]
 name = "net-tools"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "anyhow",
  "clap",
@@ -2544,7 +2544,7 @@ dependencies = [
 
 [[package]]
 name = "net-tools-core"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "anyhow",
  "hickory-proto",
