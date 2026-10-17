@@ -10,7 +10,16 @@ all-features = true
 [advisories]
 # Advisory database (RustSec) is fetched from the default URL.
 # Add IDs here (with a reason) if an advisory must be temporarily ignored.
-ignore = []
+ignore = [
+    # The zbus 5 split crates are unmaintained; the functionality moved into
+    # zbus 6. They are pulled in transitively by the Linux accessibility stack
+    # (accesskit/atspi) and there is no safe upgrade yet. These are maintenance
+    # notices, not known vulnerabilities; remove once accesskit ships a zbus 6
+    # based release.
+    { id = "RUSTSEC-2026-0370", reason = "zvariant is only used by the Linux accessibility stack; no fixed release is available yet" },
+    { id = "RUSTSEC-2026-0371", reason = "zbus_names is only used by the Linux accessibility stack; no fixed release is available yet" },
+    { id = "RUSTSEC-2026-0372", reason = "zvariant_derive is only used by the Linux accessibility stack; no fixed release is available yet" },
+]
 
 [licenses]
 # Licenses accepted for all crates. Keep this list explicit and minimal.
