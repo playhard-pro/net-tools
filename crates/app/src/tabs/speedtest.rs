@@ -318,17 +318,6 @@ impl SpeedtestTab {
                 SpeedtestTool::Iperf3Server,
                 t!("speedtest.iperf3_server"),
             );
-            // Show both task states so a background test in the other sub-tool
-            // is not hidden by the switch.
-            ui.separator();
-            state_badge(ui, self.librespeed_ctrl.state);
-            if self.librespeed_ctrl.is_active() {
-                ui.spinner();
-            }
-            state_badge(ui, self.iperf3_ctrl.state);
-            if self.iperf3_ctrl.is_active() {
-                ui.spinner();
-            }
         });
     }
 
