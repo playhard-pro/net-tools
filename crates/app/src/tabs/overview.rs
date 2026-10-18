@@ -34,6 +34,9 @@ const PENDING_REPAINT: Duration = Duration::from_millis(200);
 /// Character budget for the interface name in the collapsed row.
 const INTERFACE_NAME_PREVIEW_CHARS: usize = 16;
 
+/// Minimum width for the label column in the public egress details grid.
+const PUBLIC_IP_LABEL_COLUMN_WIDTH: f32 = 104.0;
+
 /// Maximum initial body height of the route table, expressed in visible rows.
 const ROUTE_VISIBLE_ROWS: usize = 14;
 
@@ -909,6 +912,7 @@ fn public_ip_card(ui: &mut egui::Ui, family: &str, entry: Option<&PublicIp>) {
                 ui.add_space(4.0);
                 egui::Grid::new(format!("overview_public_ip_{family}"))
                     .num_columns(2)
+                    .min_col_width(PUBLIC_IP_LABEL_COLUMN_WIDTH)
                     .spacing([8.0, 2.0])
                     .show(ui, |ui| {
                         for (label, value) in rows {
