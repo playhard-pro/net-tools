@@ -415,9 +415,7 @@ impl OverviewTab {
                     dns_section(&mut columns[0], snapshot);
                     self.public_egress_ui(&mut columns[0], rt);
                     section_heading(&mut columns[0], &t!("overview.routes"));
-                    egui::ScrollArea::horizontal()
-                        .id_salt("overview_routes_hscroll")
-                        .show(&mut columns[0], |ui| routes_table(ui, snapshot));
+                    routes_table(&mut columns[0], snapshot);
 
                     // Second column: live rates followed by the interfaces.
                     self.rates_ui(&mut columns[1], snapshot, true);
@@ -1242,6 +1240,66 @@ fn csv_row(out: &mut String, section: &str, item: &str, key: &str, value: &str) 
 mod tests {
     use super::*;
     use net_tools_core::net::overview::InterfaceCounters;
+
+    #[test]
+    fn ui_handles_narrow_and_wide_windows() {
+        use net_tools_core::net::overview::{DefaultGateway, NetworkRoute};
+
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let mut tab = OverviewTab::new();
+        tab.snapshot = Some(NetworkSnapshot {
+            captured_at: "now".into(),
+            interfaces: vec![NetworkInterface {
+                name: "a-very-long-interface-name-for-layout".into(),
+                mac: Some("00:11:22:33:44:55".into()),
+                ipv4: vec!["192.0.2.10/24".into()],
+                ipv6: vec!["2001:db8::1/64".into()],
+                mtu: Some(1500),
+                link_speed_bps: Some(1_000_000_000),
+                up: true,
+                counters: InterfaceCounters::default(),
+            }],
+            default_gateways: vec![DefaultGateway {
+                family: "IPv4".into(),
+                gateway: "192.0.2.1".into(),
+                interface: "a-very-long-interface-name-for-layout".into(),
+                metric: Some(1),
+            }],
+            dns_servers: vec!["1.1.1.1".into()],
+            routes: vec![NetworkRoute {
+                family: "IPv4".into(),
+                destination: "default".into(),
+                gateway: "192.0.2.1".into(),
+                interface: "a-very-long-interface-name-for-layout".into(),
+                metric: Some(1),
+            }],
+        });
+        tab.public_egress = Some(PublicEgress::default());
+        tab.selected_interface = Some(ALL_INTERFACES.to_string());
+
+        for width in [1.0, 120.0, 320.0, 960.0, 1400.0] {
+            let ctx = egui::Context::default();
+            for _ in 0..4 {
+                let input = egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::pos2(0.0, 0.0),
+                        egui::vec2(width, 700.0),
+                    )),
+                    ..Default::default()
+                };
+                ctx.run_ui(input, |ui| {
+                    egui::CentralPanel::default().show(ui, |ui| {
+                        tab.ui(ui, runtime.handle(), true);
+                    });
+                })
+                .textures_delta
+                .clear();
+            }
+        }
+    }
 
     #[test]
     fn rate_point_divides_counter_delta_by_elapsed_time() {

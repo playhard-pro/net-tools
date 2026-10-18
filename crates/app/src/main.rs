@@ -17,6 +17,22 @@ use eframe::egui;
 // i18n: load all locale files under locales/ at compile time (must be invoked at the crate root).
 i18n!("../../locales", fallback = "en");
 
+/// Prefer Xwayland inside WSLg.
+///
+/// The WSLg Wayland compositor uses a software GL path and can terminate while
+/// an OpenGL window is being resized. WSLg always provides Xwayland as well, so
+/// the X11 backend is the safer choice there. Other Wayland sessions keep their
+/// native backend.
+#[cfg(target_os = "linux")]
+fn prefer_x11_on_wslg() {
+    if std::path::Path::new("/mnt/wslg").exists() && std::env::var_os("DISPLAY").is_some() {
+        std::env::remove_var("WAYLAND_DISPLAY");
+    }
+}
+
+#[cfg(not(target_os = "linux"))]
+fn prefer_x11_on_wslg() {}
+
 fn main() -> eframe::Result {
     // The speed test runs iperf3 in a hidden child process of this same
     // executable so that its live JSON event stream can be consumed by the UI.
@@ -29,6 +45,8 @@ fn main() -> eframe::Result {
     if let Some(code) = net_tools_core::system_time::handle_elevation_request() {
         std::process::exit(code);
     }
+
+    prefer_x11_on_wslg();
 
     // Logging.
     let filter = tracing_subscriber::EnvFilter::try_from_default_env()

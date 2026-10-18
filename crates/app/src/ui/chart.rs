@@ -51,7 +51,7 @@ pub fn throughput_chart(
         .fold(1.0_f64, f64::max)
         .max(1.0);
     let palette = Palette::from_ui(ui);
-    let width = ui.available_width();
+    let width = ui.available_width().max(1.0);
 
     Plot::new(id)
         .width(width)
@@ -97,7 +97,7 @@ pub fn network_rate_chart(
         .fold(1.0_f64, f64::max)
         .max(1.0);
     let palette = Palette::from_ui(ui);
-    let width = ui.available_width();
+    let width = ui.available_width().max(1.0);
 
     Plot::new(id)
         .width(width)
