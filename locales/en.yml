@@ -16,6 +16,7 @@ theme:
   dark: Dark
 
 tab:
+  overview: Overview
   ping: Ping
   mtr: MTR
   http: HTTP Ping
@@ -169,6 +170,58 @@ ntp:
   metrics_line_one: "server %{server} · stratum %{stratum} · %{leap} · NTPv%{version}"
   metrics_line_two: "offset %{offset} ms · delay %{delay} ms · root delay %{root_delay} ms · root dispersion %{root_dispersion} ms"
   metrics_line_three: "precision %{precision} s · reference %{reference_id} · reference time %{reference_time} UTC · query %{elapsed} ms"
+
+overview:
+  loading: collecting network information…
+  collect_failed: Failed to collect network information.
+  refresh: Refresh
+  auto_refresh: Auto refresh
+  refresh_interval: Automatic refresh interval
+  public_egress: Public egress
+  public_ip_source: "Source:"
+  unavailable: unavailable
+  country: Country
+  region: Region
+  city: City
+  postal_code: Postal code
+  continent: Continent
+  coordinates: Coordinates
+  timezone: Timezone
+  asn: ASN
+  isp: ISP
+  organization: Organization
+  public_ip_loading: resolving the public egress address…
+  public_ip_failed: Could not resolve the public egress address.
+  retry: Retry
+  captured: "Captured:"
+  interfaces: Interfaces
+  name: Name
+  status: Status
+  up: up
+  down: down
+  mac: MAC
+  ipv4: IPv4
+  ipv6: IPv6
+  mtu: MTU
+  link_speed: Link speed
+  live_rates: Live rates
+  all_interfaces: All interfaces
+  rx_bytes: RX bytes
+  tx_bytes: TX bytes
+  rx_packets: RX packets
+  tx_packets: TX packets
+  bytes_per_second: Bytes/s
+  packets_per_second: Packets/s
+  elapsed_s: Elapsed (s)
+  default_gateway: Default gateway
+  dns_servers: DNS servers
+  routes: Routing table
+  family: Family
+  destination: Destination
+  gateway: Gateway
+  interface: Interface
+  metric: Metric
+  none: none
 
 speedtest:
   librespeed: LibreSpeed

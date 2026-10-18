@@ -11,6 +11,7 @@ use crate::tabs::ip_insight::IpInsightTab;
 use crate::tabs::lookup::LookupTab;
 use crate::tabs::mtr::MtrTab;
 use crate::tabs::ntp::NtpTab;
+use crate::tabs::overview::OverviewTab;
 use crate::tabs::ping::PingTab;
 use crate::tabs::port_scan::PortScanTab;
 use crate::tabs::speedtest::SpeedtestTab;
@@ -36,6 +37,7 @@ const PROJECT_LICENSE: &str = env!("CARGO_PKG_LICENSE");
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Tab {
+    Overview,
     Ping,
     Mtr,
     Http,
@@ -48,8 +50,10 @@ pub enum Tab {
 }
 
 impl Tab {
-    /// Built-in order, also used to append any tab missing from a saved order.
-    pub const ALL: [Tab; 9] = [
+    /// Built-in order. The overview is pinned first and missing tabs are
+    /// appended when a saved order is loaded.
+    pub const ALL: [Tab; 10] = [
+        Tab::Overview,
         Tab::Ping,
         Tab::Mtr,
         Tab::Http,
@@ -65,6 +69,7 @@ impl Tab {
     /// saved order, while changing display labels does not.
     pub fn id(self) -> &'static str {
         match self {
+            Tab::Overview => "overview",
             Tab::Ping => "ping",
             Tab::Mtr => "mtr",
             Tab::Http => "http",
@@ -89,6 +94,7 @@ pub struct App {
     pub tab: Tab,
     /// Top-level tab order chosen by the user and persisted in the config.
     pub tab_order: Vec<Tab>,
+    pub overview: OverviewTab,
     pub ping: PingTab,
     pub mtr: MtrTab,
     pub http: HttpPingTab,
@@ -119,8 +125,9 @@ impl App {
         Self {
             rt,
             cfg,
-            tab: Tab::Ping,
+            tab: Tab::Overview,
             tab_order,
+            overview: OverviewTab::new(),
             ping: PingTab::new(),
             mtr: MtrTab::new(),
             http: HttpPingTab::new(),
@@ -158,7 +165,13 @@ impl App {
     }
 
     /// Move a dragged tab relative to a drop target and persist the new order.
+    ///
+    /// The overview tab is pinned first. It cannot be dragged, and other tabs
+    /// cannot be dropped onto it, so the fixed position is preserved.
     fn reorder_tab(&mut self, dragged: Tab, target: Tab, after: bool) {
+        if dragged == Tab::Overview || target == Tab::Overview {
+            return;
+        }
         let previous = self.tab_order.clone();
         move_tab(&mut self.tab_order, dragged, target, after);
         if self.tab_order != previous {
@@ -181,20 +194,27 @@ impl App {
         // horizontal space.
         ui.horizontal_wrapped(|ui| {
             for tab in order {
-                let response = ui.add(
-                    egui::Button::selectable(self.tab == tab, tab_label(tab))
-                        .sense(egui::Sense::click_and_drag()),
-                );
-                response.dnd_set_drag_payload(tab);
+                let fixed = tab == Tab::Overview;
+                let response = if fixed {
+                    // The pinned overview tab is selectable but not draggable.
+                    ui.add(egui::Button::selectable(self.tab == tab, tab_label(tab)))
+                } else {
+                    let response = ui.add(
+                        egui::Button::selectable(self.tab == tab, tab_label(tab))
+                            .sense(egui::Sense::click_and_drag()),
+                    );
+                    response.dnd_set_drag_payload(tab);
+                    response
+                };
 
                 if response.clicked() {
                     selected = Some(tab);
                 }
 
-                // Only the tab under the pointer receives the hover
-                // payload. Use the pointer position to decide whether to
-                // insert before or after it.
-                if response.dnd_hover_payload::<Tab>().is_some() {
+                // Only draggable tabs under the pointer receive the hover
+                // payload. The pinned tab is not a drop target either, so the
+                // first position cannot be displaced.
+                if !fixed && response.dnd_hover_payload::<Tab>().is_some() {
                     let after = ui
                         .ctx()
                         .pointer_interact_pos()
@@ -360,6 +380,42 @@ impl App {
         }
     }
 
+    /// Render the top bar and return its final rectangle. The returned rect is
+    /// used by layout tests to verify that the panel height stays stable.
+    fn top_bar(&mut self, ui: &mut egui::Ui) -> egui::Rect {
+        egui::Panel::top("top_bar")
+            .show(ui, |ui| {
+                ui.spacing_mut().item_spacing.x = 6.0;
+                ui.add_space(2.0);
+
+                let available = ui.available_width();
+                let one_row = self.tabs_width(ui) + self.controls_width(ui) <= available - 12.0;
+                if one_row {
+                    let tabs_width = (available - self.controls_width(ui) - 12.0).max(200.0);
+                    ui.horizontal(|ui| {
+                        ui.scope(|ui| {
+                            ui.set_max_width(tabs_width);
+                            self.tab_bar(ui);
+                        });
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            self.app_controls(ui);
+                        });
+                    });
+                } else {
+                    self.tab_bar(ui);
+                    ui.add_space(4.0);
+                    ui.horizontal(|ui| {
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            self.app_controls(ui);
+                        });
+                    });
+                }
+                ui.add_space(6.0);
+            })
+            .response
+            .rect
+    }
+
     /// About dialog: version, author, contact links and license. Values are read
     /// from the package manifest so they cannot drift from the published metadata.
     fn about_dialog(&mut self, ctx: &egui::Context) {
@@ -414,6 +470,7 @@ impl App {
 /// Display label for a top-level tab.
 fn tab_label(tab: Tab) -> String {
     match tab {
+        Tab::Overview => t!("tab.overview"),
         Tab::Ping => t!("tab.ping"),
         Tab::Mtr => t!("tab.mtr"),
         Tab::Http => t!("tab.http"),
@@ -433,6 +490,8 @@ fn tab_label(tab: Tab) -> String {
 /// release are appended in their built-in position instead of disappearing.
 fn normalize_tab_order(saved: &[String]) -> Vec<Tab> {
     let mut order = Vec::with_capacity(Tab::ALL.len());
+    // The overview is always the first tab, regardless of the saved order.
+    order.push(Tab::Overview);
     for id in saved {
         if let Some(tab) = Tab::from_id(id) {
             if !order.contains(&tab) {
@@ -451,6 +510,10 @@ fn normalize_tab_order(saved: &[String]) -> Vec<Tab> {
 /// Move `dragged` next to `target`, optionally after it.
 fn move_tab(order: &mut Vec<Tab>, dragged: Tab, target: Tab, after: bool) {
     if dragged == target {
+        return;
+    }
+    // Keep the overview pinned in the first position.
+    if dragged == Tab::Overview || target == Tab::Overview {
         return;
     }
     let Some(from) = order.iter().position(|tab| *tab == dragged) else {
@@ -528,35 +591,7 @@ fn language_display_name(code: &str) -> String {
 
 impl eframe::App for App {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
-        egui::Panel::top("top_bar").show(ui, |ui| {
-            ui.spacing_mut().item_spacing.x = 6.0;
-            let available = ui.available_width();
-            let one_row = self.tabs_width(ui) + self.controls_width(ui) <= available - 12.0;
-
-            if one_row {
-                // Tabs and controls share the row; controls stay right-aligned.
-                let tabs_width = (available - self.controls_width(ui) - 12.0).max(200.0);
-                ui.horizontal_top(|ui| {
-                    ui.scope(|ui| {
-                        ui.set_max_width(tabs_width);
-                        self.tab_bar(ui);
-                    });
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        self.app_controls(ui);
-                    });
-                });
-            } else {
-                // Not enough room for both groups on one row: tabs use the
-                // full width and wrap, then the controls get a right-aligned
-                // row of their own.
-                self.tab_bar(ui);
-                ui.horizontal(|ui| {
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        self.app_controls(ui);
-                    });
-                });
-            }
-        });
+        self.top_bar(ui);
 
         // Capture the history revision before rendering so edits made by the
         // input widgets can be written to disk immediately afterwards.
@@ -564,6 +599,7 @@ impl eframe::App for App {
 
         let settings_expanded = self.settings_expanded;
         let expanded = egui::CentralPanel::default().show(ui, |ui| match self.tab {
+            Tab::Overview => self.overview.ui(ui, &self.rt, settings_expanded),
             Tab::Ping => self.ping.ui(
                 ui,
                 &mut self.cfg.ping,
@@ -655,17 +691,19 @@ mod tests {
     use super::*;
 
     #[test]
-    fn tab_order_keeps_known_ids_and_appends_missing_tabs() {
+    fn tab_order_keeps_known_ids_and_adds_missing_tabs() {
         let saved = vec![
             "dns".to_string(),
+            "overview".to_string(),
             "unknown".to_string(),
             "ping".to_string(),
             "dns".to_string(),
         ];
         let order = normalize_tab_order(&saved);
         assert_eq!(order.len(), Tab::ALL.len());
-        assert_eq!(order[0], Tab::Dns);
-        assert_eq!(order[1], Tab::Ping);
+        assert_eq!(order[0], Tab::Overview);
+        assert_eq!(order[1], Tab::Dns);
+        assert_eq!(order[2], Tab::Ping);
         for tab in Tab::ALL {
             assert!(order.contains(&tab));
         }
@@ -713,5 +751,78 @@ mod tests {
 
         move_tab(&mut order, Tab::Ping, Tab::Dns, true);
         assert_eq!(order, vec![Tab::Ping, Tab::Mtr]);
+    }
+
+    #[test]
+    fn top_bar_height_is_stable_across_frames() {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let mut app = App {
+            rt: runtime.handle().clone(),
+            cfg: AppConfig::default(),
+            tab: Tab::Overview,
+            tab_order: normalize_tab_order(&[]),
+            overview: OverviewTab::new(),
+            ping: PingTab::new(),
+            mtr: MtrTab::new(),
+            http: HttpPingTab::new(),
+            portscan: PortScanTab::new(),
+            ip_insight: IpInsightTab::new(),
+            lookup: LookupTab::new(),
+            dns: DnsTab::new(),
+            ntp: NtpTab::new(),
+            speedtest: SpeedtestTab::new(),
+            privilege: net_tools_core::net::privilege::probe(),
+            theme_preference: egui::ThemePreference::System,
+            settings_expanded: true,
+            show_about: false,
+        };
+
+        for width in [960.0, 1100.0, 1400.0] {
+            let ctx = egui::Context::default();
+            let mut heights = Vec::new();
+            for _ in 0..20 {
+                let input = egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::pos2(0.0, 0.0),
+                        egui::vec2(width, 700.0),
+                    )),
+                    ..Default::default()
+                };
+                ctx.run_ui(input, |ui| {
+                    heights.push(app.top_bar(ui).height());
+                })
+                .textures_delta
+                .clear();
+            }
+            let first = heights[4];
+            assert!(
+                first < 100.0,
+                "top bar is unexpectedly tall at {width}: {heights:?}"
+            );
+            for height in &heights[4..] {
+                assert!(
+                    (height - first).abs() < 1.0,
+                    "top bar height changed at {width}: {heights:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn overview_stays_pinned_first() {
+        let mut order = vec![Tab::Overview, Tab::Ping, Tab::Mtr];
+
+        // The overview cannot be dragged away, and no tab can be dropped on it.
+        move_tab(&mut order, Tab::Overview, Tab::Mtr, true);
+        assert_eq!(order, vec![Tab::Overview, Tab::Ping, Tab::Mtr]);
+        move_tab(&mut order, Tab::Ping, Tab::Overview, false);
+        assert_eq!(order, vec![Tab::Overview, Tab::Ping, Tab::Mtr]);
+
+        // Reordering the remaining tabs leaves the overview in place.
+        move_tab(&mut order, Tab::Mtr, Tab::Ping, false);
+        assert_eq!(order, vec![Tab::Overview, Tab::Mtr, Tab::Ping]);
     }
 }

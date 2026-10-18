@@ -16,6 +16,7 @@ theme:
   dark: 深色
 
 tab:
+  overview: 网络概览
   ping: Ping
   mtr: MTR
   http: HTTP Ping
@@ -169,6 +170,58 @@ ntp:
   metrics_line_one: "服务器 %{server} · 层级 %{stratum} · %{leap} · NTPv%{version}"
   metrics_line_two: "偏差 %{offset} 毫秒 · 延迟 %{delay} 毫秒 · 根延迟 %{root_delay} 毫秒 · 根色散 %{root_dispersion} 毫秒"
   metrics_line_three: "精度 %{precision} 秒 · 参考标识 %{reference_id} · 参考时间 %{reference_time} UTC · 查询耗时 %{elapsed} 毫秒"
+
+overview:
+  loading: 正在采集网络信息…
+  collect_failed: 无法采集网络信息。
+  refresh: 刷新
+  auto_refresh: 自动刷新
+  refresh_interval: 自动刷新间隔
+  public_egress: 公网出口
+  public_ip_source: "来源："
+  unavailable: 不可用
+  country: 国家/地区
+  region: 地区
+  city: 城市
+  postal_code: 邮政编码
+  continent: 大洲
+  coordinates: 坐标
+  timezone: 时区
+  asn: ASN
+  isp: ISP
+  organization: 组织
+  public_ip_loading: 正在查询公网出口地址…
+  public_ip_failed: 无法获取公网出口地址。
+  retry: 重试
+  captured: "采集时间："
+  interfaces: 网卡
+  name: 名称
+  status: 状态
+  up: 已启用
+  down: 已停用
+  mac: MAC
+  ipv4: IPv4
+  ipv6: IPv6
+  mtu: MTU
+  link_speed: 链路速率
+  live_rates: 实时速率
+  all_interfaces: 全部网卡
+  rx_bytes: 接收字节
+  tx_bytes: 发送字节
+  rx_packets: 接收包
+  tx_packets: 发送包
+  bytes_per_second: 字节/秒
+  packets_per_second: 包/秒
+  elapsed_s: 已用时间（秒）
+  default_gateway: 默认网关
+  dns_servers: DNS 服务器
+  routes: 路由表
+  family: 协议族
+  destination: 目标
+  gateway: 网关
+  interface: 网卡
+  metric: 度量值
+  none: 无
 
 speedtest:
   librespeed: LibreSpeed

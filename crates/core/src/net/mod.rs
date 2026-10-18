@@ -11,6 +11,7 @@ pub mod librespeed;
 pub(crate) mod linux_icmp;
 pub mod mtr;
 pub mod ntp;
+pub mod overview;
 pub mod ports;
 pub mod portscan;
 pub mod privilege;

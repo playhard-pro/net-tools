@@ -51,8 +51,10 @@ pub fn throughput_chart(
         .fold(1.0_f64, f64::max)
         .max(1.0);
     let palette = Palette::from_ui(ui);
+    let width = ui.available_width();
 
     Plot::new(id)
+        .width(width)
         .height(height)
         .show_x(true)
         .show_y(true)
@@ -70,6 +72,52 @@ pub fn throughput_chart(
             if !upload.is_empty() {
                 plot_ui.line(
                     Line::new("Upload", PlotPoints::from(upload)).color(palette.chart_secondary),
+                );
+            }
+        });
+}
+
+/// Render receive and transmit rate samples as two lines on one compact chart.
+///
+/// Both series share the axes so their relative magnitude stays visible. The
+/// caller supplies the unit label because the same widget is used for byte and
+/// packet rates.
+pub fn network_rate_chart(
+    ui: &mut egui::Ui,
+    id: &str,
+    rx: &[[f64; 2]],
+    tx: &[[f64; 2]],
+    height: f32,
+    y_label: &str,
+) {
+    let y_max = rx
+        .iter()
+        .chain(tx.iter())
+        .map(|point| point[1])
+        .fold(1.0_f64, f64::max)
+        .max(1.0);
+    let palette = Palette::from_ui(ui);
+    let width = ui.available_width();
+
+    Plot::new(id)
+        .width(width)
+        .height(height)
+        .show_x(true)
+        .show_y(true)
+        .include_y(0.0)
+        .include_y(y_max)
+        .x_axis_label(t!("overview.elapsed_s"))
+        .y_axis_label(y_label)
+        .legend(egui_plot::Legend::default())
+        .show(ui, |plot_ui| {
+            if !rx.is_empty() {
+                plot_ui.line(
+                    Line::new("RX", PlotPoints::from(rx.to_vec())).color(palette.chart_primary),
+                );
+            }
+            if !tx.is_empty() {
+                plot_ui.line(
+                    Line::new("TX", PlotPoints::from(tx.to_vec())).color(palette.chart_secondary),
                 );
             }
         });

@@ -29,6 +29,7 @@ device performance testing.
 
 | Tab | Description |
 |-----|-------------|
+| Overview | Local interface inventory (MAC, IPv4/IPv6, MTU, link speed and state), default gateways, DNS servers and the full routing table; live receive/transmit byte and packet rates with charts, plus the IPv4 and IPv6 public egress addresses with location, ASN and ISP details from IP.SB. The whole view can be copied or exported as CSV, JSON or HTML |
 | Ping | Continuous probing with a live chart, loss rate and min/avg/max/jitter |
 | MTR | Continuous hop-by-hop routing: all hops are probed in parallel and each is refreshed at the probe interval; multiple responders per hop are listed comma separated |
 | HTTP Ping | Multi-method requests with per-stage timing (DNS/connect/TLS/TTFB/total) |
@@ -67,6 +68,35 @@ starts a new one with the edited target.
   prompt.
 - SNTP responses are not authenticated. Only use **Set time** on a network and
   server you trust; the confirmation dialog warns about this as well.
+
+### Network Overview
+
+The Overview tab combines the host's local network configuration and live
+counters in one place. The layout uses two equal-width columns: the first shows
+the default gateways, DNS servers, public egress information and routing table;
+the second shows the live traffic charts followed by the interfaces. Each
+interface is collapsed to one compact row with its state and link speed, and
+long names are shortened with an ellipsis. Expanding a row shows the full name,
+MAC address, MTU and every IPv4/IPv6 address.
+
+Counters are sampled in the background and converted to receive/transmit byte
+and packet rates. The chart can follow a single interface or the aggregate of
+all non-loopback interfaces; the first sample after the tab opens only
+establishes a baseline, so rates appear from the next refresh. Automatic refresh
+is enabled by default and its interval can be changed in the toolbar.
+
+Public egress is resolved through the IP.SB geolocation API for both address
+families: `https://api.ip.sb/geoip` for IPv4 and
+`https://api-ipv6.ip.sb/geoip` for IPv6. The result shows the address, country,
+region, city, timezone, coordinates, ASN, ISP and organization when those
+fields are present, so IPv4-only and IPv6-only networks are both represented.
+The current snapshot, egress details and rates can be copied to the clipboard or
+exported as CSV, JSON or HTML.
+
+Linux data comes from `/proc` and `/sys`, Windows uses the IP Helper API, and
+macOS reads the standard `ifconfig`, `netstat` and `scutil` output. Some links
+(such as virtual adapters, tunnels or Wi-Fi media) do not report a negotiated
+speed; those values are shown as `-`.
 
 ### Speedtest
 
@@ -113,7 +143,7 @@ backend, and iperf3 generates substantial traffic.
   the full window width to the results.
 - The interface follows the system light/dark theme by default, with a manual
   System / Light / Dark selector in the top bar.
-- Top-level tabs can be reordered by dragging, wrap onto extra rows when needed, and the order is remembered.
+- The Overview tab is pinned first and cannot be dragged. The remaining top-level tabs can be reordered by dragging, wrap onto extra rows when needed, and the order is remembered.
 - Configuration is saved to the platform config directory and restored on the
   next launch.
 
