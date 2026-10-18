@@ -3,7 +3,7 @@ resolver = "2"
 members = ["crates/core", "crates/app"]
 
 [workspace.package]
-version = "0.2.8"
+version = "0.2.9"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 publish = false
@@ -26,5 +26,10 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 [profile.release]
 opt-level = 3
-lto = "thin"
+# Whole-program optimization and a single codegen unit trade compile time for
+# a noticeably smaller binary. Keeping the regular optimization level avoids
+# slowing down the data paths that high-throughput probes depend on.
+lto = "fat"
+codegen-units = 1
+panic = "abort"
 strip = true

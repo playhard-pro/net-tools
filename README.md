@@ -37,9 +37,11 @@ device performance testing.
 | Lookup | Query a domain or IP address through RDAP; the registration data is shown as a fully expanded JSON tree, with jCard contact data parsed into readable fields and automatic fallback to the parent domain when a subdomain has no record |
 | DNS | dig-like queries for a chosen record type (optional custom server, UDP with TCP fallback), plus a full iterative trace from the root servers; results are shown as text |
 | NTP | SNTP query with a live analog clock, local and UTC time to milliseconds, and technical metrics such as stratum, offset, delay, root delay/dispersion, precision and reference ID; offers pinned presets and custom servers, and can update the system clock after confirmation (Windows requests UAC elevation automatically) |
+| Speedtest | LibreSpeed, iperf3 client and built-in iperf3 server sub-tabs, with a real-time throughput chart, RTT/jitter and TCP/UDP metrics, a runtime-loaded iperf3 server directory, custom servers, and exportable in-memory session history |
 
-Every feature provides **Start / Pause / Stop** controls. Pausing stops issuing
-new probes while keeping existing results; resuming continues.
+Continuous probes provide **Start / Pause / Stop** controls. Pausing stops
+issuing new probes while keeping existing results; resuming continues. One-shot
+tools and the built-in servers provide **Start / Stop**.
 
 Pressing **Enter** in a target input stops the running task and immediately
 starts a new one with the edited target.
@@ -66,12 +68,45 @@ starts a new one with the edited target.
 - SNTP responses are not authenticated. Only use **Set time** on a network and
   server you trust; the confirmation dialog warns about this as well.
 
+### Speedtest
+
+The Speedtest tab groups three related tools behind separate sub-tabs:
+
+- **LibreSpeed** measures internet throughput over HTTP. It can pick the fastest
+  server from the public LibreSpeed list, let you choose one manually, or use a
+  self-hosted backend URL. The server list is kept in memory for the current
+  session only.
+- **iperf3** measures a specific link with the iperf3 protocol. It supports TCP
+  and UDP, upload, download and bidirectional modes, parallel streams, warm-up
+  omission and an optional UDP target bandwidth. The public server directory is
+  loaded at runtime from
+  [iperf3serverlist.net](https://export.iperf3serverlist.net/listed_iperf3_servers.json)
+  and can be filtered by provider, country, site or host; custom `host:port`
+  values are always allowed.
+- **iperf3 Server** turns the application into a listening iperf3 server for
+  testing clients on your own network. It can bind to a specific interface or
+  all addresses, stop after one test, enforce a maximum test duration and apply
+  a bitrate limit. The listener runs only while this sub-tab is selected.
+
+LibreSpeed and the iperf3 client show live throughput while a test runs. The
+iperf3 client reports TCP RTT from its data streams and UDP jitter/loss; jitter
+is not part of the TCP protocol. The iperf3 server shows live client metrics for
+the test it is currently serving. Completed runs are kept in an in-memory
+session history and can be copied or exported as CSV, JSON or HTML; history is
+discarded when the application exits.
+
+Public servers are shared, may be offline, and may accept only one test at a
+time. Only run speed tests against networks and servers you own or are
+explicitly authorized to test. LibreSpeed uploads random data to the selected
+backend, and iperf3 generates substantial traffic.
+
 ### Other
 
 - Bilingual UI (English / Chinese), extensible: adding a language is just a new
   YAML file under `locales/`.
-- **Bundled CJK font** (WenQuanYi Micro Hei, Apache-2.0), so Chinese and other
-  CJK text renders without any system font installation — see `assets/fonts/`.
+- **Bundled CJK font subset** (WenQuanYi Micro Hei, Apache-2.0), so Chinese and
+  other CJK text renders without any system font installation — see
+  `assets/fonts/` and `scripts/subset_font.py`.
 - Results can be **copied** and **exported** (CSV / JSON / HTML).
 - Table columns auto-size to fit the latest content.
 - Configuration is saved to the platform config directory and restored on the
@@ -94,6 +129,10 @@ starts a new one with the edited target.
 | DNS | NTP |
 |-----|-----|
 | ![DNS tab](screenshots/dns.png) | ![NTP tab](screenshots/ntp.png) |
+
+| Speedtest |
+|-----------|
+| ![Speedtest tab with LibreSpeed, iperf3 client and iperf3 server sub-tabs](screenshots/speedtest.png) |
 
 ## Download and run
 
@@ -419,7 +458,8 @@ development setup, coding conventions and pull request checklist.
 
 ## Third-party licenses
 
-- **WenQuanYi Micro Hei** (`assets/fonts/wqy-microhei.ttc`) — Apache License 2.0.
+- **WenQuanYi Micro Hei** (`assets/fonts/wqy-microhei.ttc`, subset embedded from
+  `assets/fonts/wqy-microhei-subset.ttf`) — Apache License 2.0.
   It is dual-licensed "Apache-2.0 OR GPL-3.0-or-later with Font exception"; this
   project redistributes it under Apache-2.0. Attribution is in
   `assets/fonts/LICENSE-wqy-microhei.txt` and the license text in

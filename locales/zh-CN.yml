@@ -19,6 +19,7 @@ tab:
   lookup: 注册查询
   dns: DNS
   ntp: NTP
+  speedtest: 测速
 state:
   idle: 空闲
   running: 运行中
@@ -161,3 +162,72 @@ ntp:
   metrics_line_one: "服务器 %{server} · 层级 %{stratum} · %{leap} · NTPv%{version}"
   metrics_line_two: "偏差 %{offset} 毫秒 · 延迟 %{delay} 毫秒 · 根延迟 %{root_delay} 毫秒 · 根色散 %{root_dispersion} 毫秒"
   metrics_line_three: "精度 %{precision} 秒 · 参考标识 %{reference_id} · 参考时间 %{reference_time} UTC · 查询耗时 %{elapsed} 毫秒"
+
+speedtest:
+  librespeed: LibreSpeed
+  iperf3: iperf3
+  iperf3_server: iperf3 服务端
+  server: 服务器
+  auto: 自动（最快）
+  servers_loaded: "已加载 %{count} 个公共服务器"
+  select_server: 选择公共服务器
+  server_filter: 服务器筛选
+  server_filter_hint: 运营商、国家或主机名
+  host_required: 请先选择公共服务器或输入主机地址。
+  refresh_servers: 刷新
+  custom_url: 自建后端 URL
+  duration_s: 测试时长
+  connections: 并行连接
+  skip_download: 跳过下载
+  skip_upload: 跳过上传
+  librespeed_hint: "自建 URL 需兼容 LibreSpeed 标准后端目录结构；公共服务器会接收随机上传数据。"
+  host: 主机
+  port: 端口
+  protocol: 协议
+  direction: 方向
+  direction_upload: 上传
+  direction_download: 下载
+  direction_bidirectional: 双向
+  omit_s: 预热排除
+  streams: 并行流
+  block_size: 块大小
+  bandwidth_mbps: UDP 带宽
+  iperf3_hint: "公共服务器列表来自 iperf3serverlist.net；公共服务器同一时间只允许一个测试且可能离线，需要可重复结果时请使用自己的服务器。"
+  authorized_hint: 仅测试你拥有或已获得授权的网络和服务器。
+  empty: 开始测速后可查看实时吞吐和结果
+  rtt: RTT
+  not_available: 不适用
+  iperf3_metrics_hint: "iperf3 没有独立 ping 阶段；TCP 的 RTT 来自 TCP_INFO，抖动仅在 UDP 模式下可用。"
+  ping: 延迟
+  jitter: 抖动
+  download: 下载
+  upload: 上传
+  lost: 丢包
+  retransmits: 重传
+  history: 本次会话历史
+  no_history: 还没有完成的测速
+  elapsed_s: 已用时间（秒）
+  mbps: Mbps
+  phase_idle: 空闲
+  phase_latency: 测量延迟
+  phase_download: 下载测试
+  phase_upload: 上传测试
+  phase_connecting: 连接中
+  phase_testing: 测试中
+  phase_done: 完成
+
+server:
+  refresh_ips: 刷新 IP
+  current: 当前速率
+  all_interfaces: 监听全部地址
+  bind_address: 监听地址
+  port: 端口
+  one_off: 完成一次测试后停止
+  max_duration: 最大测试时长
+  bitrate_limit: 速率限制
+  hint: "监听地址留空表示监听所有网卡。请确保本地防火墙允许所选端口，客户端才能连接。"
+  listening_on: "正在监听 %{addr}"
+  empty: 启动服务端后，用客户端发起测试即可看到结果
+  client: 客户端
+  sent: 发送（Mbps）
+  received: 接收（Mbps）

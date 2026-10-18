@@ -13,6 +13,7 @@ use crate::tabs::mtr::MtrTab;
 use crate::tabs::ntp::NtpTab;
 use crate::tabs::ping::PingTab;
 use crate::tabs::port_scan::PortScanTab;
+use crate::tabs::speedtest::SpeedtestTab;
 
 /// Project homepage, shown as the title link. Taken from the manifest so the
 /// link and the published package metadata cannot drift apart.
@@ -42,6 +43,7 @@ pub enum Tab {
     Lookup,
     Dns,
     Ntp,
+    Speedtest,
 }
 
 pub struct App {
@@ -56,6 +58,7 @@ pub struct App {
     pub lookup: LookupTab,
     pub dns: DnsTab,
     pub ntp: NtpTab,
+    pub speedtest: SpeedtestTab,
     pub privilege: PrivilegeStatus,
     /// Whether the About dialog is currently open.
     pub show_about: bool,
@@ -78,6 +81,7 @@ impl App {
             lookup: LookupTab::new(),
             dns: DnsTab::new(),
             ntp: NtpTab::new(),
+            speedtest: SpeedtestTab::new(),
             privilege: net_tools_core::net::privilege::probe(),
             show_about: false,
         }
@@ -91,6 +95,11 @@ impl App {
             // pointless probe continues in the background.
             if self.tab == Tab::Ntp && tab != Tab::Ntp {
                 self.ntp.clear_on_hide();
+            }
+            // Leaving the speed test tab stops a running test and drops live
+            // progress, while completed session history stays available.
+            if self.tab == Tab::Speedtest && tab != Tab::Speedtest {
+                self.speedtest.clear_on_hide();
             }
             self.tab = tab;
         }
@@ -228,6 +237,7 @@ impl eframe::App for App {
                 self.tab_button(ui, Tab::Lookup, &t!("tab.lookup"));
                 self.tab_button(ui, Tab::Dns, &t!("tab.dns"));
                 self.tab_button(ui, Tab::Ntp, &t!("tab.ntp"));
+                self.tab_button(ui, Tab::Speedtest, &t!("tab.speedtest"));
                 ui.separator();
                 ui.label(t!("common.language"));
                 self.language_selector(ui);
@@ -285,6 +295,10 @@ impl eframe::App for App {
             Tab::Ntp => self
                 .ntp
                 .ui(ui, &mut self.cfg.ntp, &mut self.cfg.history, &self.rt),
+            Tab::Speedtest => {
+                self.speedtest
+                    .ui(ui, &mut self.cfg.speedtest, &mut self.cfg.history, &self.rt)
+            }
         });
 
         if self.cfg.history.revision() != history_revision {
@@ -297,6 +311,9 @@ impl eframe::App for App {
     }
 
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
+        // Stop a running speed test so its hidden worker does not outlive the
+        // application.
+        self.speedtest.clear_on_hide();
         crate::config_store::save(&self.cfg);
     }
 }

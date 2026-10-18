@@ -23,3 +23,55 @@ pub fn latency_chart(ui: &mut egui::Ui, points: &[[f64; 2]], height: f32) {
             );
         });
 }
+
+/// Render download and upload throughput samples as separate lines.
+///
+/// `id` keeps the plot state independent from other charts in the application.
+pub fn throughput_chart(
+    ui: &mut egui::Ui,
+    id: &str,
+    samples: &[net_tools_core::model::SpeedSample],
+    height: f32,
+) {
+    use net_tools_core::model::SpeedPhase;
+
+    let collect = |phase: SpeedPhase| -> Vec<[f64; 2]> {
+        samples
+            .iter()
+            .filter(|sample| sample.phase == phase)
+            .map(|sample| [sample.elapsed_s, sample.mbps])
+            .collect()
+    };
+    let download = collect(SpeedPhase::Download);
+    let upload = collect(SpeedPhase::Upload);
+    let y_max = download
+        .iter()
+        .chain(upload.iter())
+        .map(|point| point[1])
+        .fold(1.0_f64, f64::max)
+        .max(1.0);
+
+    Plot::new(id)
+        .height(height)
+        .show_x(true)
+        .show_y(true)
+        .include_y(0.0)
+        .include_y(y_max)
+        .x_axis_label(t!("speedtest.elapsed_s"))
+        .y_axis_label(t!("speedtest.mbps"))
+        .legend(egui_plot::Legend::default())
+        .show(ui, |plot_ui| {
+            if !download.is_empty() {
+                plot_ui.line(
+                    Line::new("Download", PlotPoints::from(download))
+                        .color(egui::Color32::from_rgb(0, 180, 255)),
+                );
+            }
+            if !upload.is_empty() {
+                plot_ui.line(
+                    Line::new("Upload", PlotPoints::from(upload))
+                        .color(egui::Color32::from_rgb(120, 220, 140)),
+                );
+            }
+        });
+}

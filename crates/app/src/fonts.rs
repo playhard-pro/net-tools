@@ -8,9 +8,10 @@ use std::sync::Arc;
 
 use eframe::egui;
 
-/// Bundled CJK font: WenQuanYi Micro Hei (Apache-2.0), see
-/// `assets/fonts/LICENSE-wqy-microhei.txt`.
-const CJK_FONT: &[u8] = include_bytes!("../../../assets/fonts/wqy-microhei.ttc");
+/// Bundled CJK font subset: WenQuanYi Micro Hei (Apache-2.0), see
+/// `assets/fonts/LICENSE-wqy-microhei.txt`. The subset contains all UI text,
+/// GB2312 and common symbols; regenerate it with `scripts/subset_font.py`.
+const CJK_FONT: &[u8] = include_bytes!("../../../assets/fonts/wqy-microhei-subset.ttf");
 
 /// Register the bundled CJK font as a fallback so CJK glyphs render everywhere.
 pub fn install(ctx: &egui::Context) {

@@ -381,6 +381,236 @@ pub struct NtpResult {
     pub elapsed_ms: f64,
 }
 
+/// Transport protocol used by the iperf3 tool.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum Iperf3Protocol {
+    #[default]
+    Tcp,
+    Udp,
+}
+
+impl Iperf3Protocol {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Iperf3Protocol::Tcp => "TCP",
+            Iperf3Protocol::Udp => "UDP",
+        }
+    }
+}
+
+/// Speed test tool shown inside the Speedtest tab.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum SpeedtestTool {
+    #[default]
+    LibreSpeed,
+    Iperf3,
+    Iperf3Server,
+}
+
+impl SpeedtestTool {
+    pub fn label(&self) -> &'static str {
+        match self {
+            SpeedtestTool::LibreSpeed => "LibreSpeed",
+            SpeedtestTool::Iperf3 => "iperf3",
+            SpeedtestTool::Iperf3Server => "iperf3 server",
+        }
+    }
+}
+
+/// Phase of a speed test.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum SpeedPhase {
+    #[default]
+    Idle,
+    Latency,
+    Download,
+    Upload,
+    Connecting,
+    Testing,
+    Done,
+}
+
+impl SpeedPhase {
+    pub fn label(&self) -> &'static str {
+        match self {
+            SpeedPhase::Idle => "idle",
+            SpeedPhase::Latency => "latency",
+            SpeedPhase::Download => "download",
+            SpeedPhase::Upload => "upload",
+            SpeedPhase::Connecting => "connecting",
+            SpeedPhase::Testing => "testing",
+            SpeedPhase::Done => "done",
+        }
+    }
+}
+
+/// A public iperf3 server entry from the online server list.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct Iperf3Server {
+    #[serde(rename = "IP/HOST", default)]
+    pub host: String,
+    /// Port or port range as published by the list, for example `5201-5209`.
+    #[serde(rename = "PORT", default)]
+    pub port: String,
+    /// Supported option flags published by the list, for example `-R,-u`.
+    #[serde(rename = "OPTIONS", default)]
+    pub options: String,
+    #[serde(rename = "GB/S", default)]
+    pub bandwidth: String,
+    #[serde(rename = "CONTINENT", default)]
+    pub continent: String,
+    #[serde(rename = "COUNTRY", default)]
+    pub country: String,
+    #[serde(rename = "SITE", default)]
+    pub site: String,
+    #[serde(rename = "PROVIDER", default)]
+    pub provider: String,
+}
+
+impl Iperf3Server {
+    /// First concrete port of the published port field, falling back to the
+    /// standard iperf3 port when the field cannot be parsed.
+    pub fn first_port(&self) -> u16 {
+        self.port
+            .split('-')
+            .next()
+            .and_then(|value| value.trim().parse().ok())
+            .unwrap_or(5201)
+    }
+
+    /// Human readable label for the server drop-down.
+    pub fn label(&self) -> String {
+        let location = if self.site.is_empty() {
+            self.country.clone()
+        } else if self.country.is_empty() {
+            self.site.clone()
+        } else {
+            format!("{}, {}", self.site, self.country)
+        };
+        let mut label = format!("{}:{}", self.host, self.port);
+        if !self.provider.is_empty() || !location.is_empty() {
+            let detail = [self.provider.as_str(), location.as_str()]
+                .into_iter()
+                .filter(|value| !value.is_empty())
+                .collect::<Vec<_>>()
+                .join(" · ");
+            if !detail.is_empty() {
+                label.push_str(&format!("  ({detail})"));
+            }
+        }
+        label
+    }
+}
+
+/// One throughput sample plotted by the Speedtest tab.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SpeedSample {
+    /// Seconds since the test started.
+    pub elapsed_s: f64,
+    /// Throughput of this sample in megabits per second.
+    pub mbps: f64,
+    pub phase: SpeedPhase,
+}
+
+/// Live progress of a speed test.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SpeedProgress {
+    pub tool: SpeedtestTool,
+    pub phase: SpeedPhase,
+    /// Current interval throughput in megabits per second.
+    pub current_mbps: f64,
+    /// Seconds elapsed in the current phase.
+    pub elapsed_s: f64,
+    /// Configured duration of the current phase in seconds.
+    pub total_s: f64,
+    /// Completion ratio in the range 0.0 to 1.0.
+    pub progress: f32,
+}
+
+/// Final result of one speed test run.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SpeedResult {
+    pub tool: SpeedtestTool,
+    /// Server name or address shown to the user.
+    pub server: String,
+    /// TCP, UDP, HTTP or another transport description.
+    pub protocol: String,
+    /// Direction description for iperf3, or a summary for LibreSpeed.
+    pub direction: String,
+    pub ping_ms: Option<f64>,
+    pub jitter_ms: Option<f64>,
+    pub download_mbps: Option<f64>,
+    pub upload_mbps: Option<f64>,
+    /// TCP retransmissions reported by iperf3.
+    pub retransmits: Option<u64>,
+    /// UDP packet loss percentage reported by iperf3.
+    pub lost_percent: Option<f64>,
+    /// Local wall-clock start time.
+    pub started_at: String,
+    pub elapsed_ms: f64,
+    /// Throughput samples collected during the run.
+    pub samples: Vec<SpeedSample>,
+    pub error: Option<String>,
+}
+
+/// Live metrics of a test currently served by the built-in iperf3 server.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Iperf3ServerProgress {
+    pub peer: String,
+    pub protocol: String,
+    pub direction: String,
+    pub elapsed_s: f64,
+    pub total_s: f64,
+    pub current_mbps: f64,
+    pub retransmits: Option<u64>,
+    pub jitter_ms: Option<f64>,
+    pub lost_percent: Option<f64>,
+}
+
+/// Result of one test served by the built-in iperf3 server.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Iperf3ServerResult {
+    /// Local wall-clock time when the test finished.
+    pub time: String,
+    /// Client address reported on the control connection.
+    pub peer: String,
+    pub protocol: String,
+    /// Direction from the server's point of view.
+    pub direction: String,
+    pub duration_s: f64,
+    /// Throughput the server sent to the client.
+    pub sent_mbps: Option<f64>,
+    /// Throughput the server received from the client.
+    pub received_mbps: Option<f64>,
+    pub retransmits: Option<u64>,
+    pub jitter_ms: Option<f64>,
+    pub lost_percent: Option<f64>,
+    pub error: Option<String>,
+}
+
+/// A LibreSpeed backend server from the public server list or a custom URL.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct LibreSpeedServer {
+    #[serde(default)]
+    pub id: i64,
+    #[serde(default)]
+    pub name: String,
+    #[serde(default)]
+    pub server: String,
+    #[serde(default, rename = "dlURL")]
+    pub download_url: String,
+    #[serde(default, rename = "ulURL")]
+    pub upload_url: String,
+    #[serde(default, rename = "pingURL")]
+    pub ping_url: String,
+    #[serde(default, rename = "getIpURL")]
+    pub get_ip_url: String,
+    #[serde(default, rename = "sponsorName")]
+    pub sponsor_name: String,
+    #[serde(default, rename = "sponsorURL")]
+    pub sponsor_url: String,
+}
+
 /// Unified event streamed from a probe task back to the UI.
 #[derive(Debug, Clone)]
 pub enum ProbeEvent {
@@ -411,6 +641,18 @@ pub enum ProbeEvent {
     DnsText(String),
     /// An NTP query result.
     Ntp(NtpResult),
+    /// A speed test result.
+    SpeedResult(SpeedResult),
+    /// Live speed test progress.
+    SpeedProgress(SpeedProgress),
+    /// A refreshed LibreSpeed server list.
+    LibreSpeedServers(Vec<LibreSpeedServer>),
+    /// A refreshed public iperf3 server list.
+    Iperf3Servers(Vec<Iperf3Server>),
+    /// A test completed by the built-in iperf3 server.
+    Iperf3ServerResult(Iperf3ServerResult),
+    /// Live metrics of a test running on the built-in iperf3 server.
+    Iperf3ServerProgress(Iperf3ServerProgress),
     /// The task finished naturally.
     Finished,
 }

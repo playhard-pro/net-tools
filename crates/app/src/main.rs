@@ -8,6 +8,7 @@ extern crate rust_i18n;
 mod app;
 mod config_store;
 mod fonts;
+mod speedtest_worker;
 mod tabs;
 mod ui;
 
@@ -17,6 +18,12 @@ use eframe::egui;
 i18n!("../../locales", fallback = "en");
 
 fn main() -> eframe::Result {
+    // The speed test runs iperf3 in a hidden child process of this same
+    // executable so that its live JSON event stream can be consumed by the UI.
+    if speedtest_worker::is_worker_invocation() {
+        std::process::exit(speedtest_worker::run_worker());
+    }
+
     // An elevated helper only writes the system clock and exits without opening
     // the UI. Normal launches fall through to the application below.
     if let Some(code) = net_tools_core::system_time::handle_elevation_request() {

@@ -17,8 +17,8 @@ time = { workspace = true, features = ["formatting", "macros", "local-offset"] }
 toml.workspace = true
 tracing.workspace = true
 surge-ping = "0.9.1"
-pnet = "0.35.0"
 pnet_packet = "0.35.0"
+if-addrs = "0.15.0"
 hickory-resolver = "0.26.3"
 hickory-proto = "0.26.3"
 libc = "0.2"
@@ -27,6 +27,7 @@ rustls = "0.23"
 tokio-rustls = "0.26"
 webpki-roots = "1"
 url = "2"
+riperf3 = { version = "0.8", default-features = false }
 
 [target.'cfg(windows)'.dependencies]
 # Used by the ICMPv6 engine to read the reply hop limit via WSARecvMsg, which

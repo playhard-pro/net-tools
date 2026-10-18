@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::model::{IpVersion, PortPreset, ProbeMode, ScanMode};
+use crate::model::{IpVersion, Iperf3Protocol, PortPreset, ProbeMode, ScanMode, SpeedtestTool};
 
 /// Maximum number of remembered values kept for each input field. Older entries
 /// are dropped once this many values are stored.
@@ -233,6 +233,127 @@ impl Default for NtpSettings {
     }
 }
 
+/// Settings for the LibreSpeed sub-tool.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LibreSpeedSettings {
+    /// Server id from the public list, or `auto` to pick the fastest server.
+    pub server: String,
+    /// Custom backend base URL. When non-empty it overrides `server`.
+    pub custom_url: String,
+    /// Duration of the download and upload phases in seconds.
+    pub duration_s: u64,
+    /// Number of parallel HTTP connections.
+    pub connections: usize,
+    pub skip_download: bool,
+    pub skip_upload: bool,
+    /// Timeout for a single HTTP request in milliseconds.
+    pub timeout_ms: u64,
+    pub ip_version: IpVersion,
+}
+
+impl Default for LibreSpeedSettings {
+    fn default() -> Self {
+        Self {
+            server: "auto".into(),
+            custom_url: String::new(),
+            duration_s: 10,
+            connections: 4,
+            skip_download: false,
+            skip_upload: false,
+            timeout_ms: 30_000,
+            ip_version: IpVersion::Auto,
+        }
+    }
+}
+
+/// Settings for the iperf3 sub-tool.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Iperf3Settings {
+    /// Server host name or address.
+    pub host: String,
+    pub port: u16,
+    pub protocol: Iperf3Protocol,
+    /// Download mode (`-R`): the server sends and the client receives.
+    pub reverse: bool,
+    /// Bidirectional mode (`--bidir`).
+    pub bidir: bool,
+    pub duration_s: u64,
+    /// Warm-up seconds excluded from the result.
+    pub omit_s: u64,
+    pub streams: u32,
+    /// Block size in bytes; zero keeps the iperf3 default.
+    pub block_size: usize,
+    /// UDP target bandwidth in bits per second; zero means unlimited.
+    pub bandwidth_bps: u64,
+    pub ip_version: IpVersion,
+}
+
+impl Default for Iperf3Settings {
+    fn default() -> Self {
+        Self {
+            host: String::new(),
+            port: 5201,
+            protocol: Iperf3Protocol::Tcp,
+            reverse: false,
+            bidir: false,
+            duration_s: 10,
+            omit_s: 0,
+            streams: 1,
+            block_size: 0,
+            bandwidth_bps: 0,
+            ip_version: IpVersion::Auto,
+        }
+    }
+}
+
+/// Settings for the built-in iperf3 server tab.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Iperf3ServerSettings {
+    /// Local address to bind; empty listens on all interfaces.
+    pub bind_address: String,
+    pub port: u16,
+    /// Stop listening after one client test.
+    pub one_off: bool,
+    /// Refuse tests longer than this many seconds; zero means unlimited.
+    pub max_duration_s: u64,
+    /// Refuse tests exceeding this bitrate in bits per second; zero disables.
+    pub bitrate_limit_bps: u64,
+}
+
+impl Default for Iperf3ServerSettings {
+    fn default() -> Self {
+        Self {
+            bind_address: String::new(),
+            port: 5201,
+            one_off: false,
+            max_duration_s: 0,
+            bitrate_limit_bps: 0,
+        }
+    }
+}
+
+/// Settings shared by both speed test tools.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SpeedtestSettings {
+    pub active_tool: SpeedtestTool,
+    pub librespeed: LibreSpeedSettings,
+    pub iperf3: Iperf3Settings,
+    /// Added after the client tools, so older config files still load.
+    #[serde(default)]
+    pub iperf3_server: Iperf3ServerSettings,
+}
+
+impl Default for SpeedtestSettings {
+    fn default() -> Self {
+        Self {
+            active_tool: SpeedtestTool::LibreSpeed,
+            librespeed: LibreSpeedSettings::default(),
+            iperf3: Iperf3Settings::default(),
+            iperf3_server: Iperf3ServerSettings::default(),
+        }
+    }
+}
+
 /// Recently entered values for the editable text inputs, keyed by a stable
 /// field id such as `ping.target`. Values are stored most recent first.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -320,6 +441,9 @@ pub struct AppConfig {
     /// Added after the first release, so older config files still load.
     #[serde(default)]
     pub ntp: NtpSettings,
+    /// Added after the first release, so older config files still load.
+    #[serde(default)]
+    pub speedtest: SpeedtestSettings,
 }
 
 impl Default for AppConfig {
@@ -335,6 +459,7 @@ impl Default for AppConfig {
             history: InputHistory::default(),
             dns: DnsSettings::default(),
             ntp: NtpSettings::default(),
+            speedtest: SpeedtestSettings::default(),
         }
     }
 }
@@ -363,6 +488,42 @@ mod tests {
         assert_eq!(back.dns.force_tcp, cfg.dns.force_tcp);
         assert_eq!(back.ntp.target, cfg.ntp.target);
         assert_eq!(back.ntp.timeout_ms, cfg.ntp.timeout_ms);
+        assert_eq!(back.speedtest.active_tool, cfg.speedtest.active_tool);
+        assert_eq!(
+            back.speedtest.librespeed.server,
+            cfg.speedtest.librespeed.server
+        );
+        assert_eq!(back.speedtest.iperf3.host, cfg.speedtest.iperf3.host);
+        assert_eq!(
+            back.speedtest.iperf3_server.port,
+            cfg.speedtest.iperf3_server.port
+        );
+    }
+
+    #[test]
+    fn old_config_without_speedtest_still_loads() {
+        let mut value = toml::Value::try_from(AppConfig::default()).unwrap();
+        value
+            .as_table_mut()
+            .expect("config is a table")
+            .remove("speedtest");
+        let text = toml::to_string(&value).unwrap();
+        let back: AppConfig = toml::from_str(&text).unwrap();
+        assert_eq!(back.speedtest.active_tool, SpeedtestTool::LibreSpeed);
+        assert_eq!(back.speedtest.iperf3.port, Iperf3Settings::default().port);
+    }
+
+    #[test]
+    fn speedtest_section_without_server_still_loads() {
+        let mut value = toml::Value::try_from(AppConfig::default()).unwrap();
+        value
+            .get_mut("speedtest")
+            .and_then(toml::Value::as_table_mut)
+            .expect("speedtest table")
+            .remove("iperf3_server");
+        let text = toml::to_string(&value).unwrap();
+        let back: AppConfig = toml::from_str(&text).unwrap();
+        assert_eq!(back.speedtest.iperf3_server.port, 5201);
     }
 
     #[test]
@@ -413,5 +574,13 @@ mod tests {
         let ntp = NtpSettings::default();
         assert!(!ntp.target.is_empty());
         assert!(ntp.timeout_ms > 0);
+        let speed = SpeedtestSettings::default();
+        assert!(!speed.librespeed.server.is_empty());
+        assert!(speed.librespeed.duration_s > 0);
+        assert!(speed.librespeed.connections > 0);
+        assert!(speed.iperf3.port > 0);
+        assert!(speed.iperf3.duration_s > 0);
+        let server = Iperf3ServerSettings::default();
+        assert!(server.port > 0);
     }
 }

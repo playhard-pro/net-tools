@@ -15,6 +15,12 @@ const POPUP_WIDTH: f32 = 320.0;
 /// display only; selecting one still restores the full value.
 const MAX_DISPLAY_CHARS: usize = 40;
 
+/// One fixed drop-down entry with a display label and an underlying value.
+struct Preset {
+    label: String,
+    value: String,
+}
+
 /// Single-line text input with a history drop-down.
 ///
 /// Returns `true` when Enter was pressed while the field had focus, so callers
@@ -42,13 +48,41 @@ pub fn singleline_with_presets(
     history: &mut InputHistory,
     width: f32,
 ) -> bool {
-    singleline_impl(ui, key, presets, text, history, width)
+    let presets: Vec<Preset> = presets
+        .iter()
+        .map(|value| Preset {
+            label: (*value).to_string(),
+            value: (*value).to_string(),
+        })
+        .collect();
+    singleline_impl(ui, key, &presets, text, history, width)
+}
+
+/// Single-line text input whose drop-down offers labeled presets in addition
+/// to the editable history. `presets` contains `(label, value)` pairs, which
+/// allows an entry such as "All interfaces" to store an empty value.
+pub fn singleline_with_labeled_presets(
+    ui: &mut egui::Ui,
+    key: &str,
+    presets: &[(&str, &str)],
+    text: &mut String,
+    history: &mut InputHistory,
+    width: f32,
+) -> bool {
+    let presets: Vec<Preset> = presets
+        .iter()
+        .map(|(label, value)| Preset {
+            label: (*label).to_string(),
+            value: (*value).to_string(),
+        })
+        .collect();
+    singleline_impl(ui, key, &presets, text, history, width)
 }
 
 fn singleline_impl(
     ui: &mut egui::Ui,
     key: &str,
-    presets: &[&str],
+    presets: &[Preset],
     text: &mut String,
     history: &mut InputHistory,
     width: f32,
@@ -98,7 +132,7 @@ pub fn record_fields(history: &mut InputHistory, fields: &[(&str, &str)]) {
 fn history_button(
     ui: &mut egui::Ui,
     key: &str,
-    presets: &[&str],
+    presets: &[Preset],
     text: &mut String,
     history: &mut InputHistory,
 ) {
@@ -119,7 +153,7 @@ fn history_button(
 fn history_menu(
     ui: &mut egui::Ui,
     key: &str,
-    presets: &[&str],
+    presets: &[Preset],
     text: &mut String,
     history: &mut InputHistory,
 ) {
@@ -128,8 +162,11 @@ fn history_menu(
     if !presets.is_empty() {
         ui.weak(t!("common.presets"));
         for preset in presets {
-            if ui.selectable_label(text == preset, *preset).clicked() {
-                *text = (*preset).to_string();
+            if ui
+                .selectable_label(text == &preset.value, &preset.label)
+                .clicked()
+            {
+                *text = preset.value.clone();
                 ui.close();
             }
         }
@@ -143,7 +180,11 @@ fn history_menu(
         .entries(key)
         .iter()
         .enumerate()
-        .filter(|(_, entry)| !presets.contains(&entry.as_str()))
+        .filter(|(_, entry)| {
+            !presets
+                .iter()
+                .any(|preset| preset.value.as_str() == entry.as_str())
+        })
         .map(|(index, entry)| (index, entry.clone()))
         .collect();
     if entries.is_empty() {

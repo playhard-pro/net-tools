@@ -19,6 +19,7 @@ tab:
   lookup: Lookup
   dns: DNS
   ntp: NTP
+  speedtest: Speedtest
 state:
   idle: idle
   running: running
@@ -161,3 +162,72 @@ ntp:
   metrics_line_one: "server %{server} · stratum %{stratum} · %{leap} · NTPv%{version}"
   metrics_line_two: "offset %{offset} ms · delay %{delay} ms · root delay %{root_delay} ms · root dispersion %{root_dispersion} ms"
   metrics_line_three: "precision %{precision} s · reference %{reference_id} · reference time %{reference_time} UTC · query %{elapsed} ms"
+
+speedtest:
+  librespeed: LibreSpeed
+  iperf3: iperf3
+  iperf3_server: iperf3 Server
+  server: Server
+  auto: Auto (fastest)
+  servers_loaded: "%{count} public servers loaded"
+  select_server: Select a public server
+  server_filter: Server filter
+  server_filter_hint: provider, country or host
+  host_required: Select a public server or enter a host first.
+  refresh_servers: Refresh
+  custom_url: Custom backend URL
+  duration_s: Duration
+  connections: Connections
+  skip_download: Skip download
+  skip_upload: Skip upload
+  librespeed_hint: "Custom URLs use the standard LibreSpeed backend layout. Public servers receive random upload data."
+  host: Host
+  port: Port
+  protocol: Protocol
+  direction: Direction
+  direction_upload: Upload
+  direction_download: Download
+  direction_bidirectional: Bidirectional
+  omit_s: Omit warm-up
+  streams: Streams
+  block_size: Block size
+  bandwidth_mbps: UDP bandwidth
+  iperf3_hint: "The public server list comes from iperf3serverlist.net. Public servers allow one test at a time and may be offline; prefer your own server for repeatable results."
+  authorized_hint: Only test networks and servers you own or are authorized to test.
+  empty: Start a speed test to see live throughput and results
+  rtt: RTT
+  not_available: n/a
+  iperf3_metrics_hint: "iperf3 has no ping phase; TCP RTT comes from TCP_INFO and jitter is only reported in UDP mode."
+  ping: Ping
+  jitter: Jitter
+  download: Download
+  upload: Upload
+  lost: Lost
+  retransmits: Retransmits
+  history: Session history
+  no_history: No completed tests yet
+  elapsed_s: Elapsed (s)
+  mbps: Mbps
+  phase_idle: idle
+  phase_latency: measuring latency
+  phase_download: downloading
+  phase_upload: uploading
+  phase_connecting: connecting
+  phase_testing: testing
+  phase_done: done
+
+server:
+  refresh_ips: Refresh IPs
+  current: Current
+  all_interfaces: All interfaces
+  bind_address: Bind address
+  port: Port
+  one_off: Stop after one test
+  max_duration: Max test duration
+  bitrate_limit: Bitrate limit
+  hint: "Leave the bind address empty to listen on all interfaces. Allow the chosen port through the local firewall so clients can connect."
+  listening_on: "listening on %{addr}"
+  empty: Start the server and run a test from a client to see results
+  client: Client
+  sent: Sent (Mbps)
+  received: Received (Mbps)

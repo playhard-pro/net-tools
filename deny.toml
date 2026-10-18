@@ -19,6 +19,10 @@ ignore = [
     { id = "RUSTSEC-2026-0370", reason = "zvariant is only used by the Linux accessibility stack; no fixed release is available yet" },
     { id = "RUSTSEC-2026-0371", reason = "zbus_names is only used by the Linux accessibility stack; no fixed release is available yet" },
     { id = "RUSTSEC-2026-0372", reason = "zvariant_derive is only used by the Linux accessibility stack; no fixed release is available yet" },
+    # riperf3 depends on the rsa crate for its optional authenticated mode. This
+    # application never enables iperf3 authentication, so no RSA operation runs;
+    # the advisory is not reachable through our code path.
+    { id = "RUSTSEC-2023-0071", reason = "rsa is an unused transitive dependency of riperf3; iperf3 authentication is not enabled" },
 ]
 
 [licenses]
