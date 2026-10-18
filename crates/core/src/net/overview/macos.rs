@@ -125,20 +125,17 @@ fn parse_mac_bytes(value: &str) -> Vec<u8> {
 fn parse_media_speed(value: &str) -> Option<u64> {
     let lower = value.to_ascii_lowercase();
     let base = lower.find("base")?;
+    // A media type may carry a unit suffix between the number and `base`,
+    // so split the number from that suffix before parsing it.
     let prefix = &lower[..base];
-    let digits: String = prefix
-        .chars()
-        .rev()
-        .take_while(|character| character.is_ascii_digit())
-        .collect::<String>()
-        .chars()
-        .rev()
-        .collect();
-    let mut mbps = digits.parse::<u64>().ok()?;
-    if prefix.ends_with('g') {
-        mbps = mbps.saturating_mul(1000);
-    }
-    (mbps > 0).then_some(mbps.saturating_mul(1_000_000))
+    let number_end = prefix
+        .find(|character: char| !character.is_ascii_digit() && character != '.')
+        .unwrap_or(prefix.len());
+    let (number, unit) = prefix.split_at(number_end);
+    let mbps: f64 = number.parse().ok()?;
+    let multiplier = if unit.contains('g') { 1_000.0 } else { 1.0 };
+    let bps = mbps * multiplier * 1_000_000.0;
+    (bps >= 1.0).then_some(bps as u64)
 }
 
 /// Add IP addresses from `getifaddrs`.
@@ -400,6 +397,8 @@ mod tests {
             Some(1_000_000_000)
         );
         assert_eq!(parse_media_speed("10Gbase-T"), Some(10_000_000_000));
+        assert_eq!(parse_media_speed("2.5Gbase-T"), Some(2_500_000_000));
         assert_eq!(parse_media_speed("autoselect"), None);
+        assert_eq!(parse_media_speed("baseT"), None);
     }
 }
