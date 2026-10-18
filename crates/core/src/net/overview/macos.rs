@@ -125,14 +125,15 @@ fn parse_mac_bytes(value: &str) -> Vec<u8> {
 fn parse_media_speed(value: &str) -> Option<u64> {
     let lower = value.to_ascii_lowercase();
     let base = lower.find("base")?;
-    // A media type may carry a unit suffix between the number and `base`,
-    // so split the number from that suffix before parsing it.
+    // Media types can carry descriptive text before the number and a unit
+    // suffix before `base`, so trim the unit and read the trailing number.
     let prefix = &lower[..base];
-    let number_end = prefix
-        .find(|character: char| !character.is_ascii_digit() && character != '.')
-        .unwrap_or(prefix.len());
-    let (number, unit) = prefix.split_at(number_end);
-    let mbps: f64 = number.parse().ok()?;
+    let number_part = prefix.trim_end_matches(|character: char| character.is_ascii_alphabetic());
+    let unit = &prefix[number_part.len()..];
+    let number_start = number_part
+        .rfind(|character: char| !character.is_ascii_digit() && character != '.')
+        .map_or(0, |index| index + 1);
+    let mbps: f64 = number_part[number_start..].parse().ok()?;
     let multiplier = if unit.contains('g') { 1_000.0 } else { 1.0 };
     let bps = mbps * multiplier * 1_000_000.0;
     (bps >= 1.0).then_some(bps as u64)
@@ -398,6 +399,10 @@ mod tests {
         );
         assert_eq!(parse_media_speed("10Gbase-T"), Some(10_000_000_000));
         assert_eq!(parse_media_speed("2.5Gbase-T"), Some(2_500_000_000));
+        assert_eq!(
+            parse_media_speed("autoselect (1000baseT <full-duplex>)"),
+            Some(1_000_000_000)
+        );
         assert_eq!(parse_media_speed("autoselect"), None);
         assert_eq!(parse_media_speed("baseT"), None);
     }
