@@ -70,7 +70,8 @@ impl Iperf3ServerTab {
         self.progress = None;
     }
 
-    pub fn ui(
+    /// Settings and controls rendered in the shared left-hand panel.
+    pub fn settings_ui(
         &mut self,
         ui: &mut egui::Ui,
         settings: &mut Iperf3ServerSettings,
@@ -84,68 +85,67 @@ impl Iperf3ServerTab {
 
         let mut submit = false;
         let mut refresh_ips = false;
-        egui::CollapsingHeader::new(t!("common.settings"))
-            .default_open(true)
+        ui.heading(t!("common.settings"));
+        egui::Grid::new("iperf3_server_settings")
+            .num_columns(2)
+            .spacing([12.0, 10.0])
             .show(ui, |ui| {
-                egui::Grid::new("iperf3_server_settings")
-                    .num_columns(2)
-                    .spacing([12.0, 6.0])
-                    .show(ui, |ui| {
-                        ui.label(t!("server.bind_address"));
-                        ui.horizontal(|ui| {
-                            let all_interfaces = t!("server.all_interfaces").to_string();
-                            let mut presets: Vec<(&str, &str)> =
-                                vec![(all_interfaces.as_str(), "")];
-                            presets
-                                .extend(self.local_ips.iter().map(|ip| (ip.as_str(), ip.as_str())));
-                            if history_input::singleline_with_labeled_presets(
-                                ui,
-                                BIND_HISTORY_KEY,
-                                &presets,
-                                &mut settings.bind_address,
-                                history,
-                                300.0,
-                            ) {
-                                submit = true;
-                            }
-                            if ui.button(t!("server.refresh_ips")).clicked() {
-                                refresh_ips = true;
-                            }
-                        });
-                        ui.end_row();
+                ui.label(t!("server.bind_address"));
+                ui.horizontal(|ui| {
+                    let all_interfaces = t!("server.all_interfaces").to_string();
+                    let mut presets: Vec<(&str, &str)> = vec![(all_interfaces.as_str(), "")];
+                    presets.extend(self.local_ips.iter().map(|ip| (ip.as_str(), ip.as_str())));
+                    if history_input::singleline_with_labeled_presets(
+                        ui,
+                        BIND_HISTORY_KEY,
+                        &presets,
+                        &mut settings.bind_address,
+                        history,
+                        140.0,
+                    ) {
+                        submit = true;
+                    }
+                });
+                ui.end_row();
 
-                        ui.label(t!("server.port"));
-                        ui.add(egui::DragValue::new(&mut settings.port).range(1..=65_535));
-                        ui.end_row();
+                ui.label("");
+                if ui.button(t!("server.refresh_ips")).clicked() {
+                    refresh_ips = true;
+                }
+                ui.end_row();
 
-                        ui.label(t!("server.one_off"));
-                        ui.checkbox(&mut settings.one_off, "");
-                        ui.end_row();
+                ui.label(t!("server.port"));
+                ui.add(egui::DragValue::new(&mut settings.port).range(1..=65_535));
+                ui.end_row();
 
-                        ui.label(t!("server.max_duration"));
-                        ui.add(
-                            egui::DragValue::new(&mut settings.max_duration_s)
-                                .range(0..=86_400)
-                                .suffix(" s"),
-                        );
-                        ui.end_row();
+                ui.label(t!("server.one_off"));
+                ui.checkbox(&mut settings.one_off, "");
+                ui.end_row();
 
-                        ui.label(t!("server.bitrate_limit"));
-                        let mut limit = settings.bitrate_limit_bps as f64 / 1_000_000.0;
-                        if ui
-                            .add(
-                                egui::DragValue::new(&mut limit)
-                                    .range(0.0..=1_000_000.0)
-                                    .suffix(" Mbps"),
-                            )
-                            .changed()
-                        {
-                            settings.bitrate_limit_bps = (limit * 1_000_000.0).round() as u64;
-                        }
-                        ui.end_row();
-                    });
-                ui.weak(t!("server.hint"));
+                ui.label(t!("server.max_duration"));
+                ui.add(
+                    egui::DragValue::new(&mut settings.max_duration_s)
+                        .range(0..=86_400)
+                        .suffix(" s"),
+                );
+                ui.end_row();
+
+                ui.label(t!("server.bitrate_limit"));
+                let mut limit = settings.bitrate_limit_bps as f64 / 1_000_000.0;
+                if ui
+                    .add(
+                        egui::DragValue::new(&mut limit)
+                            .range(0.0..=1_000_000.0)
+                            .suffix(" Mbps"),
+                    )
+                    .changed()
+                {
+                    settings.bitrate_limit_bps = (limit * 1_000_000.0).round() as u64;
+                }
+                ui.end_row();
             });
+        ui.weak(t!("server.hint"));
+
         if refresh_ips {
             self.local_ips = net_tools_core::net::iperf3::local_ip_addresses();
         }
@@ -153,6 +153,7 @@ impl Iperf3ServerTab {
             self.start(settings, history, rt);
         }
 
+        ui.add_space(6.0);
         ui.horizontal(|ui| {
             if self.ctrl.is_active() {
                 if ui.button(t!("common.stop")).clicked() {
@@ -162,7 +163,9 @@ impl Iperf3ServerTab {
                 self.start(settings, history, rt);
             }
             state_badge(ui, self.ctrl.state);
-            if self.ctrl.is_active() {
+        });
+        if self.ctrl.is_active() {
+            ui.horizontal(|ui| {
                 ui.spinner();
                 ui.weak(t!(
                     "server.listening_on",
@@ -176,8 +179,8 @@ impl Iperf3ServerTab {
                         settings.port
                     )
                 ));
-            }
-        });
+            });
+        }
 
         if let Some((message, hint)) = &self.error {
             error_banner(ui, message, hint.as_deref());
@@ -185,13 +188,16 @@ impl Iperf3ServerTab {
         for line in self.logs.iter().rev().take(5) {
             info_line(ui, line);
         }
+    }
+
+    /// Live metrics, toolbar and the session result table.
+    pub fn results_ui(&mut self, ui: &mut egui::Ui) {
+        self.toolbar(ui);
 
         if let Some(progress) = &self.progress {
             self.live_metrics(ui, progress);
         }
 
-        ui.separator();
-        self.toolbar(ui);
         if self.results.is_empty() {
             ui.vertical_centered(|ui| {
                 ui.add_space(32.0);

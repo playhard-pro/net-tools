@@ -5,17 +5,21 @@ use net_tools_core::control::TaskState;
 use net_tools_core::net::privilege::PrivilegeStatus;
 use rust_i18n::t;
 
+use super::theme::Palette;
+
 /// Colored task-state badge.
 pub fn state_badge(ui: &mut egui::Ui, state: TaskState) {
-    let (text, color) = match state {
-        TaskState::Idle => (t!("state.idle"), egui::Color32::GRAY),
-        TaskState::Running => (t!("state.running"), egui::Color32::from_rgb(0, 180, 0)),
-        TaskState::Paused => (t!("state.paused"), egui::Color32::from_rgb(230, 160, 0)),
-        TaskState::Stopping => (t!("state.stopping"), egui::Color32::from_rgb(200, 120, 0)),
-        TaskState::Finished => (t!("state.finished"), egui::Color32::from_rgb(90, 140, 220)),
+    let palette = Palette::from_ui(ui);
+    let text = match state {
+        TaskState::Idle => t!("state.idle"),
+        TaskState::Running => t!("state.running"),
+        TaskState::Paused => t!("state.paused"),
+        TaskState::Stopping => t!("state.stopping"),
+        TaskState::Finished => t!("state.finished"),
     };
+    let color = palette.state_color(state);
     egui::Frame::new()
-        .fill(color.gamma_multiply(0.18))
+        .fill(palette.badge_bg(color))
         .corner_radius(6.0)
         .inner_margin(egui::Margin::symmetric(8, 3))
         .show(ui, |ui| {
@@ -32,17 +36,18 @@ pub fn privilege_note(ui: &mut egui::Ui, available: bool, status: &PrivilegeStat
     if available {
         return;
     }
+    let palette = Palette::from_ui(ui);
     egui::Frame::new()
-        .fill(egui::Color32::from_rgb(64, 56, 12))
+        .fill(palette.warning_bg)
         .corner_radius(4.0)
         .inner_margin(egui::Margin::same(8))
         .show(ui, |ui| {
-            ui.colored_label(egui::Color32::from_rgb(240, 205, 120), message);
+            ui.colored_label(palette.warning_text, message);
             if let Some(hint) = &status.hint {
                 ui.horizontal(|ui| {
                     ui.label(
                         egui::RichText::new(hint)
-                            .color(egui::Color32::from_rgb(255, 220, 170))
+                            .color(palette.warning_hint)
                             .monospace(),
                     );
                     copy_button(ui, hint);
@@ -53,18 +58,15 @@ pub fn privilege_note(ui: &mut egui::Ui, available: bool, status: &PrivilegeStat
 
 /// Error message plus an optional hint, with a copy button.
 pub fn error_banner(ui: &mut egui::Ui, message: &str, hint: Option<&str>) {
+    let palette = Palette::from_ui(ui);
     egui::Frame::new()
-        .fill(egui::Color32::from_rgb(90, 20, 20))
+        .fill(palette.error_bg)
         .corner_radius(4.0)
         .inner_margin(egui::Margin::same(8))
         .show(ui, |ui| {
-            ui.colored_label(egui::Color32::from_rgb(255, 130, 130), message);
+            ui.colored_label(palette.error_text, message);
             if let Some(h) = hint {
-                ui.label(
-                    egui::RichText::new(h)
-                        .color(egui::Color32::from_rgb(255, 200, 160))
-                        .monospace(),
-                );
+                ui.label(egui::RichText::new(h).color(palette.error_hint).monospace());
                 copy_button(ui, h);
             }
         });
@@ -101,7 +103,8 @@ pub fn copy_button(ui: &mut egui::Ui, text: &str) {
 
 /// A plain informational line.
 pub fn info_line(ui: &mut egui::Ui, text: &str) {
-    ui.label(egui::RichText::new(text).color(egui::Color32::from_rgb(150, 200, 255)));
+    let color = Palette::from_ui(ui).info_text;
+    ui.label(egui::RichText::new(text).color(color));
 }
 
 /// Action chosen from the result toolbar.

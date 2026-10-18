@@ -21,10 +21,10 @@ pub fn common_probe(
     let mut submit = false;
     egui::Grid::new("common_probe_grid")
         .num_columns(2)
-        .spacing([12.0, 6.0])
+        .spacing([12.0, 10.0])
         .show(ui, |ui| {
             ui.label(t!("common.target"));
-            if history_input::singleline(ui, key, &mut c.target, history, 240.0) {
+            if history_input::singleline(ui, key, &mut c.target, history, 160.0) {
                 submit = true;
             }
             ui.end_row();

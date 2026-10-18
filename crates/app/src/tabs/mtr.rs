@@ -96,7 +96,8 @@ impl MtrTab {
         history: &mut InputHistory,
         rt: &tokio::runtime::Handle,
         privilege: &PrivilegeStatus,
-    ) {
+        settings_expanded: bool,
+    ) -> bool {
         self.drain();
         if self.ctrl.is_active() {
             // Keep repainting while a task runs so results and the auto-sized
@@ -104,109 +105,111 @@ impl MtrTab {
             ui.ctx().request_repaint();
         }
 
-        let mut submit = false;
-        egui::CollapsingHeader::new(t!("common.settings"))
-            .default_open(true)
-            .show(ui, |ui| {
-                egui::Grid::new("mtr_settings")
-                    .num_columns(2)
-                    .spacing([12.0, 6.0])
-                    .show(ui, |ui| {
-                        ui.label(t!("common.mode"));
-                        settings::probe_mode_selector(ui, &mut s.mode);
-                        ui.end_row();
+        let (submit, expanded) = crate::ui::layout::settings_panel(ui, settings_expanded, |ui| {
+            ui.heading(t!("common.settings"));
+            egui::Grid::new("mtr_settings")
+                .num_columns(2)
+                .spacing([12.0, 10.0])
+                .show(ui, |ui| {
+                    ui.label(t!("common.mode"));
+                    settings::probe_mode_selector(ui, &mut s.mode);
+                    ui.end_row();
 
-                        ui.label(t!("common.max_hops"));
-                        ui.add(egui::DragValue::new(&mut s.max_hops).range(1..=64));
-                        ui.end_row();
+                    ui.label(t!("common.max_hops"));
+                    ui.add(egui::DragValue::new(&mut s.max_hops).range(1..=64));
+                    ui.end_row();
 
-                        if s.mode == net_tools_core::model::ProbeMode::Udp {
-                            ui.label(t!("common.udp_port"));
-                            ui.add(egui::DragValue::new(&mut s.udp_port).range(1..=65_535));
-                            ui.end_row();
-                        }
-                    });
-                submit = settings::common_probe(ui, &mut s.common, history, TARGET_HISTORY_KEY);
+                    if s.mode == net_tools_core::model::ProbeMode::Udp {
+                        ui.label(t!("common.udp_port"));
+                        ui.add(egui::DragValue::new(&mut s.udp_port).range(1..=65_535));
+                        ui.end_row();
+                    }
+                });
+            let submit = settings::common_probe(ui, &mut s.common, history, TARGET_HISTORY_KEY);
+
+            // UDP MTR needs a raw socket, so warn only when that mode is
+            // selected and the capability is missing (Unix only: Windows has
+            // no backend).
+            if s.mode == ProbeMode::Udp && cfg!(unix) {
+                privilege_note(
+                    ui,
+                    privilege.raw,
+                    privilege,
+                    &t!("privilege.needs_raw_udp_mtr"),
+                );
+            }
+
+            ui.add_space(6.0);
+            ui.horizontal(|ui| {
+                self.control_row(ui, s, history, rt);
+                state_badge(ui, self.ctrl.state);
             });
-        if submit {
+
+            if let Some((msg, hint)) = &self.error {
+                error_banner(ui, msg, hint.as_deref());
+            }
+            for line in self.info.iter().rev().take(5) {
+                info_line(ui, line);
+            }
+            submit
+        });
+
+        if submit == Some(true) {
             history_input::record_fields(history, &[(TARGET_HISTORY_KEY, &s.common.target)]);
             self.restart(s, rt);
         }
 
-        // UDP MTR needs a raw socket, so warn only when that mode is selected
-        // and the capability is missing (Unix only: Windows has no backend).
-        if s.mode == ProbeMode::Udp && cfg!(unix) {
-            privilege_note(
-                ui,
-                privilege.raw,
-                privilege,
-                &t!("privilege.needs_raw_udp_mtr"),
-            );
-        }
+        crate::ui::layout::results_panel(ui, |ui| {
+            self.toolbar(ui);
 
-        ui.horizontal(|ui| {
-            self.control_row(ui, s, history, rt);
-            state_badge(ui, self.ctrl.state);
+            let headers = [
+                t!("mtr.hop"),
+                t!("mtr.addr"),
+                t!("mtr.reverse"),
+                t!("mtr.loss"),
+                t!("mtr.count"),
+                t!("mtr.last_ms"),
+                t!("mtr.avg_ms"),
+                t!("mtr.best_ms"),
+                t!("mtr.worst_ms"),
+                t!("mtr.stdev_ms"),
+            ];
+            table(ui, &headers, self.hops.len(), |i, row| {
+                let h = &self.hops[i];
+                row.col(|ui| {
+                    ui.label(h.hop.to_string());
+                });
+                row.col(|ui| {
+                    ui.label(h.addr_text());
+                });
+                row.col(|ui| {
+                    ui.label(h.reverse_text());
+                });
+                row.col(|ui| {
+                    ui.label(format!("{:.1}%", h.loss_ratio() * 100.0));
+                });
+                row.col(|ui| {
+                    ui.label(format!("{}/{}/{}", h.sent, h.success_count(), h.lost));
+                });
+                row.col(|ui| {
+                    ui.label(h.last_ms.map_or("-".into(), |v| format!("{:.2}", v)));
+                });
+                row.col(|ui| {
+                    ui.label(h.avg_ms.map_or("-".into(), |v| format!("{:.2}", v)));
+                });
+                row.col(|ui| {
+                    ui.label(h.best_ms.map_or("-".into(), |v| format!("{:.2}", v)));
+                });
+                row.col(|ui| {
+                    ui.label(h.worst_ms.map_or("-".into(), |v| format!("{:.2}", v)));
+                });
+                row.col(|ui| {
+                    ui.label(h.stdev_ms.map_or("-".into(), |v| format!("{:.2}", v)));
+                });
+            });
         });
 
-        if let Some((msg, hint)) = &self.error {
-            error_banner(ui, msg, hint.as_deref());
-        }
-        for line in self.info.iter().rev().take(5) {
-            info_line(ui, line);
-        }
-
-        ui.separator();
-
-        // Result toolbar lives below the divider, together with the result
-        // widgets it acts on.
-        self.toolbar(ui);
-
-        let headers = [
-            t!("mtr.hop"),
-            t!("mtr.addr"),
-            t!("mtr.reverse"),
-            t!("mtr.loss"),
-            t!("mtr.count"),
-            t!("mtr.last_ms"),
-            t!("mtr.avg_ms"),
-            t!("mtr.best_ms"),
-            t!("mtr.worst_ms"),
-            t!("mtr.stdev_ms"),
-        ];
-        table(ui, &headers, self.hops.len(), |i, row| {
-            let h = &self.hops[i];
-            row.col(|ui| {
-                ui.label(h.hop.to_string());
-            });
-            row.col(|ui| {
-                ui.label(h.addr_text());
-            });
-            row.col(|ui| {
-                ui.label(h.reverse_text());
-            });
-            row.col(|ui| {
-                ui.label(format!("{:.1}%", h.loss_ratio() * 100.0));
-            });
-            row.col(|ui| {
-                ui.label(format!("{}/{}/{}", h.sent, h.success_count(), h.lost));
-            });
-            row.col(|ui| {
-                ui.label(h.last_ms.map_or("-".into(), |v| format!("{:.2}", v)));
-            });
-            row.col(|ui| {
-                ui.label(h.avg_ms.map_or("-".into(), |v| format!("{:.2}", v)));
-            });
-            row.col(|ui| {
-                ui.label(h.best_ms.map_or("-".into(), |v| format!("{:.2}", v)));
-            });
-            row.col(|ui| {
-                ui.label(h.worst_ms.map_or("-".into(), |v| format!("{:.2}", v)));
-            });
-            row.col(|ui| {
-                ui.label(h.stdev_ms.map_or("-".into(), |v| format!("{:.2}", v)));
-            });
-        });
+        expanded
     }
 
     fn toolbar(&mut self, ui: &mut egui::Ui) {

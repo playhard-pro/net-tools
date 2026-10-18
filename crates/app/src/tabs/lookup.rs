@@ -10,20 +10,10 @@ use rust_i18n::t;
 
 use crate::ui::common::{error_banner, result_toolbar, state_badge, ToolbarAction};
 use crate::ui::history_input;
+use crate::ui::theme::Palette;
 
 /// History bucket for the target input.
 const TARGET_HISTORY_KEY: &str = "lookup.target";
-/// Color used for object keys and container labels.
-const KEY_COLOR: egui::Color32 = egui::Color32::from_rgb(120, 180, 255);
-/// Color used for string values.
-const STRING_COLOR: egui::Color32 = egui::Color32::from_rgb(140, 220, 140);
-/// Color used for numeric values.
-const NUMBER_COLOR: egui::Color32 = egui::Color32::from_rgb(230, 180, 120);
-/// Color used for boolean values.
-const BOOL_COLOR: egui::Color32 = egui::Color32::from_rgb(200, 150, 230);
-/// Color used for `null`.
-const NULL_COLOR: egui::Color32 = egui::Color32::GRAY;
-
 pub struct LookupTab {
     pub ctrl: TaskController<ProbeEvent>,
     pub result: Option<LookupResult>,
@@ -88,60 +78,60 @@ impl LookupTab {
         s: &mut LookupSettings,
         history: &mut InputHistory,
         rt: &tokio::runtime::Handle,
-    ) {
+        settings_expanded: bool,
+    ) -> bool {
         self.drain();
         if self.ctrl.is_active() {
             // Keep repainting while the request is in flight.
             ui.ctx().request_repaint();
         }
 
-        let mut submit = false;
-        egui::CollapsingHeader::new(t!("common.settings"))
-            .default_open(true)
-            .show(ui, |ui| {
-                egui::Grid::new("lookup_settings")
-                    .num_columns(2)
-                    .spacing([12.0, 6.0])
-                    .show(ui, |ui| {
-                        ui.label(t!("common.target"));
-                        if history_input::singleline(
-                            ui,
-                            "lookup.target",
-                            &mut s.target,
-                            history,
-                            320.0,
-                        ) {
-                            submit = true;
-                        }
-                        ui.end_row();
+        let (submit, expanded) = crate::ui::layout::settings_panel(ui, settings_expanded, |ui| {
+            ui.heading(t!("common.settings"));
+            let mut submit = false;
+            egui::Grid::new("lookup_settings")
+                .num_columns(2)
+                .spacing([12.0, 10.0])
+                .show(ui, |ui| {
+                    ui.label(t!("common.target"));
+                    if history_input::singleline(ui, "lookup.target", &mut s.target, history, 160.0)
+                    {
+                        submit = true;
+                    }
+                    ui.end_row();
 
-                        ui.label(t!("common.timeout_ms"));
-                        ui.add(
-                            egui::DragValue::new(&mut s.timeout_ms)
-                                .range(100..=120_000)
-                                .suffix(" ms"),
-                        );
-                        ui.end_row();
-                    });
+                    ui.label(t!("common.timeout_ms"));
+                    ui.add(
+                        egui::DragValue::new(&mut s.timeout_ms)
+                            .range(100..=120_000)
+                            .suffix(" ms"),
+                    );
+                    ui.end_row();
+                });
+
+            ui.add_space(6.0);
+            ui.horizontal(|ui| {
+                self.control_row(ui, s, history, rt);
+                state_badge(ui, self.ctrl.state);
             });
-        if submit {
+
+            if let Some((msg, hint)) = &self.error {
+                error_banner(ui, msg, hint.as_deref());
+            }
+            submit
+        });
+
+        if submit == Some(true) {
             history_input::record_fields(history, &[(TARGET_HISTORY_KEY, &s.target)]);
             self.restart(s, rt);
         }
 
-        ui.horizontal(|ui| {
-            self.control_row(ui, s, history, rt);
-            state_badge(ui, self.ctrl.state);
+        crate::ui::layout::results_panel(ui, |ui| {
+            self.toolbar(ui);
+            self.result_ui(ui);
         });
 
-        if let Some((msg, hint)) = &self.error {
-            error_banner(ui, msg, hint.as_deref());
-        }
-
-        ui.separator();
-
-        self.toolbar(ui);
-        self.result_ui(ui);
+        expanded
     }
 
     fn control_row(
@@ -182,12 +172,13 @@ impl LookupTab {
         let Some(result) = &self.result else {
             return;
         };
+        let palette = Palette::from_ui(ui);
 
         ui.horizontal(|ui| {
             ui.label(
                 egui::RichText::new(&result.target)
                     .heading()
-                    .color(KEY_COLOR),
+                    .color(palette.key),
             );
             ui.label(t!("lookup.kind", kind = &result.kind));
             if let Some(status) = result.status {
@@ -203,7 +194,7 @@ impl LookupTab {
         // Explain why the shown target differs from what the user entered.
         if !result.original_target.is_empty() && result.original_target != result.target {
             ui.colored_label(
-                egui::Color32::from_rgb(230, 180, 120),
+                palette.warning_text,
                 t!("lookup.fallback", original = &result.original_target),
             );
         }
@@ -212,13 +203,10 @@ impl LookupTab {
         }
 
         if result.status == Some(404) && result.data.is_none() && result.error.is_none() {
-            ui.colored_label(
-                egui::Color32::from_rgb(230, 180, 120),
-                t!("lookup.not_found"),
-            );
+            ui.colored_label(palette.warning_text, t!("lookup.not_found"));
         }
         if let Some(error) = &result.error {
-            ui.colored_label(egui::Color32::from_rgb(255, 130, 130), error);
+            ui.colored_label(palette.error_text, error);
         }
         if let Some(raw) = &result.raw {
             ui.label(egui::RichText::new(raw).monospace());
@@ -367,6 +355,7 @@ fn container_node(
         id,
         default_open,
     );
+    let key_color = Palette::from_ui(ui).key;
     state
         .show_header(ui, |ui| {
             let text = if label.is_empty() {
@@ -374,7 +363,7 @@ fn container_node(
             } else {
                 format!("{label}  {hint}")
             };
-            ui.label(egui::RichText::new(text).strong().color(KEY_COLOR));
+            ui.label(egui::RichText::new(text).strong().color(key_color));
         })
         .body(|ui| body(ui));
 }
@@ -383,17 +372,18 @@ fn container_node(
 /// label is empty (for example an array of scalars at the document root) only
 /// the value is shown.
 fn scalar_row(ui: &mut egui::Ui, label: &str, value: &serde_json::Value) {
+    let palette = Palette::from_ui(ui);
     let (text, color) = match value {
-        serde_json::Value::String(s) => (format!("\"{s}\""), STRING_COLOR),
-        serde_json::Value::Number(n) => (n.to_string(), NUMBER_COLOR),
-        serde_json::Value::Bool(b) => (b.to_string(), BOOL_COLOR),
-        serde_json::Value::Null => ("null".to_string(), NULL_COLOR),
+        serde_json::Value::String(s) => (format!("\"{s}\""), palette.string),
+        serde_json::Value::Number(n) => (n.to_string(), palette.number),
+        serde_json::Value::Bool(b) => (b.to_string(), palette.boolean),
+        serde_json::Value::Null => ("null".to_string(), palette.null),
         // Objects and arrays are handled by `json_tree`, so this is unreachable.
-        other => (other.to_string(), NULL_COLOR),
+        other => (other.to_string(), palette.null),
     };
     ui.horizontal(|ui| {
         if !label.is_empty() {
-            ui.label(egui::RichText::new(format!("{label}:")).color(KEY_COLOR));
+            ui.label(egui::RichText::new(format!("{label}:")).color(palette.key));
         }
         ui.label(egui::RichText::new(text).monospace().color(color));
     });

@@ -16,6 +16,7 @@ use crate::tabs::iperf3_server::Iperf3ServerTab;
 use crate::ui::common::{error_banner, result_toolbar, state_badge, ToolbarAction};
 use crate::ui::history_input;
 use crate::ui::result_table::table_fixed_rows;
+use crate::ui::theme::Palette;
 
 /// History bucket for the custom LibreSpeed backend URL.
 const LIBRESPEED_URL_KEY: &str = "speedtest.librespeed.custom_url";
@@ -213,7 +214,8 @@ impl SpeedtestTab {
         settings: &mut SpeedtestSettings,
         history: &mut InputHistory,
         rt: &tokio::runtime::Handle,
-    ) {
+        settings_expanded: bool,
+    ) -> bool {
         self.drain();
         if !self.visible {
             self.visible = true;
@@ -232,30 +234,55 @@ impl SpeedtestTab {
             ui.ctx().request_repaint_after(LIVE_REPAINT);
         }
 
+        // The sub-tool selector spans both columns so switching between the
+        // three tools feels like changing tabs rather than changing a setting.
         let previous_tool = settings.active_tool;
         self.tool_selector(ui, settings);
         if previous_tool != settings.active_tool && previous_tool == SpeedtestTool::Iperf3Server {
             // The built-in server only runs while its sub-tab is selected.
             self.server.clear_on_hide();
         }
-        if settings.active_tool == SpeedtestTool::Iperf3Server {
-            self.server.ui(ui, &mut settings.iperf3_server, history, rt);
-            return;
-        }
-        let (start_requested, refresh_requested) =
-            egui::CollapsingHeader::new(t!("common.settings"))
-                .default_open(true)
-                .show(ui, |ui| match settings.active_tool {
-                    SpeedtestTool::LibreSpeed => {
-                        self.librespeed_settings(ui, settings, history, rt)
-                    }
-                    SpeedtestTool::Iperf3 => self.iperf3_settings(ui, settings, history),
-                    SpeedtestTool::Iperf3Server => (false, false),
-                })
-                .body_returned
-                .unwrap_or_default();
+
+        let tool = settings.active_tool;
+        let (outcome, expanded) = crate::ui::layout::settings_panel(ui, settings_expanded, |ui| {
+            ui.heading(t!("common.settings"));
+            let mut start_requested = false;
+            let mut refresh_requested = false;
+            match tool {
+                SpeedtestTool::LibreSpeed => {
+                    let (start, refresh) = self.librespeed_settings(ui, settings, history, rt);
+                    start_requested = start;
+                    refresh_requested = refresh;
+                }
+                SpeedtestTool::Iperf3 => {
+                    let (start, refresh) = self.iperf3_settings(ui, settings, history);
+                    start_requested = start;
+                    refresh_requested = refresh;
+                }
+                SpeedtestTool::Iperf3Server => {
+                    self.server
+                        .settings_ui(ui, &mut settings.iperf3_server, history, rt);
+                }
+            }
+
+            if tool != SpeedtestTool::Iperf3Server {
+                self.controls(ui, settings, history, rt);
+                let active_state = self.active_state(tool);
+                if let Some((message, hint)) = &active_state.error {
+                    error_banner(ui, message, hint.as_deref());
+                }
+                if let Some(notice) = &active_state.notice {
+                    let color = Palette::from_ui(ui).info_text;
+                    ui.colored_label(color, notice);
+                }
+            }
+
+            (start_requested, refresh_requested)
+        });
+        let (start_requested, refresh_requested) = outcome.unwrap_or_default();
+
         if refresh_requested {
-            match settings.active_tool {
+            match tool {
                 SpeedtestTool::LibreSpeed => self.refresh_servers(settings, rt),
                 SpeedtestTool::Iperf3 => self.refresh_iperf3_servers(rt),
                 SpeedtestTool::Iperf3Server => {}
@@ -265,28 +292,24 @@ impl SpeedtestTab {
             self.start_active(settings, history, rt);
         }
 
-        self.controls(ui, settings, history, rt);
-        self.toolbar(ui, settings.active_tool);
+        crate::ui::layout::results_panel(ui, |ui| match tool {
+            SpeedtestTool::Iperf3Server => self.server.results_ui(ui),
+            SpeedtestTool::LibreSpeed | SpeedtestTool::Iperf3 => {
+                self.toolbar(ui, tool);
+                // Results and history can exceed the available height,
+                // especially when the chart and a narrow window are combined.
+                egui::ScrollArea::vertical()
+                    .id_salt("speedtest_results_scroll")
+                    .auto_shrink([false, false])
+                    .show(ui, |ui| {
+                        self.result_ui(ui, tool);
+                        ui.add_space(10.0);
+                        self.history_ui(ui, tool);
+                    });
+            }
+        });
 
-        let active_state = self.active_state(settings.active_tool);
-        if let Some((message, hint)) = &active_state.error {
-            error_banner(ui, message, hint.as_deref());
-        }
-        if let Some(notice) = &active_state.notice {
-            ui.colored_label(egui::Color32::from_rgb(150, 200, 255), notice);
-        }
-
-        ui.separator();
-        // Results and history can exceed the available height, especially when
-        // the chart and a narrow window are combined, so keep them scrollable.
-        egui::ScrollArea::vertical()
-            .id_salt("speedtest_results_scroll")
-            .auto_shrink([false, false])
-            .show(ui, |ui| {
-                self.result_ui(ui, settings.active_tool);
-                ui.add_space(10.0);
-                self.history_ui(ui, settings.active_tool);
-            });
+        expanded
     }
 
     fn any_active(&self) -> bool {
@@ -373,7 +396,7 @@ impl SpeedtestTab {
         let s = &mut settings.librespeed;
         egui::Grid::new("speedtest_librespeed_settings")
             .num_columns(2)
-            .spacing([12.0, 6.0])
+            .spacing([12.0, 10.0])
             .show(ui, |ui| {
                 ui.label(t!("speedtest.server"));
                 ui.horizontal(|ui| {
@@ -388,7 +411,7 @@ impl SpeedtestTab {
                     };
                     egui::ComboBox::from_id_salt("librespeed_server")
                         .selected_text(selected)
-                        .width(320.0)
+                        .width(160.0)
                         .show_ui(ui, |ui| {
                             ui.selectable_value(
                                 &mut s.server,
@@ -403,6 +426,11 @@ impl SpeedtestTab {
                                 );
                             }
                         });
+                });
+                ui.end_row();
+
+                ui.label("");
+                ui.horizontal(|ui| {
                     if ui.button(t!("speedtest.refresh_servers")).clicked() {
                         refresh = true;
                     }
@@ -418,7 +446,7 @@ impl SpeedtestTab {
                     LIBRESPEED_URL_KEY,
                     &mut s.custom_url,
                     history,
-                    360.0,
+                    160.0,
                 ) {
                     submit = true;
                 }
@@ -471,7 +499,7 @@ impl SpeedtestTab {
         let s = &mut settings.iperf3;
         egui::Grid::new("speedtest_iperf3_settings")
             .num_columns(2)
-            .spacing([12.0, 6.0])
+            .spacing([12.0, 10.0])
             .show(ui, |ui| {
                 ui.label(t!("speedtest.server"));
                 ui.horizontal(|ui| {
@@ -489,7 +517,7 @@ impl SpeedtestTab {
                         });
                     egui::ComboBox::from_id_salt("iperf3_public_server")
                         .selected_text(selected)
-                        .width(460.0)
+                        .width(160.0)
                         .show_ui(ui, |ui| {
                             let filter = self.iperf3_filter.trim().to_ascii_lowercase();
                             for server in &self.iperf3_servers {
@@ -510,6 +538,11 @@ impl SpeedtestTab {
                                 }
                             }
                         });
+                });
+                ui.end_row();
+
+                ui.label("");
+                ui.horizontal(|ui| {
                     if ui.button(t!("speedtest.refresh_servers")).clicked() {
                         refresh = true;
                     }
@@ -528,12 +561,12 @@ impl SpeedtestTab {
                 ui.add(
                     egui::TextEdit::singleline(&mut self.iperf3_filter)
                         .hint_text(t!("speedtest.server_filter_hint"))
-                        .desired_width(240.0),
+                        .desired_width(140.0),
                 );
                 ui.end_row();
 
                 ui.label(t!("speedtest.host"));
-                if history_input::singleline(ui, IPERF3_HOST_KEY, &mut s.host, history, 360.0) {
+                if history_input::singleline(ui, IPERF3_HOST_KEY, &mut s.host, history, 160.0) {
                     submit = true;
                 }
                 ui.end_row();
@@ -1040,23 +1073,20 @@ fn phase_label(phase: SpeedPhase) -> String {
 
 pub(crate) fn metric_card(ui: &mut egui::Ui, label: impl ToString, value: &str) {
     let label = label.to_string();
+    let palette = Palette::from_ui(ui);
     egui::Frame::new()
-        .fill(egui::Color32::from_rgb(32, 38, 48))
+        .fill(palette.card_bg)
         .corner_radius(6.0)
         .inner_margin(egui::Margin::same(8))
         .show(ui, |ui| {
             ui.set_min_width(120.0);
-            ui.label(
-                egui::RichText::new(label)
-                    .small()
-                    .color(egui::Color32::WHITE),
-            );
+            ui.label(egui::RichText::new(label).small().color(palette.card_text));
             ui.label(
                 egui::RichText::new(value)
                     .monospace()
                     .size(16.0)
                     .strong()
-                    .color(egui::Color32::WHITE),
+                    .color(palette.card_text),
             );
         });
 }

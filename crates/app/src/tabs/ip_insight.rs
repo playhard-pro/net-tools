@@ -11,6 +11,7 @@ use rust_i18n::t;
 use crate::ui::common::{error_banner, result_toolbar, state_badge, ToolbarAction};
 use crate::ui::history_input;
 use crate::ui::result_table::key_value_table;
+use crate::ui::theme::Palette;
 
 /// History bucket for the target input.
 const TARGET_HISTORY_KEY: &str = "ip_insight.target";
@@ -86,62 +87,65 @@ impl IpInsightTab {
         s: &mut IpInsightSettings,
         history: &mut InputHistory,
         rt: &tokio::runtime::Handle,
-    ) {
+        settings_expanded: bool,
+    ) -> bool {
         self.drain();
         if self.ctrl.is_active() {
             // Keep repainting while a query runs so results appear as they land.
             ui.ctx().request_repaint();
         }
 
-        let mut submit = false;
-        egui::CollapsingHeader::new(t!("common.settings"))
-            .default_open(true)
-            .show(ui, |ui| {
-                egui::Grid::new("ip_insight_settings")
-                    .num_columns(2)
-                    .spacing([12.0, 6.0])
-                    .show(ui, |ui| {
-                        ui.label(t!("common.target"));
-                        if history_input::singleline(
-                            ui,
-                            "ip_insight.target",
-                            &mut s.target,
-                            history,
-                            240.0,
-                        ) {
-                            submit = true;
-                        }
-                        ui.end_row();
+        let (submit, expanded) = crate::ui::layout::settings_panel(ui, settings_expanded, |ui| {
+            ui.heading(t!("common.settings"));
+            let mut submit = false;
+            egui::Grid::new("ip_insight_settings")
+                .num_columns(2)
+                .spacing([12.0, 10.0])
+                .show(ui, |ui| {
+                    ui.label(t!("common.target"));
+                    if history_input::singleline(
+                        ui,
+                        "ip_insight.target",
+                        &mut s.target,
+                        history,
+                        160.0,
+                    ) {
+                        submit = true;
+                    }
+                    ui.end_row();
 
-                        ui.label(t!("common.timeout_ms"));
-                        ui.add(
-                            egui::DragValue::new(&mut s.timeout_ms)
-                                .range(100..=120_000)
-                                .suffix(" ms"),
-                        );
-                        ui.end_row();
-                    });
+                    ui.label(t!("common.timeout_ms"));
+                    ui.add(
+                        egui::DragValue::new(&mut s.timeout_ms)
+                            .range(100..=120_000)
+                            .suffix(" ms"),
+                    );
+                    ui.end_row();
+                });
+
+            ui.add_space(6.0);
+            ui.horizontal(|ui| {
+                self.control_row(ui, s, history, rt);
+                state_badge(ui, self.ctrl.state);
             });
-        if submit {
+
+            if let Some((msg, hint)) = &self.error {
+                error_banner(ui, msg, hint.as_deref());
+            }
+            submit
+        });
+
+        if submit == Some(true) {
             history_input::record_fields(history, &[(TARGET_HISTORY_KEY, &s.target)]);
             self.restart(s, rt);
         }
 
-        ui.horizontal(|ui| {
-            self.control_row(ui, s, history, rt);
-            state_badge(ui, self.ctrl.state);
+        crate::ui::layout::results_panel(ui, |ui| {
+            self.toolbar(ui);
+            self.results_ui(ui);
         });
 
-        if let Some((msg, hint)) = &self.error {
-            error_banner(ui, msg, hint.as_deref());
-        }
-
-        ui.separator();
-
-        // Result toolbar lives below the divider, together with the results it
-        // acts on.
-        self.toolbar(ui);
-        self.results_ui(ui);
+        expanded
     }
 
     fn control_row(
@@ -246,6 +250,7 @@ impl IpInsightTab {
 
 /// Draw a single provider's heading, status line and key/value table.
 fn provider_ui(ui: &mut egui::Ui, result: &IpInsightResult) {
+    let palette = Palette::from_ui(ui);
     ui.horizontal(|ui| {
         ui.heading(&result.provider);
         if let Some(status) = result.status {
@@ -260,7 +265,7 @@ fn provider_ui(ui: &mut egui::Ui, result: &IpInsightResult) {
     });
 
     if let Some(error) = &result.error {
-        ui.colored_label(egui::Color32::from_rgb(255, 130, 130), error);
+        ui.colored_label(palette.error_text, error);
     }
     if let Some(data) = &result.data {
         let rows = flatten_json(data);

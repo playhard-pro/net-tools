@@ -10,6 +10,11 @@ about:
   repository: "仓库："
   license: "许可证："
   close: 关闭
+theme:
+  system: 跟随系统
+  light: 浅色
+  dark: 深色
+
 tab:
   ping: Ping
   mtr: MTR
@@ -40,6 +45,8 @@ privilege:
   needs_raw_syn: "SYN 扫描需要原始套接字，请以提权方式运行："
 common:
   settings: 设置
+  theme: 主题
+  advanced: 高级
   language: 语言
   start: 开始
   pause: 暂停

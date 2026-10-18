@@ -4,10 +4,13 @@ use eframe::egui;
 use egui_plot::{Line, Plot, PlotPoints};
 use rust_i18n::t;
 
+use super::theme::Palette;
+
 /// Render a `(x, y)` series as a line chart. `points` is `(seq, rtt_ms)`.
 pub fn latency_chart(ui: &mut egui::Ui, points: &[[f64; 2]], height: f32) {
     let data: Vec<[f64; 2]> = points.to_vec();
     let y_max = points.iter().map(|p| p[1]).fold(1.0_f64, f64::max).max(1.0);
+    let line_color = Palette::from_ui(ui).chart_primary;
 
     Plot::new("latency_plot")
         .height(height)
@@ -17,10 +20,7 @@ pub fn latency_chart(ui: &mut egui::Ui, points: &[[f64; 2]], height: f32) {
         .include_y(y_max)
         .y_axis_label(t!("common.rtt_ms"))
         .show(ui, |plot_ui| {
-            plot_ui.line(
-                Line::new("rtt", PlotPoints::from(data))
-                    .color(egui::Color32::from_rgb(0, 180, 255)),
-            );
+            plot_ui.line(Line::new("rtt", PlotPoints::from(data)).color(line_color));
         });
 }
 
@@ -50,6 +50,7 @@ pub fn throughput_chart(
         .map(|point| point[1])
         .fold(1.0_f64, f64::max)
         .max(1.0);
+    let palette = Palette::from_ui(ui);
 
     Plot::new(id)
         .height(height)
@@ -63,14 +64,12 @@ pub fn throughput_chart(
         .show(ui, |plot_ui| {
             if !download.is_empty() {
                 plot_ui.line(
-                    Line::new("Download", PlotPoints::from(download))
-                        .color(egui::Color32::from_rgb(0, 180, 255)),
+                    Line::new("Download", PlotPoints::from(download)).color(palette.chart_primary),
                 );
             }
             if !upload.is_empty() {
                 plot_ui.line(
-                    Line::new("Upload", PlotPoints::from(upload))
-                        .color(egui::Color32::from_rgb(120, 220, 140)),
+                    Line::new("Upload", PlotPoints::from(upload)).color(palette.chart_secondary),
                 );
             }
         });

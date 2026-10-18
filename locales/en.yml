@@ -10,6 +10,11 @@ about:
   repository: "Repository:"
   license: "License:"
   close: Close
+theme:
+  system: System
+  light: Light
+  dark: Dark
+
 tab:
   ping: Ping
   mtr: MTR
@@ -40,6 +45,8 @@ privilege:
   needs_raw_syn: "SYN scan needs a raw socket. Run with elevation:"
 common:
   settings: Settings
+  theme: Theme
+  advanced: Advanced
   language: Language
   start: Start
   pause: Pause

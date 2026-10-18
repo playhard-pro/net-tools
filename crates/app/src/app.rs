@@ -14,6 +14,7 @@ use crate::tabs::ntp::NtpTab;
 use crate::tabs::ping::PingTab;
 use crate::tabs::port_scan::PortScanTab;
 use crate::tabs::speedtest::SpeedtestTab;
+use crate::ui::theme::Palette;
 
 /// Project homepage, shown as the title link. Taken from the manifest so the
 /// link and the published package metadata cannot drift apart.
@@ -46,10 +47,48 @@ pub enum Tab {
     Speedtest,
 }
 
+impl Tab {
+    /// Built-in order, also used to append any tab missing from a saved order.
+    pub const ALL: [Tab; 9] = [
+        Tab::Ping,
+        Tab::Mtr,
+        Tab::Http,
+        Tab::PortScan,
+        Tab::IpInsight,
+        Tab::Lookup,
+        Tab::Dns,
+        Tab::Ntp,
+        Tab::Speedtest,
+    ];
+
+    /// Stable identifier stored in the configuration. Changing this breaks the
+    /// saved order, while changing display labels does not.
+    pub fn id(self) -> &'static str {
+        match self {
+            Tab::Ping => "ping",
+            Tab::Mtr => "mtr",
+            Tab::Http => "http",
+            Tab::PortScan => "port_scan",
+            Tab::IpInsight => "ip_insight",
+            Tab::Lookup => "lookup",
+            Tab::Dns => "dns",
+            Tab::Ntp => "ntp",
+            Tab::Speedtest => "speedtest",
+        }
+    }
+
+    /// Resolve a saved identifier. Unknown values are ignored by the caller.
+    pub fn from_id(id: &str) -> Option<Self> {
+        Tab::ALL.into_iter().find(|tab| tab.id() == id)
+    }
+}
+
 pub struct App {
     pub rt: tokio::runtime::Handle,
     pub cfg: AppConfig,
     pub tab: Tab,
+    /// Top-level tab order chosen by the user and persisted in the config.
+    pub tab_order: Vec<Tab>,
     pub ping: PingTab,
     pub mtr: MtrTab,
     pub http: HttpPingTab,
@@ -60,6 +99,11 @@ pub struct App {
     pub ntp: NtpTab,
     pub speedtest: SpeedtestTab,
     pub privilege: PrivilegeStatus,
+    /// Manual or system-following theme preference.
+    pub theme_preference: egui::ThemePreference,
+    /// Whether the shared settings panel is expanded. The same value is used by
+    /// every tab so collapsing it stays consistent while switching tools.
+    pub settings_expanded: bool,
     /// Whether the About dialog is currently open.
     pub show_about: bool,
 }
@@ -69,10 +113,14 @@ impl App {
         // Install the bundled CJK font so CJK characters are not shown as boxes.
         crate::fonts::install(&cc.egui_ctx);
         let cfg = crate::config_store::load().unwrap_or_default();
+        let tab_order = normalize_tab_order(&cfg.tab_order);
+        let theme_preference = theme_preference_from_key(&cfg.theme);
+        cc.egui_ctx.set_theme(theme_preference);
         Self {
             rt,
             cfg,
             tab: Tab::Ping,
+            tab_order,
             ping: PingTab::new(),
             mtr: MtrTab::new(),
             http: HttpPingTab::new(),
@@ -83,34 +131,157 @@ impl App {
             ntp: NtpTab::new(),
             speedtest: SpeedtestTab::new(),
             privilege: net_tools_core::net::privilege::probe(),
+            theme_preference,
+            settings_expanded: true,
             show_about: false,
         }
     }
 
-    fn tab_button(&mut self, ui: &mut egui::Ui, tab: Tab, label: &str) {
-        let selected = self.tab == tab;
-        if ui.selectable_label(selected, label).clicked() {
-            // Leaving the NTP tab drops its live result and stops a query that
-            // is still running, so the clock does not keep repainting and no
-            // pointless probe continues in the background.
-            if self.tab == Tab::Ntp && tab != Tab::Ntp {
-                self.ntp.clear_on_hide();
-            }
-            // Leaving the speed test tab stops a running test and drops live
-            // progress, while completed session history stays available.
-            if self.tab == Tab::Speedtest && tab != Tab::Speedtest {
-                self.speedtest.clear_on_hide();
-            }
-            self.tab = tab;
+    /// Switch to another tab, stopping background work that must not continue
+    /// while its tab is hidden.
+    fn select_tab(&mut self, tab: Tab) {
+        if self.tab == tab {
+            return;
         }
+        // Leaving the NTP tab drops its live result and stops a query that is
+        // still running, so the clock does not keep repainting and no pointless
+        // probe continues in the background.
+        if self.tab == Tab::Ntp && tab != Tab::Ntp {
+            self.ntp.clear_on_hide();
+        }
+        // Leaving the speed test tab stops a running test and drops live
+        // progress, while completed session history stays available.
+        if self.tab == Tab::Speedtest && tab != Tab::Speedtest {
+            self.speedtest.clear_on_hide();
+        }
+        self.tab = tab;
+    }
+
+    /// Move a dragged tab relative to a drop target and persist the new order.
+    fn reorder_tab(&mut self, dragged: Tab, target: Tab, after: bool) {
+        let previous = self.tab_order.clone();
+        move_tab(&mut self.tab_order, dragged, target, after);
+        if self.tab_order != previous {
+            self.cfg.tab_order = self
+                .tab_order
+                .iter()
+                .map(|tab| tab.id().to_owned())
+                .collect();
+            crate::config_store::save(&self.cfg);
+        }
+    }
+
+    /// Render the top tab strip and let the user drag tabs into a new order.
+    fn tab_bar(&mut self, ui: &mut egui::Ui) {
+        let order = self.tab_order.clone();
+        let mut selected = None;
+        let mut dropped = None;
+
+        // The tab strip wraps onto additional rows when it runs out of
+        // horizontal space.
+        ui.horizontal_wrapped(|ui| {
+            for tab in order {
+                let response = ui.add(
+                    egui::Button::selectable(self.tab == tab, tab_label(tab))
+                        .sense(egui::Sense::click_and_drag()),
+                );
+                response.dnd_set_drag_payload(tab);
+
+                if response.clicked() {
+                    selected = Some(tab);
+                }
+
+                // Only the tab under the pointer receives the hover
+                // payload. Use the pointer position to decide whether to
+                // insert before or after it.
+                if response.dnd_hover_payload::<Tab>().is_some() {
+                    let after = ui
+                        .ctx()
+                        .pointer_interact_pos()
+                        .is_some_and(|pos| pos.x > response.rect.center().x);
+                    let x = if after {
+                        response.rect.right()
+                    } else {
+                        response.rect.left()
+                    };
+                    ui.painter().line_segment(
+                        [
+                            egui::pos2(x, response.rect.top()),
+                            egui::pos2(x, response.rect.bottom()),
+                        ],
+                        egui::Stroke::new(2.0, ui.visuals().selection.bg_fill),
+                    );
+                    if let Some(payload) = response.dnd_release_payload::<Tab>() {
+                        dropped = Some((*payload, tab, after));
+                    }
+                }
+            }
+        });
+
+        if let Some(tab) = selected {
+            self.select_tab(tab);
+        }
+        if let Some((dragged, target, after)) = dropped {
+            self.reorder_tab(dragged, target, after);
+        }
+    }
+
+    /// Global controls shown at the right side of the top bar. In a
+    /// right-to-left layout this produces the visual order
+    /// `Theme, Language, About, privileges`.
+    fn app_controls(&mut self, ui: &mut egui::Ui) {
+        self.privilege_badge(ui);
+        ui.separator();
+        if ui.small_button(t!("about.button")).clicked() {
+            self.show_about = true;
+        }
+        ui.separator();
+        self.language_selector(ui);
+        ui.label(t!("common.language"));
+        self.theme_selector(ui);
+        ui.label(t!("common.theme"));
+    }
+
+    /// Approximate the width of the tab strip. This only decides whether the
+    /// top bar can use one row; a small safety margin covers button rounding.
+    fn tabs_width(&self, ui: &egui::Ui) -> f32 {
+        let spacing = ui.spacing().item_spacing.x;
+        let padding = ui.spacing().button_padding.x * 2.0;
+        let mut width = 0.0;
+        for tab in &self.tab_order {
+            width += text_width(ui, &tab_label(*tab), egui::TextStyle::Button) + padding;
+        }
+        width + spacing * self.tab_order.len().saturating_sub(1) as f32 + 12.0
+    }
+
+    /// Approximate the width of the right-hand control group.
+    fn controls_width(&self, ui: &egui::Ui) -> f32 {
+        let spacing = ui.spacing().item_spacing.x;
+        let padding = ui.spacing().button_padding.x * 2.0;
+        let text = |value: String| text_width(ui, &value, egui::TextStyle::Body);
+
+        let mut width = text(t!("common.theme").to_string()) + 76.0;
+        width += text(t!("common.language").to_string()) + 84.0;
+        width += text(t!("about.button").to_string()) + padding;
+        width += text(privilege_label(&self.privilege));
+        if self.privilege.hint.is_some() {
+            width += spacing + text(t!("privilege.copy_cmd").to_string()) + padding;
+        }
+
+        // Two separators plus item spacing between all controls.
+        let items: usize = if self.privilege.hint.is_some() { 9 } else { 8 };
+        width += 2.0 * (spacing + 1.0) + spacing * items.saturating_sub(1) as f32;
+        // Safety margin for button rounding, combo arrows and separators.
+        width + 60.0
     }
 
     fn language_selector(&mut self, ui: &mut egui::Ui) {
         let locales = available_locales!();
         let current = self.cfg.language.clone();
         let display = language_display_name(&current);
-        egui::ComboBox::from_id_salt("language")
+        let response = egui::ComboBox::from_id_salt("language")
             .selected_text(display)
+            .width(84.0)
             .show_ui(ui, |ui| {
                 for code in locales {
                     let code = code.to_string();
@@ -121,6 +292,34 @@ impl App {
                     }
                 }
             });
+        response.response.on_hover_text(t!("common.language"));
+    }
+
+    /// Theme selector: system, light or dark. The choice is applied immediately
+    /// and persisted so it survives a restart.
+    fn theme_selector(&mut self, ui: &mut egui::Ui) {
+        let current = self.theme_preference;
+        let response = egui::ComboBox::from_id_salt("theme")
+            .selected_text(theme_label(current))
+            .width(76.0)
+            .show_ui(ui, |ui| {
+                for theme in [
+                    egui::ThemePreference::System,
+                    egui::ThemePreference::Light,
+                    egui::ThemePreference::Dark,
+                ] {
+                    if ui
+                        .selectable_label(current == theme, theme_label(theme))
+                        .clicked()
+                    {
+                        self.theme_preference = theme;
+                        ui.ctx().set_theme(theme);
+                        self.cfg.theme = theme_key(theme).to_string();
+                        crate::config_store::save(&self.cfg);
+                    }
+                }
+            });
+        response.response.on_hover_text(t!("common.theme"));
     }
 
     /// Privilege badge: reports whether the ICMP engines can open a socket, with
@@ -128,17 +327,12 @@ impl App {
     /// missing capability offers the elevation command, and only a permission
     /// error ever reaches this point with a hint.
     fn privilege_badge(&mut self, ui: &mut egui::Ui) {
+        let palette = Palette::from_ui(ui);
         let (color, label) = match (self.privilege.icmp, self.privilege.raw) {
-            (true, true) => (egui::Color32::from_rgb(0, 180, 0), t!("privilege.ok")),
+            (true, true) => (palette.privilege_ok, t!("privilege.ok")),
             // Probing works, but the features that need a raw socket do not.
-            (true, false) => (
-                egui::Color32::from_rgb(200, 170, 0),
-                t!("privilege.partial"),
-            ),
-            (false, _) => (
-                egui::Color32::from_rgb(220, 110, 50),
-                t!("privilege.limited"),
-            ),
+            (true, false) => (palette.privilege_partial, t!("privilege.partial")),
+            (false, _) => (palette.privilege_limited, t!("privilege.limited")),
         };
 
         let icmp_state = if self.privilege.icmp {
@@ -217,6 +411,113 @@ impl App {
     }
 }
 
+/// Display label for a top-level tab.
+fn tab_label(tab: Tab) -> String {
+    match tab {
+        Tab::Ping => t!("tab.ping"),
+        Tab::Mtr => t!("tab.mtr"),
+        Tab::Http => t!("tab.http"),
+        Tab::PortScan => t!("tab.portscan"),
+        Tab::IpInsight => t!("tab.ip_insight"),
+        Tab::Lookup => t!("tab.lookup"),
+        Tab::Dns => t!("tab.dns"),
+        Tab::Ntp => t!("tab.ntp"),
+        Tab::Speedtest => t!("tab.speedtest"),
+    }
+    .to_string()
+}
+
+/// Turn the persisted identifiers into a complete tab order.
+///
+/// Unknown and duplicate identifiers are dropped, and tabs added in a later
+/// release are appended in their built-in position instead of disappearing.
+fn normalize_tab_order(saved: &[String]) -> Vec<Tab> {
+    let mut order = Vec::with_capacity(Tab::ALL.len());
+    for id in saved {
+        if let Some(tab) = Tab::from_id(id) {
+            if !order.contains(&tab) {
+                order.push(tab);
+            }
+        }
+    }
+    for tab in Tab::ALL {
+        if !order.contains(&tab) {
+            order.push(tab);
+        }
+    }
+    order
+}
+
+/// Move `dragged` next to `target`, optionally after it.
+fn move_tab(order: &mut Vec<Tab>, dragged: Tab, target: Tab, after: bool) {
+    if dragged == target {
+        return;
+    }
+    let Some(from) = order.iter().position(|tab| *tab == dragged) else {
+        return;
+    };
+    order.remove(from);
+
+    let Some(mut to) = order.iter().position(|tab| *tab == target) else {
+        // The target vanished; put the dragged tab back where it was.
+        order.insert(from.min(order.len()), dragged);
+        return;
+    };
+    if after {
+        to += 1;
+    }
+    order.insert(to, dragged);
+}
+
+/// Measure a single line of text with the given style.
+fn text_width(ui: &egui::Ui, text: &str, style: egui::TextStyle) -> f32 {
+    let font_id = style.resolve(ui.style());
+    ui.ctx().fonts_mut(|fonts| {
+        fonts
+            .layout_no_wrap(text.to_owned(), font_id, egui::Color32::WHITE)
+            .size()
+            .x
+    })
+}
+
+/// Localized privilege badge label for the current capability state.
+fn privilege_label(status: &PrivilegeStatus) -> String {
+    match (status.icmp, status.raw) {
+        (true, true) => t!("privilege.ok"),
+        (true, false) => t!("privilege.partial"),
+        (false, _) => t!("privilege.limited"),
+    }
+    .to_string()
+}
+
+/// Map the persisted theme value to egui's preference type.
+fn theme_preference_from_key(key: &str) -> egui::ThemePreference {
+    match key {
+        "light" => egui::ThemePreference::Light,
+        "dark" => egui::ThemePreference::Dark,
+        _ => egui::ThemePreference::System,
+    }
+}
+
+/// Stable config value for a theme preference.
+fn theme_key(theme: egui::ThemePreference) -> &'static str {
+    match theme {
+        egui::ThemePreference::System => "system",
+        egui::ThemePreference::Light => "light",
+        egui::ThemePreference::Dark => "dark",
+    }
+}
+
+/// Localized display label for the theme selector.
+fn theme_label(theme: egui::ThemePreference) -> String {
+    match theme {
+        egui::ThemePreference::System => t!("theme.system"),
+        egui::ThemePreference::Light => t!("theme.light"),
+        egui::ThemePreference::Dark => t!("theme.dark"),
+    }
+    .to_string()
+}
+
 fn language_display_name(code: &str) -> String {
     match code {
         "en" => "English".to_string(),
@@ -228,39 +529,48 @@ fn language_display_name(code: &str) -> String {
 impl eframe::App for App {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         egui::Panel::top("top_bar").show(ui, |ui| {
-            ui.horizontal(|ui| {
-                self.tab_button(ui, Tab::Ping, &t!("tab.ping"));
-                self.tab_button(ui, Tab::Mtr, &t!("tab.mtr"));
-                self.tab_button(ui, Tab::Http, &t!("tab.http"));
-                self.tab_button(ui, Tab::PortScan, &t!("tab.portscan"));
-                self.tab_button(ui, Tab::IpInsight, &t!("tab.ip_insight"));
-                self.tab_button(ui, Tab::Lookup, &t!("tab.lookup"));
-                self.tab_button(ui, Tab::Dns, &t!("tab.dns"));
-                self.tab_button(ui, Tab::Ntp, &t!("tab.ntp"));
-                self.tab_button(ui, Tab::Speedtest, &t!("tab.speedtest"));
-                ui.separator();
-                ui.label(t!("common.language"));
-                self.language_selector(ui);
-                ui.separator();
-                self.privilege_badge(ui);
-                ui.separator();
-                if ui.small_button(t!("about.button")).clicked() {
-                    self.show_about = true;
-                }
-            });
+            ui.spacing_mut().item_spacing.x = 6.0;
+            let available = ui.available_width();
+            let one_row = self.tabs_width(ui) + self.controls_width(ui) <= available - 12.0;
+
+            if one_row {
+                // Tabs and controls share the row; controls stay right-aligned.
+                let tabs_width = (available - self.controls_width(ui) - 12.0).max(200.0);
+                ui.horizontal_top(|ui| {
+                    ui.scope(|ui| {
+                        ui.set_max_width(tabs_width);
+                        self.tab_bar(ui);
+                    });
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        self.app_controls(ui);
+                    });
+                });
+            } else {
+                // Not enough room for both groups on one row: tabs use the
+                // full width and wrap, then the controls get a right-aligned
+                // row of their own.
+                self.tab_bar(ui);
+                ui.horizontal(|ui| {
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        self.app_controls(ui);
+                    });
+                });
+            }
         });
 
         // Capture the history revision before rendering so edits made by the
         // input widgets can be written to disk immediately afterwards.
         let history_revision = self.cfg.history.revision();
 
-        egui::CentralPanel::default().show(ui, |ui| match self.tab {
+        let settings_expanded = self.settings_expanded;
+        let expanded = egui::CentralPanel::default().show(ui, |ui| match self.tab {
             Tab::Ping => self.ping.ui(
                 ui,
                 &mut self.cfg.ping,
                 &mut self.cfg.history,
                 &self.rt,
                 &self.privilege,
+                settings_expanded,
             ),
             Tab::Mtr => self.mtr.ui(
                 ui,
@@ -268,38 +578,60 @@ impl eframe::App for App {
                 &mut self.cfg.history,
                 &self.rt,
                 &self.privilege,
+                settings_expanded,
             ),
-            Tab::Http => self
-                .http
-                .ui(ui, &mut self.cfg.http, &mut self.cfg.history, &self.rt),
+            Tab::Http => self.http.ui(
+                ui,
+                &mut self.cfg.http,
+                &mut self.cfg.history,
+                &self.rt,
+                settings_expanded,
+            ),
             Tab::PortScan => self.portscan.ui(
                 ui,
                 &mut self.cfg.port_scan,
                 &mut self.cfg.history,
                 &self.rt,
                 &self.privilege,
+                settings_expanded,
             ),
             Tab::IpInsight => self.ip_insight.ui(
                 ui,
                 &mut self.cfg.ip_insight,
                 &mut self.cfg.history,
                 &self.rt,
+                settings_expanded,
             ),
-            Tab::Lookup => {
-                self.lookup
-                    .ui(ui, &mut self.cfg.lookup, &mut self.cfg.history, &self.rt)
-            }
-            Tab::Dns => self
-                .dns
-                .ui(ui, &mut self.cfg.dns, &mut self.cfg.history, &self.rt),
-            Tab::Ntp => self
-                .ntp
-                .ui(ui, &mut self.cfg.ntp, &mut self.cfg.history, &self.rt),
-            Tab::Speedtest => {
-                self.speedtest
-                    .ui(ui, &mut self.cfg.speedtest, &mut self.cfg.history, &self.rt)
-            }
+            Tab::Lookup => self.lookup.ui(
+                ui,
+                &mut self.cfg.lookup,
+                &mut self.cfg.history,
+                &self.rt,
+                settings_expanded,
+            ),
+            Tab::Dns => self.dns.ui(
+                ui,
+                &mut self.cfg.dns,
+                &mut self.cfg.history,
+                &self.rt,
+                settings_expanded,
+            ),
+            Tab::Ntp => self.ntp.ui(
+                ui,
+                &mut self.cfg.ntp,
+                &mut self.cfg.history,
+                &self.rt,
+                settings_expanded,
+            ),
+            Tab::Speedtest => self.speedtest.ui(
+                ui,
+                &mut self.cfg.speedtest,
+                &mut self.cfg.history,
+                &self.rt,
+                settings_expanded,
+            ),
         });
+        self.settings_expanded = expanded.inner;
 
         if self.cfg.history.revision() != history_revision {
             crate::config_store::save(&self.cfg);
@@ -315,5 +647,71 @@ impl eframe::App for App {
         // application.
         self.speedtest.clear_on_hide();
         crate::config_store::save(&self.cfg);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn tab_order_keeps_known_ids_and_appends_missing_tabs() {
+        let saved = vec![
+            "dns".to_string(),
+            "unknown".to_string(),
+            "ping".to_string(),
+            "dns".to_string(),
+        ];
+        let order = normalize_tab_order(&saved);
+        assert_eq!(order.len(), Tab::ALL.len());
+        assert_eq!(order[0], Tab::Dns);
+        assert_eq!(order[1], Tab::Ping);
+        for tab in Tab::ALL {
+            assert!(order.contains(&tab));
+        }
+    }
+
+    #[test]
+    fn empty_saved_order_uses_builtin_order() {
+        assert_eq!(normalize_tab_order(&[]), Tab::ALL.to_vec());
+    }
+
+    #[test]
+    fn move_tab_handles_both_directions() {
+        let mut order = vec![Tab::Ping, Tab::Mtr, Tab::Http];
+
+        // Moving forward inserts after the target after removing the source.
+        move_tab(&mut order, Tab::Ping, Tab::Http, true);
+        assert_eq!(order, vec![Tab::Mtr, Tab::Http, Tab::Ping]);
+
+        // Moving backward inserts before the target.
+        move_tab(&mut order, Tab::Ping, Tab::Mtr, false);
+        assert_eq!(order, vec![Tab::Ping, Tab::Mtr, Tab::Http]);
+    }
+
+    #[test]
+    fn theme_keys_roundtrip_and_default_to_system() {
+        for theme in [
+            egui::ThemePreference::System,
+            egui::ThemePreference::Light,
+            egui::ThemePreference::Dark,
+        ] {
+            assert_eq!(theme_preference_from_key(theme_key(theme)), theme);
+        }
+        assert_eq!(theme_preference_from_key(""), egui::ThemePreference::System);
+        assert_eq!(
+            theme_preference_from_key("unknown"),
+            egui::ThemePreference::System
+        );
+    }
+
+    #[test]
+    fn move_tab_ignores_same_and_missing_targets() {
+        let mut order = vec![Tab::Ping, Tab::Mtr];
+        move_tab(&mut order, Tab::Ping, Tab::Ping, false);
+        assert_eq!(order, vec![Tab::Ping, Tab::Mtr]);
+
+        move_tab(&mut order, Tab::Ping, Tab::Dns, true);
+        assert_eq!(order, vec![Tab::Ping, Tab::Mtr]);
     }
 }

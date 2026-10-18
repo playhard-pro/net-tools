@@ -166,7 +166,8 @@ impl PingTab {
         history: &mut InputHistory,
         rt: &tokio::runtime::Handle,
         privilege: &PrivilegeStatus,
-    ) {
+        settings_expanded: bool,
+    ) -> bool {
         self.drain();
         if self.ctrl.is_active() {
             // Keep repainting while a task runs so results and the auto-sized
@@ -174,119 +175,118 @@ impl PingTab {
             ui.ctx().request_repaint();
         }
 
-        // Settings.
-        let mut submit = false;
-        egui::CollapsingHeader::new(t!("common.settings"))
-            .default_open(true)
-            .show(ui, |ui| {
-                egui::Grid::new("ping_settings")
+        let (submit, expanded) = crate::ui::layout::settings_panel(ui, settings_expanded, |ui| {
+            ui.heading(t!("common.settings"));
+            egui::Grid::new("ping_settings")
+                .num_columns(2)
+                .spacing([12.0, 10.0])
+                .show(ui, |ui| {
+                    ui.label(t!("common.mode"));
+                    settings::probe_mode_selector(ui, &mut s.mode);
+                    ui.end_row();
+                });
+            if s.mode == net_tools_core::model::ProbeMode::Udp {
+                egui::Grid::new("ping_udp")
                     .num_columns(2)
-                    .spacing([12.0, 6.0])
+                    .spacing([12.0, 10.0])
                     .show(ui, |ui| {
-                        ui.label(t!("common.mode"));
-                        settings::probe_mode_selector(ui, &mut s.mode);
+                        ui.label(t!("common.udp_port"));
+                        ui.add(egui::DragValue::new(&mut s.udp_port).range(1..=65_535));
                         ui.end_row();
                     });
-                if s.mode == net_tools_core::model::ProbeMode::Udp {
-                    egui::Grid::new("ping_udp")
-                        .num_columns(2)
-                        .spacing([12.0, 6.0])
-                        .show(ui, |ui| {
-                            ui.label(t!("common.udp_port"));
-                            ui.add(egui::DragValue::new(&mut s.udp_port).range(1..=65_535));
-                            ui.end_row();
-                        });
-                }
-                submit = settings::common_probe(ui, &mut s.common, history, TARGET_HISTORY_KEY);
+            }
+            let submit = settings::common_probe(ui, &mut s.common, history, TARGET_HISTORY_KEY);
+
+            // ICMP ping needs an ICMP socket. On Linux that is normally
+            // available unprivileged, so this only shows on restricted hosts.
+            if s.mode == ProbeMode::Icmp {
+                privilege_note(ui, privilege.icmp, privilege, &t!("privilege.needs_icmp"));
+            }
+
+            ui.add_space(6.0);
+            ui.horizontal(|ui| {
+                self.control_row(ui, s, history, rt);
+                state_badge(ui, self.ctrl.state);
             });
-        if submit {
-            history_input::record_fields(history, &[(TARGET_HISTORY_KEY, &s.common.target)]);
-            self.restart(s, rt);
-        }
-
-        // ICMP ping needs an ICMP socket. On Linux that is normally available
-        // unprivileged, so this only shows on restricted hosts.
-        if s.mode == ProbeMode::Icmp {
-            privilege_note(ui, privilege.icmp, privilege, &t!("privilege.needs_icmp"));
-        }
-
-        // Control buttons and state.
-        ui.horizontal(|ui| {
-            self.control_row(ui, s, history, rt);
-            state_badge(ui, self.ctrl.state);
             ui.label(format!(
                 "{} / {} ({}%)",
                 self.received,
                 self.sent,
                 self.loss_pct() as u32
             ));
+
+            if let Some((msg, hint)) = &self.error {
+                error_banner(ui, msg, hint.as_deref());
+            }
+            for line in self.info.iter().rev().take(5) {
+                info_line(ui, line);
+            }
+            submit
         });
 
-        if let Some((msg, hint)) = &self.error {
-            error_banner(ui, msg, hint.as_deref());
-        }
-        for line in self.info.iter().rev().take(5) {
-            info_line(ui, line);
+        if submit == Some(true) {
+            history_input::record_fields(history, &[(TARGET_HISTORY_KEY, &s.common.target)]);
+            self.restart(s, rt);
         }
 
-        ui.separator();
+        crate::ui::layout::results_panel(ui, |ui| {
+            self.toolbar(ui);
 
-        // Result toolbar lives below the divider, together with the result
-        // widgets it acts on.
-        self.toolbar(ui);
+            // Statistics.
+            ui.horizontal_wrapped(|ui| {
+                ui.label(t!(
+                    "ping.stats.min",
+                    v = self.min_ms.map_or("-".into(), |v| format!("{:.1} ms", v))
+                ));
+                ui.label(t!(
+                    "ping.stats.avg",
+                    v = self.avg_ms().map_or("-".into(), |v| format!("{:.1} ms", v))
+                ));
+                ui.label(t!(
+                    "ping.stats.max",
+                    v = self.max_ms.map_or("-".into(), |v| format!("{:.1} ms", v))
+                ));
+                ui.label(t!(
+                    "ping.stats.jitter",
+                    v = format!("{:.1} ms", self.jitter_ms)
+                ));
+            });
 
-        // Statistics.
-        ui.horizontal_wrapped(|ui| {
-            ui.label(t!(
-                "ping.stats.min",
-                v = self.min_ms.map_or("-".into(), |v| format!("{:.1} ms", v))
-            ));
-            ui.label(t!(
-                "ping.stats.avg",
-                v = self.avg_ms().map_or("-".into(), |v| format!("{:.1} ms", v))
-            ));
-            ui.label(t!(
-                "ping.stats.max",
-                v = self.max_ms.map_or("-".into(), |v| format!("{:.1} ms", v))
-            ));
-            ui.label(t!(
-                "ping.stats.jitter",
-                v = format!("{:.1} ms", self.jitter_ms)
-            ));
+            // Table: newest record first, kept to a fixed number of visible rows.
+            let headers = [
+                t!("common.time"),
+                t!("common.rtt_ms"),
+                t!("common.ttl"),
+                t!("common.from"),
+                t!("common.size"),
+            ];
+            table_fixed_rows(ui, &headers, self.samples.len(), VISIBLE_ROWS, |i, row| {
+                let sample = &self.samples[i];
+                row.col(|ui| {
+                    ui.label(&sample.time);
+                });
+                row.col(|ui| {
+                    ui.label(format!("{:.2}", sample.rtt_ms));
+                });
+                row.col(|ui| {
+                    ui.label(sample.ttl.map_or("-".into(), |v| v.to_string()));
+                });
+                row.col(|ui| {
+                    ui.label(&sample.from);
+                });
+                row.col(|ui| {
+                    ui.label(format!("{} B", sample.size));
+                });
+            });
+
+            // Chart sits below the table, with a little breathing room.
+            if !self.chart.is_empty() {
+                ui.add_space(12.0);
+                crate::ui::chart::latency_chart(ui, &self.chart, 180.0);
+            }
         });
 
-        // Table: newest record first, kept to a fixed number of visible rows.
-        let headers = [
-            t!("common.time"),
-            t!("common.rtt_ms"),
-            t!("common.ttl"),
-            t!("common.from"),
-            t!("common.size"),
-        ];
-        table_fixed_rows(ui, &headers, self.samples.len(), VISIBLE_ROWS, |i, row| {
-            let sample = &self.samples[i];
-            row.col(|ui| {
-                ui.label(&sample.time);
-            });
-            row.col(|ui| {
-                ui.label(format!("{:.2}", sample.rtt_ms));
-            });
-            row.col(|ui| {
-                ui.label(sample.ttl.map_or("-".into(), |v| v.to_string()));
-            });
-            row.col(|ui| {
-                ui.label(&sample.from);
-            });
-            row.col(|ui| {
-                ui.label(format!("{} B", sample.size));
-            });
-        });
-
-        // Chart sits below the table, with a little breathing room.
-        if !self.chart.is_empty() {
-            ui.add_space(12.0);
-            crate::ui::chart::latency_chart(ui, &self.chart, 180.0);
-        }
+        expanded
     }
 
     fn toolbar(&mut self, ui: &mut egui::Ui) {

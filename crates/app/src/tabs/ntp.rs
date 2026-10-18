@@ -16,6 +16,7 @@ use time::{OffsetDateTime, UtcOffset};
 
 use crate::ui::common::{error_banner, state_badge};
 use crate::ui::history_input;
+use crate::ui::theme::Palette;
 
 /// Servers always offered in the target drop-down. They are pinned and cannot
 /// be removed or cleared, regardless of the stored history.
@@ -156,7 +157,8 @@ impl NtpTab {
         s: &mut NtpSettings,
         history: &mut InputHistory,
         rt: &tokio::runtime::Handle,
-    ) {
+        settings_expanded: bool,
+    ) -> bool {
         self.drain();
         self.visible = true;
         self.poll_pending_set(ui);
@@ -164,63 +166,64 @@ impl NtpTab {
             ui.ctx().request_repaint_after(CLOCK_REPAINT);
         }
 
-        let mut submit = false;
-        egui::CollapsingHeader::new(t!("common.settings"))
-            .default_open(true)
-            .show(ui, |ui| {
-                egui::Grid::new("ntp_settings")
-                    .num_columns(2)
-                    .spacing([12.0, 6.0])
-                    .show(ui, |ui| {
-                        ui.label(t!("common.target"));
-                        if history_input::singleline_with_presets(
-                            ui,
-                            TARGET_HISTORY_KEY,
-                            PRESET_SERVERS,
-                            &mut s.target,
-                            history,
-                            320.0,
-                        ) {
-                            submit = true;
-                        }
-                        ui.end_row();
+        let (submit, expanded) = crate::ui::layout::settings_panel(ui, settings_expanded, |ui| {
+            ui.heading(t!("common.settings"));
+            let mut submit = false;
+            egui::Grid::new("ntp_settings")
+                .num_columns(2)
+                .spacing([12.0, 10.0])
+                .show(ui, |ui| {
+                    ui.label(t!("common.target"));
+                    if history_input::singleline_with_presets(
+                        ui,
+                        TARGET_HISTORY_KEY,
+                        PRESET_SERVERS,
+                        &mut s.target,
+                        history,
+                        160.0,
+                    ) {
+                        submit = true;
+                    }
+                    ui.end_row();
 
-                        ui.label(t!("common.timeout_ms"));
-                        ui.add(
-                            egui::DragValue::new(&mut s.timeout_ms)
-                                .range(100..=120_000)
-                                .suffix(" ms"),
-                        );
-                        ui.end_row();
+                    ui.label(t!("common.timeout_ms"));
+                    ui.add(
+                        egui::DragValue::new(&mut s.timeout_ms)
+                            .range(100..=120_000)
+                            .suffix(" ms"),
+                    );
+                    ui.end_row();
+                });
+            ui.weak(t!("ntp.target_hint"));
 
-                        ui.label("");
-                        ui.weak(t!("ntp.target_hint"));
-                        ui.end_row();
-                    });
+            ui.add_space(6.0);
+            ui.horizontal(|ui| {
+                self.control_row(ui, s, history, rt);
+                state_badge(ui, self.ctrl.state);
             });
-        if submit {
+
+            if let Some((msg, hint)) = &self.error {
+                error_banner(ui, msg, hint.as_deref());
+            }
+            if let Some(notice) = &self.notice {
+                let color = Palette::from_ui(ui).success_text;
+                ui.colored_label(color, notice);
+            }
+            submit
+        });
+
+        if submit == Some(true) {
             self.record_target(s, history);
             self.restart(s, rt);
         }
 
-        ui.horizontal(|ui| {
-            self.control_row(ui, s, history, rt);
-            state_badge(ui, self.ctrl.state);
-        });
-
-        if let Some((msg, hint)) = &self.error {
-            error_banner(ui, msg, hint.as_deref());
-        }
-        if let Some(notice) = &self.notice {
-            ui.colored_label(egui::Color32::from_rgb(120, 210, 140), notice);
-        }
-
-        ui.separator();
-        self.result_ui(ui);
+        crate::ui::layout::results_panel(ui, |ui| self.result_ui(ui));
 
         if self.confirm_open {
             self.confirm_dialog(ui.ctx(), s);
         }
+
+        expanded
     }
 
     /// Query and set-time buttons. The query button is disabled while a query
@@ -396,10 +399,8 @@ impl NtpTab {
         let modal = egui::Modal::new(egui::Id::new("ntp_set_time_confirm")).show(ctx, |ui| {
             ui.set_width(460.0);
             ui.heading(t!("ntp.confirm_title"));
-            ui.colored_label(
-                egui::Color32::from_rgb(240, 205, 120),
-                t!("ntp.confirm_warning"),
-            );
+            let warning = Palette::from_ui(ui).warning_text;
+            ui.colored_label(warning, t!("ntp.confirm_warning"));
             ui.add_space(6.0);
             egui::Grid::new("ntp_confirm_grid")
                 .num_columns(2)
@@ -481,10 +482,11 @@ fn draw_clock(ui: &mut egui::Ui, local: &OffsetDateTime) {
     let painter = ui.painter();
     let center = rect.center();
     let radius = rect.width().min(rect.height()) * 0.5 - 8.0;
-    let face = egui::Color32::from_rgb(24, 28, 36);
-    let rim = egui::Color32::from_rgb(90, 150, 230);
-    let tick = egui::Color32::from_rgb(130, 145, 165);
-    let text = egui::Color32::from_rgb(220, 230, 245);
+    let palette = Palette::from_ui(ui);
+    let face = palette.clock_face;
+    let rim = palette.clock_rim;
+    let tick = palette.clock_tick;
+    let text = palette.clock_text;
 
     painter.circle_filled(center, radius, face);
     painter.circle_stroke(center, radius, egui::Stroke::new(2.5, rim));
@@ -534,7 +536,7 @@ fn draw_clock(ui: &mut egui::Ui, local: &OffsetDateTime) {
         seconds / 60.0,
         radius * 0.78,
         2.0,
-        egui::Color32::from_rgb(230, 110, 100),
+        palette.clock_second,
     );
     painter.circle_filled(center, 4.0, rim);
 }

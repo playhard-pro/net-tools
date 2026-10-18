@@ -109,6 +109,11 @@ backend, and iperf3 generates substantial traffic.
   `assets/fonts/` and `scripts/subset_font.py`.
 - Results can be **copied** and **exported** (CSV / JSON / HTML).
 - Table columns auto-size to fit the latest content.
+- Settings live in a left-hand panel that can be resized or collapsed, leaving
+  the full window width to the results.
+- The interface follows the system light/dark theme by default, with a manual
+  System / Light / Dark selector in the top bar.
+- Top-level tabs can be reordered by dragging, wrap onto extra rows when needed, and the order is remembered.
 - Configuration is saved to the platform config directory and restored on the
   next launch.
 

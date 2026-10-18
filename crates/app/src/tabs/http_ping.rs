@@ -100,7 +100,8 @@ impl HttpPingTab {
         s: &mut HttpSettings,
         history: &mut InputHistory,
         rt: &tokio::runtime::Handle,
-    ) {
+        settings_expanded: bool,
+    ) -> bool {
         self.drain();
         if self.ctrl.is_active() {
             // Keep repainting while a task runs so results and the auto-sized
@@ -108,99 +109,119 @@ impl HttpPingTab {
             ui.ctx().request_repaint();
         }
 
-        let mut submit = false;
-        egui::CollapsingHeader::new(t!("common.settings"))
-            .default_open(true)
-            .show(ui, |ui| {
-                egui::Grid::new("http_settings")
-                    .num_columns(2)
-                    .spacing([12.0, 6.0])
-                    .show(ui, |ui| {
-                        ui.label(t!("http.url"));
-                        if history_input::singleline(
-                            ui,
-                            URL_HISTORY_KEY,
-                            &mut s.target,
-                            history,
-                            320.0,
-                        ) {
-                            submit = true;
-                        }
-                        ui.end_row();
+        let (submit, expanded) = crate::ui::layout::settings_panel(ui, settings_expanded, |ui| {
+            ui.heading(t!("common.settings"));
+            let mut submit = false;
+            egui::Grid::new("http_settings")
+                .num_columns(2)
+                .spacing([12.0, 10.0])
+                .show(ui, |ui| {
+                    ui.label(t!("http.url"));
+                    if history_input::singleline(ui, URL_HISTORY_KEY, &mut s.target, history, 160.0)
+                    {
+                        submit = true;
+                    }
+                    ui.end_row();
 
-                        ui.label(t!("http.method"));
-                        method_selector(ui, &mut s.method);
-                        ui.end_row();
+                    ui.label(t!("http.method"));
+                    method_selector(ui, &mut s.method);
+                    ui.end_row();
 
-                        ui.label(t!("common.ip_version"));
-                        settings::ip_version_selector(ui, &mut s.ip_version);
-                        ui.end_row();
+                    ui.label(t!("common.ip_version"));
+                    settings::ip_version_selector(ui, &mut s.ip_version);
+                    ui.end_row();
 
-                        ui.label(t!("common.timeout_ms"));
-                        ui.add(
-                            egui::DragValue::new(&mut s.timeout_ms)
-                                .range(10..=120_000)
-                                .suffix(" ms"),
-                        );
-                        ui.end_row();
+                    ui.label(t!("common.timeout_ms"));
+                    ui.add(
+                        egui::DragValue::new(&mut s.timeout_ms)
+                            .range(10..=120_000)
+                            .suffix(" ms"),
+                    );
+                    ui.end_row();
 
-                        ui.label(t!("common.interval_ms"));
-                        ui.add(
-                            egui::DragValue::new(&mut s.interval_ms)
-                                .range(10..=60_000)
-                                .suffix(" ms"),
-                        );
-                        ui.end_row();
+                    ui.label(t!("common.interval_ms"));
+                    ui.add(
+                        egui::DragValue::new(&mut s.interval_ms)
+                            .range(10..=60_000)
+                            .suffix(" ms"),
+                    );
+                    ui.end_row();
 
-                        ui.label(t!("http.follow_redirects"));
-                        ui.checkbox(&mut s.follow_redirects, "");
-                        ui.end_row();
+                    ui.label(t!("http.follow_redirects"));
+                    ui.checkbox(&mut s.follow_redirects, "");
+                    ui.end_row();
 
-                        ui.label(t!("http.verify_tls"));
-                        ui.checkbox(&mut s.verify_tls, "");
-                        ui.end_row();
+                    ui.label(t!("http.verify_tls"));
+                    ui.checkbox(&mut s.verify_tls, "");
+                    ui.end_row();
 
-                        ui.label(t!("http.expect_status"));
-                        let mut status_text =
-                            s.expect_status.map(|v| v.to_string()).unwrap_or_default();
-                        ui.add(egui::TextEdit::singleline(&mut status_text).desired_width(60.0));
-                        s.expect_status = status_text.trim().parse::<u16>().ok();
-                        ui.end_row();
+                    ui.label(t!("common.reverse_dns"));
+                    ui.checkbox(&mut s.reverse_dns, "");
+                    ui.end_row();
+                });
 
-                        ui.label(t!("http.expect_keyword"));
-                        let mut kw = s.expect_keyword.clone().unwrap_or_default();
-                        ui.add(egui::TextEdit::singleline(&mut kw).desired_width(160.0));
-                        s.expect_keyword = if kw.trim().is_empty() { None } else { Some(kw) };
-                        ui.end_row();
+            egui::CollapsingHeader::new(t!("common.advanced"))
+                .default_open(false)
+                .show(ui, |ui| {
+                    egui::Grid::new("http_advanced_settings")
+                        .num_columns(2)
+                        .spacing([12.0, 10.0])
+                        .show(ui, |ui| {
+                            ui.label(t!("http.expect_status"));
+                            let mut status_text =
+                                s.expect_status.map(|v| v.to_string()).unwrap_or_default();
+                            ui.add(
+                                egui::TextEdit::singleline(&mut status_text).desired_width(80.0),
+                            );
+                            s.expect_status = status_text.trim().parse::<u16>().ok();
+                            ui.end_row();
 
-                        ui.label(t!("http.headers"));
-                        history_input::multiline(
-                            ui,
-                            HEADERS_HISTORY_KEY,
-                            &mut s.headers,
-                            history,
-                            320.0,
-                            2,
-                        );
-                        ui.end_row();
+                            ui.label(t!("http.expect_keyword"));
+                            let mut kw = s.expect_keyword.clone().unwrap_or_default();
+                            ui.add(egui::TextEdit::singleline(&mut kw).desired_width(160.0));
+                            s.expect_keyword = if kw.trim().is_empty() { None } else { Some(kw) };
+                            ui.end_row();
 
-                        ui.label(t!("http.body"));
-                        history_input::multiline(
-                            ui,
-                            BODY_HISTORY_KEY,
-                            &mut s.body,
-                            history,
-                            320.0,
-                            2,
-                        );
-                        ui.end_row();
+                            ui.label(t!("http.headers"));
+                            history_input::multiline(
+                                ui,
+                                HEADERS_HISTORY_KEY,
+                                &mut s.headers,
+                                history,
+                                160.0,
+                                2,
+                            );
+                            ui.end_row();
 
-                        ui.label(t!("common.reverse_dns"));
-                        ui.checkbox(&mut s.reverse_dns, "");
-                        ui.end_row();
-                    });
+                            ui.label(t!("http.body"));
+                            history_input::multiline(
+                                ui,
+                                BODY_HISTORY_KEY,
+                                &mut s.body,
+                                history,
+                                160.0,
+                                2,
+                            );
+                            ui.end_row();
+                        });
+                });
+
+            ui.add_space(6.0);
+            ui.horizontal(|ui| {
+                self.control_row(ui, s, history, rt);
+                state_badge(ui, self.ctrl.state);
             });
-        if submit {
+
+            if let Some((msg, hint)) = &self.error {
+                error_banner(ui, msg, hint.as_deref());
+            }
+            for line in self.info.iter().rev().take(5) {
+                info_line(ui, line);
+            }
+            submit
+        });
+
+        if submit == Some(true) {
             history_input::record_fields(
                 history,
                 &[
@@ -212,76 +233,64 @@ impl HttpPingTab {
             self.restart(s, rt);
         }
 
-        ui.horizontal(|ui| {
-            self.control_row(ui, s, history, rt);
-            state_badge(ui, self.ctrl.state);
+        crate::ui::layout::results_panel(ui, |ui| {
+            self.toolbar(ui);
+
+            // Table: newest record first, kept to a fixed number of visible rows.
+            let headers = [
+                t!("common.time"),
+                t!("http.method"),
+                t!("http.status"),
+                t!("http.dns_ms"),
+                t!("http.connect_ms"),
+                t!("http.tls_ms"),
+                t!("http.ttfb_ms"),
+                t!("http.total_ms"),
+                t!("http.body_bytes"),
+                t!("http.ok"),
+            ];
+            table_fixed_rows(ui, &headers, self.results.len(), VISIBLE_ROWS, |i, row| {
+                let r = &self.results[i];
+                row.col(|ui| {
+                    ui.label(&r.time);
+                });
+                row.col(|ui| {
+                    ui.label(&r.method);
+                });
+                row.col(|ui| {
+                    ui.label(r.status.map_or("-".into(), |v| v.to_string()));
+                });
+                row.col(|ui| {
+                    ui.label(format!("{:.1}", r.dns_ms));
+                });
+                row.col(|ui| {
+                    ui.label(format!("{:.1}", r.connect_ms));
+                });
+                row.col(|ui| {
+                    ui.label(r.tls_ms.map_or("-".into(), |v| format!("{:.1}", v)));
+                });
+                row.col(|ui| {
+                    ui.label(format!("{:.1}", r.ttfb_ms));
+                });
+                row.col(|ui| {
+                    ui.label(format!("{:.1}", r.total_ms));
+                });
+                row.col(|ui| {
+                    ui.label(r.body_bytes.to_string());
+                });
+                row.col(|ui| {
+                    ui.label(if r.ok { "OK" } else { "X" });
+                });
+            });
+
+            // Chart sits below the table, with a little breathing room.
+            if !self.chart.is_empty() {
+                ui.add_space(12.0);
+                crate::ui::chart::latency_chart(ui, &self.chart, 180.0);
+            }
         });
 
-        if let Some((msg, hint)) = &self.error {
-            error_banner(ui, msg, hint.as_deref());
-        }
-        for line in self.info.iter().rev().take(5) {
-            info_line(ui, line);
-        }
-
-        ui.separator();
-
-        // Result toolbar lives below the divider, together with the result
-        // widgets it acts on.
-        self.toolbar(ui);
-
-        // Table: newest record first, kept to a fixed number of visible rows.
-        let headers = [
-            t!("common.time"),
-            t!("http.method"),
-            t!("http.status"),
-            t!("http.dns_ms"),
-            t!("http.connect_ms"),
-            t!("http.tls_ms"),
-            t!("http.ttfb_ms"),
-            t!("http.total_ms"),
-            t!("http.body_bytes"),
-            t!("http.ok"),
-        ];
-        table_fixed_rows(ui, &headers, self.results.len(), VISIBLE_ROWS, |i, row| {
-            let r = &self.results[i];
-            row.col(|ui| {
-                ui.label(&r.time);
-            });
-            row.col(|ui| {
-                ui.label(&r.method);
-            });
-            row.col(|ui| {
-                ui.label(r.status.map_or("-".into(), |v| v.to_string()));
-            });
-            row.col(|ui| {
-                ui.label(format!("{:.1}", r.dns_ms));
-            });
-            row.col(|ui| {
-                ui.label(format!("{:.1}", r.connect_ms));
-            });
-            row.col(|ui| {
-                ui.label(r.tls_ms.map_or("-".into(), |v| format!("{:.1}", v)));
-            });
-            row.col(|ui| {
-                ui.label(format!("{:.1}", r.ttfb_ms));
-            });
-            row.col(|ui| {
-                ui.label(format!("{:.1}", r.total_ms));
-            });
-            row.col(|ui| {
-                ui.label(r.body_bytes.to_string());
-            });
-            row.col(|ui| {
-                ui.label(if r.ok { "OK" } else { "X" });
-            });
-        });
-
-        // Chart sits below the table, with a little breathing room.
-        if !self.chart.is_empty() {
-            ui.add_space(12.0);
-            crate::ui::chart::latency_chart(ui, &self.chart, 180.0);
-        }
+        expanded
     }
 
     fn toolbar(&mut self, ui: &mut egui::Ui) {

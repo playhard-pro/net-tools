@@ -79,86 +79,87 @@ impl DnsTab {
         s: &mut DnsSettings,
         history: &mut InputHistory,
         rt: &tokio::runtime::Handle,
-    ) {
+        settings_expanded: bool,
+    ) -> bool {
         self.drain();
         if self.ctrl.is_active() {
             // Keep repainting while the query is in flight.
             ui.ctx().request_repaint();
         }
 
-        let mut submit = false;
-        egui::CollapsingHeader::new(t!("common.settings"))
-            .default_open(true)
-            .show(ui, |ui| {
-                egui::Grid::new("dns_settings")
-                    .num_columns(2)
-                    .spacing([12.0, 6.0])
-                    .show(ui, |ui| {
-                        ui.label(t!("common.target"));
-                        if history_input::singleline(
-                            ui,
-                            TARGET_HISTORY_KEY,
-                            &mut s.target,
-                            history,
-                            320.0,
-                        ) {
-                            submit = true;
-                        }
-                        ui.end_row();
+        let (submit, expanded) = crate::ui::layout::settings_panel(ui, settings_expanded, |ui| {
+            ui.heading(t!("common.settings"));
+            let mut submit = false;
+            egui::Grid::new("dns_settings")
+                .num_columns(2)
+                .spacing([12.0, 10.0])
+                .show(ui, |ui| {
+                    ui.label(t!("common.target"));
+                    if history_input::singleline(
+                        ui,
+                        TARGET_HISTORY_KEY,
+                        &mut s.target,
+                        history,
+                        160.0,
+                    ) {
+                        submit = true;
+                    }
+                    ui.end_row();
 
-                        ui.label(t!("dns.record_type"));
-                        record_type_input(ui, &mut s.record_type);
-                        ui.end_row();
+                    ui.label(t!("dns.record_type"));
+                    record_type_input(ui, &mut s.record_type);
+                    ui.end_row();
 
-                        ui.label(t!("dns.server"));
-                        ui.horizontal(|ui| {
-                            if history_input::singleline(
-                                ui,
-                                SERVER_HISTORY_KEY,
-                                &mut s.server,
-                                history,
-                                220.0,
-                            ) {
-                                submit = true;
-                            }
-                            // Format hint, e.g. "8.8.8.8:53".
-                            ui.weak(t!("dns.server_hint"));
-                        });
-                        ui.end_row();
+                    ui.label(t!("dns.server"));
+                    if history_input::singleline(
+                        ui,
+                        SERVER_HISTORY_KEY,
+                        &mut s.server,
+                        history,
+                        140.0,
+                    ) {
+                        submit = true;
+                    }
+                    ui.end_row();
 
-                        ui.label(t!("common.timeout_ms"));
-                        ui.add(
-                            egui::DragValue::new(&mut s.timeout_ms)
-                                .range(100..=120_000)
-                                .suffix(" ms"),
-                        );
-                        ui.end_row();
+                    ui.label(t!("common.timeout_ms"));
+                    ui.add(
+                        egui::DragValue::new(&mut s.timeout_ms)
+                            .range(100..=120_000)
+                            .suffix(" ms"),
+                    );
+                    ui.end_row();
 
-                        ui.label(t!("dns.force_tcp"));
-                        ui.checkbox(&mut s.force_tcp, "");
-                        ui.end_row();
+                    ui.label(t!("dns.force_tcp"));
+                    ui.checkbox(&mut s.force_tcp, "");
+                    ui.end_row();
 
-                        ui.label(t!("dns.trace_mode"));
-                        ui.checkbox(&mut s.trace, "");
-                        ui.end_row();
-                    });
+                    ui.label(t!("dns.trace_mode"));
+                    ui.checkbox(&mut s.trace, "");
+                    ui.end_row();
+                });
+            ui.weak(t!("dns.server_hint"));
+
+            ui.add_space(6.0);
+            ui.horizontal(|ui| {
+                self.control_row(ui, s, history, rt);
+                state_badge(ui, self.ctrl.state);
             });
-        if submit {
+
+            if let Some((msg, hint)) = &self.error {
+                error_banner(ui, msg, hint.as_deref());
+            }
+            submit
+        });
+
+        if submit == Some(true) {
             record_inputs(s, history);
             self.restart(s, rt);
         }
 
-        ui.horizontal(|ui| {
-            self.control_row(ui, s, history, rt);
-            state_badge(ui, self.ctrl.state);
-        });
+        crate::ui::layout::results_panel(ui, |ui| self.output_ui(ui));
 
-        if let Some((msg, hint)) = &self.error {
-            error_banner(ui, msg, hint.as_deref());
-        }
-
-        ui.separator();
-        self.output_ui(ui);
+        expanded
     }
 
     fn control_row(

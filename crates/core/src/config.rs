@@ -422,6 +422,15 @@ impl InputHistory {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
     pub language: String,
+    /// UI theme preference: `system`, `light` or `dark`. Unknown values fall
+    /// back to following the system theme.
+    #[serde(default)]
+    pub theme: String,
+    /// User-defined top-level tab order, stored as stable tab ids. An empty
+    /// list means the built-in order. Unknown ids are ignored and missing tabs
+    /// are appended in their built-in order when the UI loads the config.
+    #[serde(default)]
+    pub tab_order: Vec<String>,
     pub ping: PingSettings,
     pub mtr: MtrSettings,
     pub http: HttpSettings,
@@ -450,6 +459,8 @@ impl Default for AppConfig {
     fn default() -> Self {
         Self {
             language: "en".into(),
+            theme: "system".into(),
+            tab_order: Vec::new(),
             ping: PingSettings::default(),
             mtr: MtrSettings::default(),
             http: HttpSettings::default(),
@@ -474,6 +485,8 @@ mod tests {
         let text = toml::to_string_pretty(&cfg).unwrap();
         let back: AppConfig = toml::from_str(&text).unwrap();
         assert_eq!(back.language, cfg.language);
+        assert_eq!(back.theme, cfg.theme);
+        assert_eq!(back.tab_order, cfg.tab_order);
         assert_eq!(back.ping.udp_port, cfg.ping.udp_port);
         assert_eq!(back.mtr.max_hops, cfg.mtr.max_hops);
         assert_eq!(back.http.method, cfg.http.method);
@@ -498,6 +511,41 @@ mod tests {
             back.speedtest.iperf3_server.port,
             cfg.speedtest.iperf3_server.port
         );
+    }
+
+    #[test]
+    fn old_config_without_theme_still_loads() {
+        let mut value = toml::Value::try_from(AppConfig::default()).unwrap();
+        value
+            .as_table_mut()
+            .expect("config is a table")
+            .remove("theme");
+        let text = toml::to_string(&value).unwrap();
+        let back: AppConfig = toml::from_str(&text).unwrap();
+        assert!(back.theme.is_empty());
+    }
+
+    #[test]
+    fn old_config_without_tab_order_still_loads() {
+        let mut value = toml::Value::try_from(AppConfig::default()).unwrap();
+        value
+            .as_table_mut()
+            .expect("config is a table")
+            .remove("tab_order");
+        let text = toml::to_string(&value).unwrap();
+        let back: AppConfig = toml::from_str(&text).unwrap();
+        assert!(back.tab_order.is_empty());
+    }
+
+    #[test]
+    fn tab_order_roundtrip() {
+        let cfg = AppConfig {
+            tab_order: vec!["dns".into(), "ping".into()],
+            ..AppConfig::default()
+        };
+        let text = toml::to_string_pretty(&cfg).unwrap();
+        let back: AppConfig = toml::from_str(&text).unwrap();
+        assert_eq!(back.tab_order, cfg.tab_order);
     }
 
     #[test]

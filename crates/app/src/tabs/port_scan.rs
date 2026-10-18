@@ -11,6 +11,7 @@ use crate::ui::common::{error_banner, info_line, privilege_note, state_badge};
 use crate::ui::history_input;
 use crate::ui::result_table::table;
 use crate::ui::settings;
+use crate::ui::theme::Palette;
 
 /// History buckets for the editable inputs.
 const TARGETS_HISTORY_KEY: &str = "portscan.targets";
@@ -89,7 +90,8 @@ impl PortScanTab {
         history: &mut InputHistory,
         rt: &tokio::runtime::Handle,
         privilege: &PrivilegeStatus,
-    ) {
+        settings_expanded: bool,
+    ) -> bool {
         self.drain();
         if self.ctrl.is_active() {
             // Keep repainting while a task runs so results and the auto-sized
@@ -97,70 +99,87 @@ impl PortScanTab {
             ui.ctx().request_repaint();
         }
 
-        let mut submit = false;
-        egui::CollapsingHeader::new(t!("common.settings"))
-            .default_open(true)
-            .show(ui, |ui| {
-                egui::Grid::new("portscan_settings")
-                    .num_columns(2)
-                    .spacing([12.0, 6.0])
-                    .show(ui, |ui| {
-                        ui.label(t!("common.targets"));
-                        if history_input::singleline(
-                            ui,
-                            TARGETS_HISTORY_KEY,
-                            &mut s.targets,
-                            history,
-                            240.0,
-                        ) {
-                            submit = true;
-                        }
-                        ui.end_row();
+        let (submit, expanded) = crate::ui::layout::settings_panel(ui, settings_expanded, |ui| {
+            ui.heading(t!("common.settings"));
+            let mut submit = false;
+            egui::Grid::new("portscan_settings")
+                .num_columns(2)
+                .spacing([12.0, 10.0])
+                .show(ui, |ui| {
+                    ui.label(t!("common.targets"));
+                    if history_input::singleline(
+                        ui,
+                        TARGETS_HISTORY_KEY,
+                        &mut s.targets,
+                        history,
+                        160.0,
+                    ) {
+                        submit = true;
+                    }
+                    ui.end_row();
 
-                        ui.label(t!("common.preset"));
-                        settings::port_preset_selector(ui, &mut s.preset);
-                        ui.end_row();
+                    ui.label(t!("common.preset"));
+                    settings::port_preset_selector(ui, &mut s.preset);
+                    ui.end_row();
 
-                        ui.label(t!("common.ports"));
-                        history_input::singleline(
-                            ui,
-                            PORTS_HISTORY_KEY,
-                            &mut s.ports,
-                            history,
-                            240.0,
-                        );
-                        ui.end_row();
+                    ui.label(t!("common.ports"));
+                    history_input::singleline(ui, PORTS_HISTORY_KEY, &mut s.ports, history, 160.0);
+                    ui.end_row();
 
-                        ui.label(t!("common.mode"));
-                        settings::scan_mode_selector(ui, &mut s.mode);
-                        ui.end_row();
+                    ui.label(t!("common.mode"));
+                    settings::scan_mode_selector(ui, &mut s.mode);
+                    ui.end_row();
 
-                        ui.label(t!("common.ip_version"));
-                        settings::ip_version_selector(ui, &mut s.ip_version);
-                        ui.end_row();
+                    ui.label(t!("common.ip_version"));
+                    settings::ip_version_selector(ui, &mut s.ip_version);
+                    ui.end_row();
 
-                        ui.label(t!("common.concurrency"));
-                        ui.add(egui::DragValue::new(&mut s.concurrency).range(1..=4096));
-                        ui.end_row();
+                    ui.label(t!("common.concurrency"));
+                    ui.add(egui::DragValue::new(&mut s.concurrency).range(1..=4096));
+                    ui.end_row();
 
-                        ui.label(t!("common.timeout_ms"));
-                        ui.add(
-                            egui::DragValue::new(&mut s.timeout_ms)
-                                .range(10..=120_000)
-                                .suffix(" ms"),
-                        );
-                        ui.end_row();
+                    ui.label(t!("common.timeout_ms"));
+                    ui.add(
+                        egui::DragValue::new(&mut s.timeout_ms)
+                            .range(10..=120_000)
+                            .suffix(" ms"),
+                    );
+                    ui.end_row();
 
-                        ui.label(t!("common.grab_banner"));
-                        ui.checkbox(&mut s.grab_banner, "");
-                        ui.end_row();
+                    ui.label(t!("common.grab_banner"));
+                    ui.checkbox(&mut s.grab_banner, "");
+                    ui.end_row();
 
-                        ui.label(t!("common.reverse_dns"));
-                        ui.checkbox(&mut s.reverse_dns, "");
-                        ui.end_row();
-                    });
+                    ui.label(t!("common.reverse_dns"));
+                    ui.checkbox(&mut s.reverse_dns, "");
+                    ui.end_row();
+                });
+
+            // SYN scanning needs a raw socket and is Linux-only, so only
+            // warn there.
+            if s.mode == ScanMode::Syn && cfg!(target_os = "linux") {
+                privilege_note(ui, privilege.raw, privilege, &t!("privilege.needs_raw_syn"));
+            }
+
+            ui.add_space(6.0);
+            ui.horizontal(|ui| {
+                self.control_row(ui, s, history, rt);
+                state_badge(ui, self.ctrl.state);
             });
-        if submit {
+            if let Some(p) = &self.progress {
+                ui.label(format!("{} / {} ({})", p.scanned, p.total, p.open));
+            }
+
+            if let Some((msg, hint)) = &self.error {
+                error_banner(ui, msg, hint.as_deref());
+            }
+            for line in self.info.iter().rev().take(5) {
+                info_line(ui, line);
+            }
+            submit
+        });
+
+        if submit == Some(true) {
             history_input::record_fields(
                 history,
                 &[
@@ -171,72 +190,52 @@ impl PortScanTab {
             self.restart(s, rt);
         }
 
-        // SYN scanning needs a raw socket and is Linux-only, so only warn there.
-        if s.mode == ScanMode::Syn && cfg!(target_os = "linux") {
-            privilege_note(ui, privilege.raw, privilege, &t!("privilege.needs_raw_syn"));
-        }
+        crate::ui::layout::results_panel(ui, |ui| {
+            self.toolbar(ui);
 
-        ui.horizontal(|ui| {
-            self.control_row(ui, s, history, rt);
-            state_badge(ui, self.ctrl.state);
-            if let Some(p) = &self.progress {
-                ui.label(format!("{} / {} ({})", p.scanned, p.total, p.open));
-            }
+            let palette = Palette::from_ui(ui);
+            let headers = [
+                t!("common.host"),
+                t!("common.port"),
+                t!("common.protocol"),
+                t!("common.state"),
+                t!("common.service"),
+                t!("common.banner"),
+            ];
+            table(ui, &headers, self.results.len(), |i, row| {
+                let r = &self.results[i];
+                row.col(|ui| {
+                    ui.label(&r.host);
+                });
+                row.col(|ui| {
+                    ui.label(r.port.to_string());
+                });
+                row.col(|ui| {
+                    ui.label(r.protocol.label());
+                });
+                row.col(|ui| {
+                    let color = match r.state {
+                        PortState::Open => palette.state_running,
+                        PortState::Closed => palette.state_idle,
+                        PortState::Filtered | PortState::OpenOrFiltered => palette.state_paused,
+                    };
+                    ui.colored_label(color, r.state.label());
+                });
+                row.col(|ui| {
+                    ui.label(r.service.clone().unwrap_or_else(|| "-".into()));
+                });
+                row.col(|ui| {
+                    let banner = r
+                        .banner
+                        .clone()
+                        .unwrap_or_else(|| "-".into())
+                        .replace(['\r', '\n'], " ");
+                    ui.label(banner);
+                });
+            });
         });
 
-        if let Some((msg, hint)) = &self.error {
-            error_banner(ui, msg, hint.as_deref());
-        }
-        for line in self.info.iter().rev().take(5) {
-            info_line(ui, line);
-        }
-
-        ui.separator();
-
-        // Result toolbar lives below the divider, together with the result
-        // widgets it acts on.
-        self.toolbar(ui);
-
-        let headers = [
-            t!("common.host"),
-            t!("common.port"),
-            t!("common.protocol"),
-            t!("common.state"),
-            t!("common.service"),
-            t!("common.banner"),
-        ];
-        table(ui, &headers, self.results.len(), |i, row| {
-            let r = &self.results[i];
-            row.col(|ui| {
-                ui.label(&r.host);
-            });
-            row.col(|ui| {
-                ui.label(r.port.to_string());
-            });
-            row.col(|ui| {
-                ui.label(r.protocol.label());
-            });
-            row.col(|ui| {
-                let color = match r.state {
-                    PortState::Open => egui::Color32::from_rgb(0, 200, 0),
-                    PortState::Closed => egui::Color32::GRAY,
-                    PortState::Filtered => egui::Color32::from_rgb(230, 160, 0),
-                    PortState::OpenOrFiltered => egui::Color32::from_rgb(230, 160, 0),
-                };
-                ui.colored_label(color, r.state.label());
-            });
-            row.col(|ui| {
-                ui.label(r.service.clone().unwrap_or_else(|| "-".into()));
-            });
-            row.col(|ui| {
-                let banner = r
-                    .banner
-                    .clone()
-                    .unwrap_or_else(|| "-".into())
-                    .replace(['\r', '\n'], " ");
-                ui.label(banner);
-            });
-        });
+        expanded
     }
 
     fn toolbar(&mut self, ui: &mut egui::Ui) {
