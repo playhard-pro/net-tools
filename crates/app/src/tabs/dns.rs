@@ -241,7 +241,7 @@ fn record_type_input(ui: &mut egui::Ui, value: &mut String) {
     ui.horizontal(|ui| {
         ui.add(egui::TextEdit::singleline(value).desired_width(90.0));
         ui.push_id("dns_record_type", |ui| {
-            let button = ui.button("▼").on_hover_text(t!("dns.common_types"));
+            let button = crate::ui::common::dropdown_button(ui, &t!("dns.common_types"));
             egui::Popup::from_toggle_button_response(&button)
                 .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
                 .width(120.0)

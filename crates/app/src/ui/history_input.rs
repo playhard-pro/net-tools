@@ -139,7 +139,7 @@ fn history_button(
     // Scope the auto-generated ids by field key so multiple buttons never
     // collide and the open state stays attached to the right field.
     ui.push_id(("history", key), |ui| {
-        let button = ui.button("▼").on_hover_text(t!("common.history"));
+        let button = super::common::dropdown_button(ui, &t!("common.history"));
         egui::Popup::from_toggle_button_response(&button)
             // Keep the pop-up open while entries are deleted inside it; it is
             // closed explicitly when an entry is picked or cleared.
@@ -216,7 +216,7 @@ fn history_menu(
                         *text = entry.clone();
                         ui.close();
                     }
-                    if ui.small_button("✕").clicked() {
+                    if ui.small_button("x").clicked() {
                         remove = Some(index);
                     }
                 });

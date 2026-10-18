@@ -273,7 +273,7 @@ impl HttpPingTab {
                 ui.label(r.body_bytes.to_string());
             });
             row.col(|ui| {
-                ui.label(if r.ok { "✓" } else { "✗" });
+                ui.label(if r.ok { "OK" } else { "X" });
             });
         });
 

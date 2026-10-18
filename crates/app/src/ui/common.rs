@@ -70,6 +70,28 @@ pub fn error_banner(ui: &mut egui::Ui, message: &str, hint: Option<&str>) {
         });
 }
 
+/// Small drop-down button whose arrow is painted instead of rendered from a
+/// font glyph. This keeps the control independent of the bundled CJK subset.
+pub fn dropdown_button(ui: &mut egui::Ui, tooltip: &str) -> egui::Response {
+    let height = ui.spacing().interact_size.y;
+    let response = ui.add(egui::Button::new("").min_size(egui::vec2(height.max(20.0), height)));
+    let visuals = ui.style().interact(&response);
+    let painter = ui.painter();
+    let center = response.rect.center();
+    let half_width = 3.5;
+    let half_height = 2.5;
+    painter.add(egui::Shape::convex_polygon(
+        vec![
+            egui::pos2(center.x - half_width, center.y - half_height),
+            egui::pos2(center.x + half_width, center.y - half_height),
+            egui::pos2(center.x, center.y + half_height),
+        ],
+        visuals.fg_stroke.color,
+        egui::Stroke::NONE,
+    ));
+    response.on_hover_text(tooltip)
+}
+
 /// Copy text to the clipboard.
 pub fn copy_button(ui: &mut egui::Ui, text: &str) {
     if ui.small_button(t!("common.copy")).clicked() {
