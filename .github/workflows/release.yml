@@ -41,7 +41,6 @@ jobs:
           - os: macos-15
             platform: macos
             arch: aarch64
-            formats: app,dmg
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
@@ -65,9 +64,24 @@ jobs:
       - name: Build release binary
         run: cargo build --release --workspace
 
-      - name: Package Linux / macOS installers
-        if: runner.os != 'Windows'
+      - name: Package Linux installers
+        if: runner.os == 'Linux'
         run: cargo packager -c packager.toml -f ${{ matrix.formats }}
+
+      # Signing and notarization are optional. When the secrets are absent the
+      # script falls back to an ad-hoc signature so Gatekeeper does not report a
+      # broken bundle. Empty secrets are ignored by the script.
+      - name: Package macOS app and dmg
+        if: runner.os == 'macOS'
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_KEYCHAIN_PROFILE: ${{ secrets.APPLE_KEYCHAIN_PROFILE }}
+        run: bash scripts/package_macos.sh
 
       # cargo-packager omits the target OS from its file names, so add it here
       # to match the Windows archive naming scheme.
