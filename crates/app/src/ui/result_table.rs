@@ -20,7 +20,15 @@ pub fn table<H: AsRef<str>>(
     num_rows: usize,
     row_fn: impl FnMut(usize, &mut TableRow<'_, '_>),
 ) {
-    table_impl(ui, headers, num_rows, None, row_fn);
+    table_impl(
+        ui,
+        headers,
+        num_rows,
+        None,
+        None,
+        egui::TextWrapMode::Extend,
+        row_fn,
+    );
 }
 
 /// Like [`table`], but the scrollable body keeps a fixed height of `rows`
@@ -38,6 +46,32 @@ pub fn table_fixed_rows<H: AsRef<str>>(
         headers,
         num_rows,
         Some(ROW_HEIGHT * rows as f32),
+        None,
+        egui::TextWrapMode::Extend,
+        row_fn,
+    );
+}
+
+/// Like [`table_fixed_rows`], but with explicit column widths.
+///
+/// Columns should be sized to fit the available width, and long cell content is
+/// truncated instead of widening the table. Callers are expected to expose the
+/// full value through a tooltip.
+pub fn table_fixed_rows_with_columns<H: AsRef<str>>(
+    ui: &mut egui::Ui,
+    headers: &[H],
+    num_rows: usize,
+    rows: usize,
+    columns: impl IntoIterator<Item = Column>,
+    row_fn: impl FnMut(usize, &mut TableRow<'_, '_>),
+) {
+    table_impl(
+        ui,
+        headers,
+        num_rows,
+        Some(ROW_HEIGHT * rows as f32),
+        Some(columns.into_iter().collect()),
+        egui::TextWrapMode::Truncate,
         row_fn,
     );
 }
@@ -74,11 +108,14 @@ fn table_impl<H: AsRef<str>>(
     headers: &[H],
     num_rows: usize,
     fixed_body_height: Option<f32>,
+    columns: Option<Vec<Column>>,
+    wrap_mode: egui::TextWrapMode,
     mut row_fn: impl FnMut(usize, &mut TableRow<'_, '_>),
 ) {
-    // Cells must not wrap: a wrapping label is measured at the (narrow) cell
-    // width, so auto-sized columns would never grow to fit their content.
-    ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Extend);
+    // Auto-sized columns need extended cell content so they can grow to fit it.
+    // Constrained columns use truncation instead, so long values cannot widen
+    // the table past the available space.
+    ui.style_mut().wrap_mode = Some(wrap_mode);
 
     // Without a fixed height, bound the table to the remaining space so it
     // scrolls internally instead of growing without limit and pushing later
@@ -91,8 +128,14 @@ fn table_impl<H: AsRef<str>>(
         .max_scroll_height(max_height)
         .min_scrolled_height(min_height)
         .auto_shrink([false, false]);
-    for _ in headers {
-        builder = builder.column(Column::auto().at_least(24.0));
+    let columns = columns.unwrap_or_else(|| {
+        headers
+            .iter()
+            .map(|_| Column::auto().at_least(24.0))
+            .collect()
+    });
+    for column in columns {
+        builder = builder.column(column);
     }
     builder
         .header(HEADER_HEIGHT, |mut header| {
@@ -290,6 +333,61 @@ mod tests {
         assert!(
             toolbar_bottom <= table_top + 0.5,
             "toolbar bottom {toolbar_bottom} is not above table top {table_top}"
+        );
+    }
+
+    /// Explicit columns plus truncation must keep long content inside the
+    /// column that owns the table, even when the table sits in a half-width
+    /// layout.
+    #[test]
+    fn constrained_table_stays_inside_its_column() {
+        let ctx = egui::Context::default();
+        let mut table_right = 0.0f32;
+        let mut column_right = 0.0f32;
+
+        for _ in 0..8 {
+            let input = egui::RawInput {
+                screen_rect: Some(egui::Rect::from_min_size(
+                    egui::pos2(0.0, 0.0),
+                    egui::vec2(800.0, 600.0),
+                )),
+                ..Default::default()
+            };
+            ctx.run_ui(input, |ui| {
+                egui::CentralPanel::default().show(ui, |ui| {
+                    ui.columns(2, |columns| {
+                        let ui = &mut columns[0];
+                        let width =
+                            (ui.available_width() - ui.spacing().scroll.allocated_width()).max(1.0);
+                        let table = ui.scope(|ui| {
+                            table_fixed_rows_with_columns(
+                                ui,
+                                &["a", "b"],
+                                1,
+                                4,
+                                [Column::exact(width * 0.5), Column::exact(width * 0.5)],
+                                |_i, row| {
+                                    row.col(|ui| {
+                                        let _ = ui.label("x".repeat(400));
+                                    });
+                                    row.col(|ui| {
+                                        let _ = ui.label("y".repeat(400));
+                                    });
+                                },
+                            );
+                        });
+                        table_right = table.response.rect.right();
+                        column_right = ui.max_rect().right();
+                    });
+                });
+            })
+            .textures_delta
+            .clear();
+        }
+
+        assert!(
+            table_right <= column_right + 1.0,
+            "table right {table_right} crossed column right {column_right}"
         );
     }
 }

@@ -6,6 +6,7 @@ use std::sync::mpsc::{self, Receiver, TryRecvError};
 use std::time::{Duration, Instant};
 
 use eframe::egui;
+use egui_extras::Column;
 use net_tools_core::net::overview::{
     self, InterfaceCounters, NetworkInterface, NetworkSnapshot, PublicEgress, PublicIp,
 };
@@ -13,7 +14,7 @@ use rust_i18n::t;
 
 use crate::tabs::speedtest::metric_card;
 use crate::ui::common::{error_banner, result_toolbar, ToolbarAction};
-use crate::ui::result_table::table_fixed_rows;
+use crate::ui::result_table::table_fixed_rows_with_columns;
 use crate::ui::theme::Palette;
 
 /// History key used for the aggregate rate across all non-loopback interfaces.
@@ -39,6 +40,12 @@ const PUBLIC_IP_LABEL_COLUMN_WIDTH: f32 = 104.0;
 
 /// Maximum initial body height of the route table, expressed in visible rows.
 const ROUTE_VISIBLE_ROWS: usize = 14;
+
+/// Relative widths of the route table columns.
+///
+/// Destination and gateway values can be very long, so they receive most of the
+/// space and are truncated rather than allowed to widen the table.
+const ROUTE_COLUMN_WEIGHTS: [f32; 5] = [0.09, 0.35, 0.20, 0.24, 0.12];
 
 /// Minimum body height kept for the route table when few routes are present.
 const ROUTE_MIN_VISIBLE_ROWS: usize = 6;
@@ -1138,11 +1145,18 @@ fn routes_table(ui: &mut egui::Ui, snapshot: &NetworkSnapshot) {
         .routes
         .len()
         .clamp(ROUTE_MIN_VISIBLE_ROWS, ROUTE_VISIBLE_ROWS);
-    table_fixed_rows(
+
+    // The table scrolls vertically, so reserve the scrollbar width to keep the
+    // column widths from spilling into the second overview column.
+    let table_width = (ui.available_width() - ui.spacing().scroll.allocated_width()).max(1.0);
+    let columns = ROUTE_COLUMN_WEIGHTS.map(|weight| Column::exact(table_width * weight));
+
+    table_fixed_rows_with_columns(
         ui,
         &headers,
         snapshot.routes.len(),
         visible_rows,
+        columns,
         |index, row| {
             let Some(route) = snapshot.routes.get(index) else {
                 return;
@@ -1151,13 +1165,14 @@ fn routes_table(ui: &mut egui::Ui, snapshot: &NetworkSnapshot) {
                 ui.label(&route.family);
             });
             row.col(|ui| {
-                ui.monospace(&route.destination);
+                ui.monospace(&route.destination)
+                    .on_hover_text(&route.destination);
             });
             row.col(|ui| {
-                ui.monospace(&route.gateway);
+                ui.monospace(&route.gateway).on_hover_text(&route.gateway);
             });
             row.col(|ui| {
-                ui.label(&route.interface);
+                ui.label(&route.interface).on_hover_text(&route.interface);
             });
             row.col(|ui| {
                 ui.monospace(
