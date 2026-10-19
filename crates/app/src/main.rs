@@ -8,6 +8,7 @@ extern crate rust_i18n;
 mod app;
 mod config_store;
 mod fonts;
+mod latency_stats;
 mod speedtest_worker;
 mod tabs;
 mod ui;

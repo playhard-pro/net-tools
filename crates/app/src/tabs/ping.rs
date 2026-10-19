@@ -7,6 +7,7 @@ use net_tools_core::model::{ProbeEvent, ProbeMode, ProbeSample};
 use net_tools_core::net::privilege::PrivilegeStatus;
 use rust_i18n::t;
 
+use crate::latency_stats::LatencyStats;
 use crate::ui::common::{error_banner, info_line, privilege_note, state_badge};
 use crate::ui::history_input;
 use crate::ui::result_table::table_fixed_rows;
@@ -16,6 +17,8 @@ use crate::ui::settings;
 const MAX_SAMPLES: usize = 1000;
 /// Number of data rows visible before the table starts scrolling.
 const VISIBLE_ROWS: usize = 10;
+/// Number of buckets used by the RTT histogram.
+const HISTOGRAM_BINS: usize = 20;
 /// History bucket for the target input.
 const TARGET_HISTORY_KEY: &str = "ping.target";
 
@@ -25,12 +28,11 @@ pub struct PingTab {
     pub sent: u64,
     pub received: u64,
     pub lost: u64,
-    pub min_ms: Option<f64>,
-    pub max_ms: Option<f64>,
-    pub total_ms: f64,
+    pub stats: LatencyStats,
     pub jitter_ms: f64,
     pub last_ms: Option<f64>,
     pub chart: Vec<[f64; 2]>,
+    pub histogram: Vec<crate::ui::chart::HistogramBin>,
     pub info: Vec<String>,
     pub error: Option<(String, Option<String>)>,
 }
@@ -49,12 +51,11 @@ impl PingTab {
             sent: 0,
             received: 0,
             lost: 0,
-            min_ms: None,
-            max_ms: None,
-            total_ms: 0.0,
+            stats: LatencyStats::default(),
             jitter_ms: 0.0,
             last_ms: None,
             chart: Vec::new(),
+            histogram: Vec::new(),
             info: Vec::new(),
             error: None,
         }
@@ -65,12 +66,11 @@ impl PingTab {
         self.sent = 0;
         self.received = 0;
         self.lost = 0;
-        self.min_ms = None;
-        self.max_ms = None;
-        self.total_ms = 0.0;
+        self.stats = LatencyStats::default();
         self.jitter_ms = 0.0;
         self.last_ms = None;
         self.chart.clear();
+        self.histogram.clear();
         self.info.clear();
         self.error = None;
     }
@@ -100,6 +100,7 @@ impl PingTab {
     }
 
     pub fn drain(&mut self) {
+        let mut latency_added = false;
         for ev in self.ctrl.drain() {
             match ev {
                 ProbeEvent::Latency(sample) => {
@@ -109,9 +110,7 @@ impl PingTab {
                         self.jitter_ms = (self.jitter_ms + (sample.rtt_ms - last).abs()) / 2.0;
                     }
                     self.last_ms = Some(sample.rtt_ms);
-                    self.total_ms += sample.rtt_ms;
-                    self.min_ms = Some(self.min_ms.map_or(sample.rtt_ms, |m| m.min(sample.rtt_ms)));
-                    self.max_ms = Some(self.max_ms.map_or(sample.rtt_ms, |m| m.max(sample.rtt_ms)));
+                    latency_added = true;
                     self.chart.push([sample.seq as f64, sample.rtt_ms]);
                     if self.chart.len() > MAX_SAMPLES {
                         self.chart.remove(0);
@@ -141,14 +140,17 @@ impl PingTab {
                 _ => {}
             }
         }
+
+        if latency_added {
+            self.recompute_stats();
+        }
     }
 
-    pub fn avg_ms(&self) -> Option<f64> {
-        if self.received == 0 {
-            None
-        } else {
-            Some(self.total_ms / self.received as f64)
-        }
+    /// Recompute derived statistics after the retained sample window changes.
+    fn recompute_stats(&mut self) {
+        self.stats = LatencyStats::from_values(self.samples.iter().map(|sample| sample.rtt_ms));
+        let rtts: Vec<f64> = self.samples.iter().map(|sample| sample.rtt_ms).collect();
+        self.histogram = crate::ui::chart::histogram_bins(&rtts, HISTOGRAM_BINS);
     }
 
     pub fn loss_pct(&self) -> f64 {
@@ -233,23 +235,21 @@ impl PingTab {
             self.toolbar(ui);
 
             // Statistics.
+            let format_ms = |value: Option<f64>| {
+                value.map_or_else(|| "-".to_string(), |ms| format!("{ms:.1} ms"))
+            };
             ui.horizontal_wrapped(|ui| {
-                ui.label(t!(
-                    "ping.stats.min",
-                    v = self.min_ms.map_or("-".into(), |v| format!("{:.1} ms", v))
-                ));
-                ui.label(t!(
-                    "ping.stats.avg",
-                    v = self.avg_ms().map_or("-".into(), |v| format!("{:.1} ms", v))
-                ));
-                ui.label(t!(
-                    "ping.stats.max",
-                    v = self.max_ms.map_or("-".into(), |v| format!("{:.1} ms", v))
-                ));
+                ui.label(t!("ping.stats.min", v = format_ms(self.stats.min_ms)));
+                ui.label(t!("ping.stats.avg", v = format_ms(self.stats.avg_ms)));
+                ui.label(t!("ping.stats.max", v = format_ms(self.stats.max_ms)));
+                ui.label(t!("ping.stats.stdev", v = format_ms(self.stats.stdev_ms)));
                 ui.label(t!(
                     "ping.stats.jitter",
                     v = format!("{:.1} ms", self.jitter_ms)
                 ));
+                ui.label(t!("ping.stats.p50", v = format_ms(self.stats.p50_ms)));
+                ui.label(t!("ping.stats.p95", v = format_ms(self.stats.p95_ms)));
+                ui.label(t!("ping.stats.p99", v = format_ms(self.stats.p99_ms)));
             });
 
             // Table: newest record first, kept to a fixed number of visible rows.
@@ -283,6 +283,19 @@ impl PingTab {
             if !self.chart.is_empty() {
                 ui.add_space(12.0);
                 crate::ui::chart::latency_chart(ui, &self.chart, 180.0);
+            }
+
+            if !self.histogram.is_empty() {
+                ui.add_space(12.0);
+                ui.label(egui::RichText::new(t!("ping.histogram.title")).strong());
+                crate::ui::chart::histogram_chart(
+                    ui,
+                    "ping_latency_histogram",
+                    &self.histogram,
+                    160.0,
+                    &t!("ping.histogram.rtt_ms"),
+                    &t!("ping.histogram.samples"),
+                );
             }
         });
 

@@ -94,7 +94,15 @@ ping:
     min: "min: %{v}"
     avg: "avg: %{v}"
     max: "max: %{v}"
+    stdev: "stdev: %{v}"
     jitter: "jitter: %{v}"
+    p50: "P50: %{v}"
+    p95: "P95: %{v}"
+    p99: "P99: %{v}"
+  histogram:
+    title: RTT histogram
+    rtt_ms: RTT (ms)
+    samples: Samples
 mtr:
   hop: Hop
   addr: Address
@@ -123,6 +131,18 @@ http:
   total_ms: Total (ms)
   body_bytes: Bytes
   ok: OK
+  stats:
+    min: "min: %{v}"
+    avg: "avg: %{v}"
+    max: "max: %{v}"
+    stdev: "stdev: %{v}"
+    p50: "P50: %{v}"
+    p95: "P95: %{v}"
+    p99: "P99: %{v}"
+  histogram:
+    title: Total time histogram
+    total_ms: Total (ms)
+    samples: Samples
 ip_insight:
   query: Query
   key: Key

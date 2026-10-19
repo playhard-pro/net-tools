@@ -94,7 +94,15 @@ ping:
     min: "最小: %{v}"
     avg: "平均: %{v}"
     max: "最大: %{v}"
+    stdev: "标准差: %{v}"
     jitter: "抖动: %{v}"
+    p50: "P50: %{v}"
+    p95: "P95: %{v}"
+    p99: "P99: %{v}"
+  histogram:
+    title: RTT 直方图
+    rtt_ms: RTT(ms)
+    samples: 样本数
 mtr:
   hop: 跳
   addr: 地址
@@ -123,6 +131,18 @@ http:
   total_ms: 总耗时(ms)
   body_bytes: 字节数
   ok: 是否通过
+  stats:
+    min: "最小: %{v}"
+    avg: "平均: %{v}"
+    max: "最大: %{v}"
+    stdev: "标准差: %{v}"
+    p50: "P50: %{v}"
+    p95: "P95: %{v}"
+    p99: "P99: %{v}"
+  histogram:
+    title: 总耗时直方图
+    total_ms: 总耗时(ms)
+    samples: 样本数
 ip_insight:
   query: 查询
   key: 字段

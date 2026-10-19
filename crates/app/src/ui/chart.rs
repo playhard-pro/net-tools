@@ -1,10 +1,113 @@
-//! Latency line chart (based on egui_plot).
+//! Latency charts: line chart and RTT histogram (based on egui_plot).
 
 use eframe::egui;
-use egui_plot::{Line, Plot, PlotPoints};
+use egui_plot::{Bar, BarChart, Line, Plot, PlotPoints};
 use rust_i18n::t;
 
 use super::theme::Palette;
+
+/// One bucket of a latency histogram.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct HistogramBin {
+    /// Inclusive lower RTT bound in milliseconds.
+    pub lower_ms: f64,
+    /// Upper RTT bound in milliseconds, exclusive except for the last bucket.
+    pub upper_ms: f64,
+    /// Number of samples that fall into this bucket.
+    pub count: u64,
+}
+
+/// Split `values` into equal-width buckets covering their full range.
+///
+/// An empty input produces no buckets. When every value is identical, a single
+/// bucket is returned so the caller can still render the sample count.
+pub fn histogram_bins(values: &[f64], bins: usize) -> Vec<HistogramBin> {
+    if values.is_empty() || bins == 0 {
+        return Vec::new();
+    }
+
+    let min = values.iter().copied().fold(f64::INFINITY, f64::min);
+    let max = values.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    if max <= min {
+        return vec![HistogramBin {
+            lower_ms: min,
+            upper_ms: max,
+            count: values.len() as u64,
+        }];
+    }
+
+    let width = (max - min) / bins as f64;
+    let mut counts = vec![0_u64; bins];
+    for &value in values {
+        // Values at the upper edge belong to the last bucket.
+        let index = (((value - min) / width).floor() as usize).min(bins - 1);
+        counts[index] += 1;
+    }
+
+    counts
+        .into_iter()
+        .enumerate()
+        .map(|(index, count)| {
+            let lower_ms = min + index as f64 * width;
+            // Keep the final bucket aligned with the exact maximum.
+            let upper_ms = if index + 1 == bins {
+                max
+            } else {
+                min + (index + 1) as f64 * width
+            };
+            HistogramBin {
+                lower_ms,
+                upper_ms,
+                count,
+            }
+        })
+        .collect()
+}
+
+/// Render a latency histogram with the sample count on the vertical axis.
+///
+/// `id` keeps the plot state independent between tabs, while the axis labels
+/// let callers describe the metric being summarized.
+pub fn histogram_chart(
+    ui: &mut egui::Ui,
+    id: &str,
+    bins: &[HistogramBin],
+    height: f32,
+    x_label: &str,
+    y_label: &str,
+) {
+    if bins.is_empty() {
+        return;
+    }
+
+    let color = Palette::from_ui(ui).chart_primary;
+    let max_count = bins.iter().map(|bin| bin.count).max().unwrap_or(1).max(1) as f64;
+    let bars: Vec<Bar> = bins
+        .iter()
+        .map(|bin| {
+            let midpoint = (bin.lower_ms + bin.upper_ms) / 2.0;
+            let width = (bin.upper_ms - bin.lower_ms).max(f64::EPSILON);
+            Bar::new(midpoint, bin.count as f64)
+                .width(width * 0.9)
+                .name(format!(
+                    "{:.1}–{:.1} ms: {}",
+                    bin.lower_ms, bin.upper_ms, bin.count
+                ))
+        })
+        .collect();
+
+    Plot::new(id)
+        .height(height)
+        .show_x(true)
+        .show_y(true)
+        .include_y(0.0)
+        .include_y(max_count)
+        .x_axis_label(x_label)
+        .y_axis_label(y_label)
+        .show(ui, |plot_ui| {
+            plot_ui.bar_chart(BarChart::new("samples", bars).color(color));
+        });
+}
 
 /// Render a `(x, y)` series as a line chart. `points` is `(seq, rtt_ms)`.
 pub fn latency_chart(ui: &mut egui::Ui, points: &[[f64; 2]], height: f32) {
@@ -121,4 +224,29 @@ pub fn network_rate_chart(
                 );
             }
         });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::histogram_bins;
+
+    #[test]
+    fn histogram_assigns_every_value_to_a_bucket() {
+        let bins = histogram_bins(&[1.0, 1.0, 2.0, 2.0, 3.0], 2);
+        assert_eq!(bins.len(), 2);
+        assert_eq!(bins.iter().map(|bin| bin.count).sum::<u64>(), 5);
+        // Values on an internal bucket boundary belong to the upper bucket.
+        assert_eq!(bins[0].count, 2);
+        assert_eq!(bins[1].count, 3);
+        assert!((bins[0].lower_ms - 1.0).abs() < f64::EPSILON);
+        assert!((bins[1].upper_ms - 3.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn histogram_handles_identical_and_empty_values() {
+        let bins = histogram_bins(&[4.0, 4.0], 5);
+        assert_eq!(bins.len(), 1);
+        assert_eq!(bins[0].count, 2);
+        assert!(histogram_bins(&[], 5).is_empty());
+    }
 }

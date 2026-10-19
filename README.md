@@ -19,9 +19,9 @@ it.
 | Tab | Highlights |
 |-----|------------|
 | Overview | Interfaces, addresses, gateways, DNS and routes; live RX/TX charts; public IPv4/IPv6 egress with location, ASN and ISP. |
-| Ping | Continuous ICMP/UDP ping with live chart, loss, min/avg/max and jitter. |
+| Ping | Continuous ICMP/UDP ping with live chart and RTT histogram, loss, min/avg/max, standard deviation and P50/P95/P99 percentiles. |
 | MTR | Parallel hop-by-hop probing with continuous refresh and multiple responders per hop. |
-| HTTP Ping | Multi-method requests with DNS, connect, TLS, TTFB and total timings. |
+| HTTP Ping | Multi-method requests with DNS, connect, TLS, TTFB and total timings, plus total-time percentiles and histogram. |
 | Port Scan | TCP connect, SYN half-open and UDP scans, with banner grabbing. |
 | IP Insight | Parallel IP geolocation queries across multiple providers. |
 | Lookup | RDAP domain/IP lookup with JSON tree, parsed contacts and parent-domain fallback. |

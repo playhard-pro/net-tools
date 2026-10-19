@@ -6,6 +6,7 @@ use net_tools_core::control::TaskController;
 use net_tools_core::model::{HttpResult, ProbeEvent};
 use rust_i18n::t;
 
+use crate::latency_stats::LatencyStats;
 use crate::ui::common::{error_banner, info_line, state_badge};
 use crate::ui::history_input;
 use crate::ui::result_table::table_fixed_rows;
@@ -19,11 +20,15 @@ const BODY_HISTORY_KEY: &str = "http.body";
 const MAX_RESULTS: usize = 1000;
 /// Number of data rows visible before the table starts scrolling.
 const VISIBLE_ROWS: usize = 5;
+/// Number of buckets used by the total-time histogram.
+const HISTOGRAM_BINS: usize = 20;
 
 pub struct HttpPingTab {
     pub ctrl: TaskController<ProbeEvent>,
     pub results: Vec<HttpResult>,
     pub chart: Vec<[f64; 2]>,
+    pub stats: LatencyStats,
+    pub histogram: Vec<crate::ui::chart::HistogramBin>,
     pub info: Vec<String>,
     pub error: Option<(String, Option<String>)>,
 }
@@ -40,6 +45,8 @@ impl HttpPingTab {
             ctrl: TaskController::new(),
             results: Vec::new(),
             chart: Vec::new(),
+            stats: LatencyStats::default(),
+            histogram: Vec::new(),
             info: Vec::new(),
             error: None,
         }
@@ -48,6 +55,8 @@ impl HttpPingTab {
     pub fn reset(&mut self) {
         self.results.clear();
         self.chart.clear();
+        self.stats = LatencyStats::default();
+        self.histogram.clear();
         self.info.clear();
         self.error = None;
     }
@@ -70,9 +79,11 @@ impl HttpPingTab {
     }
 
     pub fn drain(&mut self) {
+        let mut result_added = false;
         for ev in self.ctrl.drain() {
             match ev {
                 ProbeEvent::Http(r) => {
+                    result_added = true;
                     self.chart.push([r.seq as f64, r.total_ms]);
                     if self.chart.len() > MAX_RESULTS {
                         self.chart.remove(0);
@@ -92,6 +103,20 @@ impl HttpPingTab {
                 _ => {}
             }
         }
+
+        if result_added {
+            self.recompute_stats();
+        }
+    }
+
+    /// Recompute total-time statistics for every completed probe.
+    ///
+    /// Failed requests still have a meaningful total duration, and including
+    /// them keeps the summary consistent with the latency chart.
+    fn recompute_stats(&mut self) {
+        let totals: Vec<f64> = self.results.iter().map(|result| result.total_ms).collect();
+        self.stats = LatencyStats::from_values(totals.iter().copied());
+        self.histogram = crate::ui::chart::histogram_bins(&totals, HISTOGRAM_BINS);
     }
 
     pub fn ui(
@@ -236,6 +261,21 @@ impl HttpPingTab {
         crate::ui::layout::results_panel(ui, |ui| {
             self.toolbar(ui);
 
+            // Total request time statistics. Stage timings remain in the table
+            // without separate summaries.
+            let format_ms = |value: Option<f64>| {
+                value.map_or_else(|| "-".to_string(), |ms| format!("{ms:.1} ms"))
+            };
+            ui.horizontal_wrapped(|ui| {
+                ui.label(t!("http.stats.min", v = format_ms(self.stats.min_ms)));
+                ui.label(t!("http.stats.avg", v = format_ms(self.stats.avg_ms)));
+                ui.label(t!("http.stats.max", v = format_ms(self.stats.max_ms)));
+                ui.label(t!("http.stats.stdev", v = format_ms(self.stats.stdev_ms)));
+                ui.label(t!("http.stats.p50", v = format_ms(self.stats.p50_ms)));
+                ui.label(t!("http.stats.p95", v = format_ms(self.stats.p95_ms)));
+                ui.label(t!("http.stats.p99", v = format_ms(self.stats.p99_ms)));
+            });
+
             // Table: newest record first, kept to a fixed number of visible rows.
             let headers = [
                 t!("common.time"),
@@ -287,6 +327,19 @@ impl HttpPingTab {
             if !self.chart.is_empty() {
                 ui.add_space(12.0);
                 crate::ui::chart::latency_chart(ui, &self.chart, 180.0);
+            }
+
+            if !self.histogram.is_empty() {
+                ui.add_space(12.0);
+                ui.label(egui::RichText::new(t!("http.histogram.title")).strong());
+                crate::ui::chart::histogram_chart(
+                    ui,
+                    "http_total_histogram",
+                    &self.histogram,
+                    160.0,
+                    &t!("http.histogram.total_ms"),
+                    &t!("http.histogram.samples"),
+                );
             }
         });
 
@@ -396,4 +449,40 @@ fn method_selector(ui: &mut egui::Ui, method: &mut String) {
                 ui.selectable_value(method, m.to_string(), m);
             }
         });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::HttpPingTab;
+    use net_tools_core::model::HttpResult;
+
+    fn result(seq: u64, total_ms: f64, error: Option<&str>) -> HttpResult {
+        HttpResult {
+            seq,
+            time: String::new(),
+            ok: error.is_none(),
+            method: "GET".to_string(),
+            url: String::new(),
+            status: error.is_none().then_some(200),
+            dns_ms: 0.0,
+            connect_ms: 0.0,
+            tls_ms: None,
+            ttfb_ms: 0.0,
+            total_ms,
+            body_bytes: 0,
+            error: error.map(str::to_string),
+        }
+    }
+
+    #[test]
+    fn stats_include_failed_request_totals() {
+        let mut tab = HttpPingTab::new();
+        tab.results = vec![result(1, 10.0, None), result(2, 30.0, Some("timeout"))];
+        tab.recompute_stats();
+
+        assert_eq!(tab.stats.min_ms, Some(10.0));
+        assert_eq!(tab.stats.max_ms, Some(30.0));
+        assert_eq!(tab.stats.p50_ms, Some(20.0));
+        assert_eq!(tab.histogram.iter().map(|bin| bin.count).sum::<u64>(), 2);
+    }
 }
