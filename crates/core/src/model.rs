@@ -589,6 +589,151 @@ impl Iperf3Protocol {
     }
 }
 
+/// Tool selected inside the Utils tab.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum UtilsTool {
+    #[default]
+    Subnet,
+    Wol,
+    PortReference,
+    MacVendor,
+    Timestamp,
+}
+
+impl UtilsTool {
+    /// Stable identifier used by the configuration.
+    pub fn id(self) -> &'static str {
+        match self {
+            UtilsTool::Subnet => "subnet",
+            UtilsTool::Wol => "wol",
+            UtilsTool::PortReference => "port_reference",
+            UtilsTool::MacVendor => "mac_vendor",
+            UtilsTool::Timestamp => "timestamp",
+        }
+    }
+
+    /// Resolve a stored identifier, ignoring unknown values.
+    pub fn from_id(id: &str) -> Option<Self> {
+        [
+            UtilsTool::Subnet,
+            UtilsTool::Wol,
+            UtilsTool::PortReference,
+            UtilsTool::MacVendor,
+            UtilsTool::Timestamp,
+        ]
+        .into_iter()
+        .find(|tool| tool.id() == id)
+    }
+}
+
+/// Transport filter used by the port reference.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum PortTransportFilter {
+    #[default]
+    All,
+    Tcp,
+    Udp,
+    Sctp,
+    Dccp,
+}
+
+impl PortTransportFilter {
+    pub fn label(self) -> &'static str {
+        match self {
+            PortTransportFilter::All => "All",
+            PortTransportFilter::Tcp => "TCP",
+            PortTransportFilter::Udp => "UDP",
+            PortTransportFilter::Sctp => "SCTP",
+            PortTransportFilter::Dccp => "DCCP",
+        }
+    }
+
+    /// Whether a row with the given IANA transport value passes the filter.
+    pub fn accepts(self, transport: &str) -> bool {
+        match self {
+            PortTransportFilter::All => true,
+            PortTransportFilter::Tcp => transport.eq_ignore_ascii_case("tcp"),
+            PortTransportFilter::Udp => transport.eq_ignore_ascii_case("udp"),
+            PortTransportFilter::Sctp => transport.eq_ignore_ascii_case("sctp"),
+            PortTransportFilter::Dccp => transport.eq_ignore_ascii_case("dccp"),
+        }
+    }
+}
+
+/// View selected inside the port reference tool.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum PortReferenceView {
+    #[default]
+    Ports,
+    IpProtocols,
+}
+
+/// Unit used to interpret a numeric timestamp.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum TimestampUnit {
+    #[default]
+    Auto,
+    Seconds,
+    Milliseconds,
+    Microseconds,
+    Nanoseconds,
+}
+
+impl TimestampUnit {
+    pub fn label(self) -> &'static str {
+        match self {
+            TimestampUnit::Auto => "Auto",
+            TimestampUnit::Seconds => "seconds",
+            TimestampUnit::Milliseconds => "milliseconds",
+            TimestampUnit::Microseconds => "microseconds",
+            TimestampUnit::Nanoseconds => "nanoseconds",
+        }
+    }
+}
+
+/// Result of a Wake-on-LAN send operation.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WolResult {
+    pub mac: String,
+    pub broadcast: String,
+    pub port: u16,
+    pub packets: usize,
+    pub bytes: usize,
+    pub elapsed_ms: f64,
+    pub secure_on: bool,
+}
+
+/// Where a MAC vendor result came from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum MacVendorSource {
+    Local,
+    Online,
+}
+
+impl MacVendorSource {
+    pub fn label(self) -> &'static str {
+        match self {
+            MacVendorSource::Local => "local",
+            MacVendorSource::Online => "online",
+        }
+    }
+}
+
+/// Result of a MAC vendor lookup.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MacVendorResult {
+    /// Normalized MAC or prefix entered by the user.
+    pub mac: String,
+    /// Matched hexadecimal prefix.
+    pub prefix: String,
+    pub vendor: String,
+    pub address: Option<String>,
+    pub country: Option<String>,
+    pub block_type: Option<String>,
+    pub updated: Option<String>,
+    pub source: MacVendorSource,
+}
+
 /// Speed test tool shown inside the Speedtest tab.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum SpeedtestTool {
@@ -832,6 +977,10 @@ pub enum ProbeEvent {
     DnsText(String),
     /// An NTP query result.
     Ntp(NtpResult),
+    /// A Wake-on-LAN send result.
+    Wol(WolResult),
+    /// A MAC vendor lookup result.
+    MacVendor(MacVendorResult),
     /// A TLS target result.
     Tls(Box<TlsResult>),
     /// Progress of a batch TLS check.

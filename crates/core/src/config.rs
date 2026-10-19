@@ -4,7 +4,10 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::model::{IpVersion, Iperf3Protocol, PortPreset, ProbeMode, ScanMode, SpeedtestTool};
+use crate::model::{
+    IpVersion, Iperf3Protocol, PortPreset, PortReferenceView, PortTransportFilter, ProbeMode,
+    ScanMode, SpeedtestTool, TimestampUnit, UtilsTool,
+};
 
 /// Maximum number of remembered values kept for each input field. Older entries
 /// are dropped once this many values are stored.
@@ -402,6 +405,134 @@ impl Default for SpeedtestSettings {
     }
 }
 
+/// Settings for the subnet/CIDR calculator.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SubnetSettings {
+    /// Address with a prefix, netmask or wildcard suffix.
+    pub input: String,
+}
+
+impl Default for SubnetSettings {
+    fn default() -> Self {
+        Self {
+            input: "192.168.1.10/24".into(),
+        }
+    }
+}
+
+/// Settings for the Wake-on-LAN tool.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WolSettings {
+    pub mac: String,
+    pub broadcast: String,
+    pub port: u16,
+    /// Number of magic packets to send.
+    pub repeat: u8,
+    /// Delay between repeated packets, in milliseconds.
+    pub interval_ms: u64,
+    /// Optional SecureOn password as six hexadecimal bytes.
+    pub secure_on: String,
+}
+
+impl Default for WolSettings {
+    fn default() -> Self {
+        Self {
+            mac: String::new(),
+            broadcast: "255.255.255.255".into(),
+            port: 9,
+            repeat: 1,
+            interval_ms: 100,
+            secure_on: String::new(),
+        }
+    }
+}
+
+/// Settings for the port/protocol reference.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PortReferenceSettings {
+    pub query: String,
+    pub transport: PortTransportFilter,
+    pub view: PortReferenceView,
+}
+
+impl Default for PortReferenceSettings {
+    fn default() -> Self {
+        Self {
+            query: String::new(),
+            transport: PortTransportFilter::All,
+            view: PortReferenceView::Ports,
+        }
+    }
+}
+
+/// Settings for the MAC vendor lookup.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MacVendorSettings {
+    pub mac: String,
+    /// Whether a local miss may be sent to the online lookup service.
+    pub allow_online: bool,
+}
+
+impl Default for MacVendorSettings {
+    fn default() -> Self {
+        Self {
+            mac: String::new(),
+            allow_online: true,
+        }
+    }
+}
+
+/// Settings for the timestamp/timezone converter.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TimestampSettings {
+    pub input: String,
+    pub unit: TimestampUnit,
+    /// IANA zone used for date/time input without an explicit offset.
+    pub source_zone: String,
+    /// Additional IANA zones shown in the result.
+    pub target_zones: Vec<String>,
+}
+
+impl Default for TimestampSettings {
+    fn default() -> Self {
+        Self {
+            input: String::new(),
+            unit: TimestampUnit::Auto,
+            source_zone: "UTC".into(),
+            target_zones: vec![
+                "UTC".into(),
+                "Asia/Shanghai".into(),
+                "Europe/London".into(),
+                "America/New_York".into(),
+            ],
+        }
+    }
+}
+
+/// Settings shared by all Utils sub-tools.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UtilsSettings {
+    pub active_tool: UtilsTool,
+    pub subnet: SubnetSettings,
+    pub wol: WolSettings,
+    pub port_reference: PortReferenceSettings,
+    pub mac_vendor: MacVendorSettings,
+    pub timestamp: TimestampSettings,
+}
+
+impl Default for UtilsSettings {
+    fn default() -> Self {
+        Self {
+            active_tool: UtilsTool::Subnet,
+            subnet: SubnetSettings::default(),
+            wol: WolSettings::default(),
+            port_reference: PortReferenceSettings::default(),
+            mac_vendor: MacVendorSettings::default(),
+            timestamp: TimestampSettings::default(),
+        }
+    }
+}
+
 /// Recently entered values for the editable text inputs, keyed by a stable
 /// field id such as `ping.target`. Values are stored most recent first.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -504,6 +635,9 @@ pub struct AppConfig {
     /// Added after the first release, so older config files still load.
     #[serde(default)]
     pub tls: TlsSettings,
+    /// Added after the first release, so older config files still load.
+    #[serde(default)]
+    pub utils: UtilsSettings,
 }
 
 impl Default for AppConfig {
@@ -523,6 +657,7 @@ impl Default for AppConfig {
             ntp: NtpSettings::default(),
             speedtest: SpeedtestSettings::default(),
             tls: TlsSettings::default(),
+            utils: UtilsSettings::default(),
         }
     }
 }
@@ -553,6 +688,13 @@ mod tests {
         assert_eq!(back.dns.force_tcp, cfg.dns.force_tcp);
         assert_eq!(back.ntp.target, cfg.ntp.target);
         assert_eq!(back.ntp.timeout_ms, cfg.ntp.timeout_ms);
+        assert_eq!(back.utils.active_tool, cfg.utils.active_tool);
+        assert_eq!(back.utils.subnet.input, cfg.utils.subnet.input);
+        assert_eq!(back.utils.wol.port, cfg.utils.wol.port);
+        assert_eq!(
+            back.utils.timestamp.target_zones,
+            cfg.utils.timestamp.target_zones
+        );
         assert_eq!(back.speedtest.active_tool, cfg.speedtest.active_tool);
         assert_eq!(
             back.speedtest.librespeed.server,

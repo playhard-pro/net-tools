@@ -62,6 +62,8 @@ common:
   no_custom_history: 暂无自定义服务器
   cancel: 取消
   copy: 复制
+  yes: "是"
+  no: "否"
   copy_all: 复制全部
   export: 导出
   target: 目标
@@ -410,3 +412,109 @@ tls:
     san_emails: SAN 邮箱
     san_uris: SAN URI
   not_checked: 未检查
+
+
+utils:
+  tools:
+    subnet: 子网计算
+    wol: 网络唤醒
+    ports: 端口速查
+    mac: MAC 厂商
+    timestamp: 时间戳
+  subnet:
+    input: 地址
+    hint: "示例：192.168.1.10/24、10.0.0.7/255.255.255.0、2001:db8::1/64"
+    empty: 输入 IPv4 或 IPv6 地址以计算子网。
+    input_field: 输入
+    family: 地址族
+    cidr: CIDR
+    network: 网络地址
+    broadcast: 广播地址
+    netmask: 子网掩码
+    wildcard: 反掩码
+    first: 起始地址
+    last: 结束地址
+    total: 地址总数
+    usable: 可用地址数
+    scope: 作用域
+    address_binary: 地址（二进制）
+    mask_binary: 掩码（二进制）
+    expanded: 展开形式
+    interface_id: 接口标识
+    ipv6_no_broadcast: IPv6 没有广播地址；前缀内所有地址均可使用。
+  wol:
+    mac: MAC 地址
+    broadcast: 广播地址
+    detect: 探测
+    no_broadcast: 未找到本机 IPv4 广播地址
+    port: 端口
+    repeat: 重复次数
+    interval: 发送间隔
+    secure_on: SecureOn 密码（可选）
+    hint: 通过 IPv4 UDP 广播发送标准 Magic Packet。
+    send: 发送
+    result: 结果
+    packets: 发送包数
+    bytes: 总字节数
+    elapsed: 耗时
+    empty: 发送 Magic Packet 后显示结果。
+  ports:
+    search: 搜索
+    search_hint: 端口、范围、服务名或关键词
+    transport: 传输协议
+    view: 视图
+    ports_view: 端口
+    protocols_view: IP 协议
+    count: "%{count} 条记录"
+    range_hint: "搜索 230 会包含 225-241 这样的范围行。"
+    port: 端口
+    service: 服务
+    description: 说明
+    number: 编号
+    keyword: 关键字
+    protocol: 协议
+  mac:
+    input: MAC / OUI
+    online: 在线查询
+    allow_online: 允许在线回退查询
+    privacy: 仅将 OUI 前缀发送到在线服务。
+    query: 查询
+    result: 结果
+    prefix: OUI 前缀
+    vendor: 厂商
+    block_type: 地址块类型
+    updated: 更新时间
+    country: 国家/地区
+    address: 地址
+    result_source: 来源
+    local: 本地
+    online_source: 在线
+    source: "在线来源："
+    source_online: MACLookup.app（数据源自 IEEE 注册表）
+    terms: 服务条款
+    empty: 输入 MAC 地址或 OUI 前缀。
+    not_found_local: 本地表未命中。开启在线查询可扩大搜索范围。
+  timestamp:
+    input: 时间戳
+    now: 当前时间
+    unit: 单位
+    unit_auto: 自动
+    unit_seconds: 秒
+    unit_milliseconds: 毫秒
+    unit_microseconds: 微秒
+    unit_nanoseconds: 纳秒
+    source_zone: 源时区
+    target_zones: 目标时区
+    add_zone: 添加时区
+    zone_search: 搜索时区
+    zone_limit: 最多添加八个目标时区。
+    hint: "支持 Unix 时间戳、RFC 3339 和 YYYY-MM-DD HH:MM:SS。"
+    empty: 输入时间戳或日期时间以转换。
+    zone: 时区
+    date_time: 日期时间
+    offset: 偏移
+    abbreviation: 缩写
+    used_unit: 实际单位
+    weekday: 星期
+    iso_week: ISO 周
+    relative: 相对时间

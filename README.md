@@ -28,6 +28,7 @@ it.
 | Lookup | RDAP domain/IP lookup with JSON tree, parsed contacts and parent-domain fallback. |
 | DNS | dig-like queries, custom server, UDP with TCP fallback, and iterative trace from the root servers. |
 | NTP | SNTP query, live analog clock, local/UTC time in milliseconds, server metrics, presets and optional system clock update. |
+| Utils | Subnet/CIDR calculator, Wake-on-LAN, IANA port/protocol reference, MAC vendor lookup and timestamp/timezone conversion. |
 | Speedtest | LibreSpeed, iperf3 client and built-in iperf3 server; live throughput, RTT/jitter and TCP/UDP metrics. |
 
 Continuous probes support **Start / Pause / Stop**; one-shot tools and servers
@@ -39,6 +40,14 @@ TLS targets accept one entry per line or comma-separated values in the form
 handshake and reads certificate details; the optional revocation, HSTS, CT and
 CAA checks add OCSP/CRL downloads, a single `HEAD /` request and DNS lookups.
 Concurrency is capped at ten targets.
+
+The Utils port reference is generated from the IANA service-name and port-number
+registry, which IANA and IETF dedicate to the public domain under CC0 1.0. The
+MAC vendor tool first checks a bundled snapshot of common IEEE registration
+authority prefixes; when enabled, a local miss may be queried against
+[MACLookup.app](https://maclookup.app), sending only the six-digit OUI prefix.
+See the [MACLookup.app terms](https://maclookup.app/terms-and-conditions) and
+the source notes in the generated data files.
 
 ## Screenshots
 
@@ -339,7 +348,8 @@ request checklist.
 ## Third-party licenses
 
 The bundled WenQuanYi Micro Hei font subset is Apache-2.0; attribution and
-license files ship with the packages. Rust dependency licenses are listed in
+license files ship with the packages. The IANA protocol registry data is CC0
+1.0. Rust dependency licenses are listed in
 [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md), generated with
 [cargo-about](https://github.com/EmbarkStudios/cargo-about).
 

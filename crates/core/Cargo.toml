@@ -43,6 +43,10 @@ ct-logs = "0.9"
 base64 = "0.22"
 percent-encoding = "2"
 
+# Timestamp and IANA timezone conversion for the Utils tab.
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+chrono-tz = "0.10"
+
 [dev-dependencies]
 rcgen = "0.14"
 

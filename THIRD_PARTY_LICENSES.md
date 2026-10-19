@@ -13,7 +13,7 @@ cargo about generate about.md.hbs -o THIRD_PARTY_LICENSES.md
 
 ## Overview
 
-- **MIT License** (492)
+- **MIT License** (497)
 - **Apache License 2.0** (21)
 - **ISC License** (21)
 - **Unicode License v3** (19)
@@ -2191,7 +2191,7 @@ TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
 PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
 LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
 NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
 
 ```
 
@@ -2202,7 +2202,7 @@ Used by:
 - aws-lc-sys 0.45.0 — https://github.com/aws/aws-lc-rs
 
 ```text
-Copyright (c) <year> <owner>.
+Copyright (c) <year> <owner>. 
 
 Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
 
@@ -6079,6 +6079,41 @@ DEALINGS IN THE SOFTWARE.
 
 Used by:
 
+- iana-time-zone 0.1.65 — https://github.com/strawlab/iana-time-zone
+
+```text
+Copyright (c) 2020 Andrew D. Straw
+
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+
+```
+
+### MIT License
+
+Used by:
+
 - downcast-rs 1.2.1 — https://github.com/marcianx/downcast-rs
 
 ```text
@@ -8350,6 +8385,8 @@ Used by:
 - asn1-rs-impl 0.2.0 — https://github.com/rusticata/asn1-rs.git
 - block2 0.5.1 — https://github.com/madsmtm/objc2
 - block2 0.6.2 — https://github.com/madsmtm/objc2
+- chrono-tz 0.10.4 — https://github.com/chronotope/chrono-tz
+- chrono 0.4.45 — https://github.com/chronotope/chrono
 - dispatch2 0.3.1 — https://github.com/madsmtm/objc2
 - dispatch 0.2.0 — http://github.com/SSheldon/rust-dispatch
 - dpi 0.1.2 — https://github.com/rust-windowing/winit
@@ -9090,10 +9127,12 @@ SOFTWARE.
 Used by:
 
 - phf 0.11.3 — https://github.com/rust-phf/rust-phf
+- phf 0.12.1 — https://github.com/rust-phf/rust-phf
 - phf 0.13.1 — https://github.com/rust-phf/rust-phf
 - phf_generator 0.13.1 — https://github.com/rust-phf/rust-phf
 - phf_macros 0.13.1 — https://github.com/rust-phf/rust-phf
 - phf_shared 0.11.3 — https://github.com/rust-phf/rust-phf
+- phf_shared 0.12.1 — https://github.com/rust-phf/rust-phf
 - phf_shared 0.13.1 — https://github.com/rust-phf/rust-phf
 
 ```text
@@ -10024,7 +10063,7 @@ Mozilla Public License Version 2.0
     means any form of the work other than Source Code Form.
 
 1.7. "Larger Work"
-    means a work that combines Covered Software with other material, in
+    means a work that combines Covered Software with other material, in 
     a separate file or files, that is not Covered Software.
 
 1.8. "License"

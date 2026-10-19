@@ -16,6 +16,7 @@ use crate::tabs::ping::PingTab;
 use crate::tabs::port_scan::PortScanTab;
 use crate::tabs::speedtest::SpeedtestTab;
 use crate::tabs::tls::TlsTab;
+use crate::tabs::utils::UtilsTab;
 use crate::ui::theme::Palette;
 
 /// Project homepage, shown as the title link. Taken from the manifest so the
@@ -48,13 +49,14 @@ pub enum Tab {
     Lookup,
     Dns,
     Ntp,
+    Utils,
     Speedtest,
 }
 
 impl Tab {
     /// Built-in order. The overview is pinned first and missing tabs are
     /// appended when a saved order is loaded.
-    pub const ALL: [Tab; 11] = [
+    pub const ALL: [Tab; 12] = [
         Tab::Overview,
         Tab::Ping,
         Tab::Mtr,
@@ -65,6 +67,7 @@ impl Tab {
         Tab::Lookup,
         Tab::Dns,
         Tab::Ntp,
+        Tab::Utils,
         Tab::Speedtest,
     ];
 
@@ -82,6 +85,7 @@ impl Tab {
             Tab::Lookup => "lookup",
             Tab::Dns => "dns",
             Tab::Ntp => "ntp",
+            Tab::Utils => "utils",
             Tab::Speedtest => "speedtest",
         }
     }
@@ -108,6 +112,7 @@ pub struct App {
     pub lookup: LookupTab,
     pub dns: DnsTab,
     pub ntp: NtpTab,
+    pub utils: UtilsTab,
     pub speedtest: SpeedtestTab,
     pub privilege: PrivilegeStatus,
     /// Manual or system-following theme preference.
@@ -142,6 +147,7 @@ impl App {
             lookup: LookupTab::new(),
             dns: DnsTab::new(),
             ntp: NtpTab::new(),
+            utils: UtilsTab::new(),
             speedtest: SpeedtestTab::new(),
             privilege: net_tools_core::net::privilege::probe(),
             theme_preference,
@@ -161,6 +167,11 @@ impl App {
         // probe continues in the background.
         if self.tab == Tab::Ntp && tab != Tab::Ntp {
             self.ntp.clear_on_hide();
+        }
+        // Leaving Utils stops an in-flight WOL or online MAC query and drops
+        // its live result. Inputs remain in the configuration.
+        if self.tab == Tab::Utils && tab != Tab::Utils {
+            self.utils.clear_on_hide();
         }
         // Leaving the speed test tab stops a running test and drops live
         // progress, while completed session history stays available.
@@ -449,6 +460,7 @@ fn tab_label(tab: Tab) -> String {
         Tab::Lookup => t!("tab.lookup"),
         Tab::Dns => t!("tab.dns"),
         Tab::Ntp => t!("tab.ntp"),
+        Tab::Utils => t!("tab.utils"),
         Tab::Speedtest => t!("tab.speedtest"),
     }
     .to_string()
@@ -616,6 +628,13 @@ impl eframe::App for App {
                 &self.rt,
                 settings_expanded,
             ),
+            Tab::Utils => self.utils.ui(
+                ui,
+                &mut self.cfg.utils,
+                &mut self.cfg.history,
+                &self.rt,
+                settings_expanded,
+            ),
             Tab::Speedtest => self.speedtest.ui(
                 ui,
                 &mut self.cfg.speedtest,
@@ -732,6 +751,7 @@ mod tests {
             lookup: LookupTab::new(),
             dns: DnsTab::new(),
             ntp: NtpTab::new(),
+            utils: UtilsTab::new(),
             speedtest: SpeedtestTab::new(),
             privilege: net_tools_core::net::privilege::probe(),
             theme_preference: egui::ThemePreference::System,

@@ -9,6 +9,7 @@ pub mod iperf3;
 pub mod librespeed;
 #[cfg(target_os = "linux")]
 pub(crate) mod linux_icmp;
+pub mod mac_vendor;
 pub mod mtr;
 pub mod ntp;
 pub mod overview;
@@ -20,3 +21,4 @@ pub mod tls;
 pub mod udp;
 #[cfg(windows)]
 pub(crate) mod windows_icmp;
+pub mod wol;

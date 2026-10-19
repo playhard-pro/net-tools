@@ -26,6 +26,7 @@ tab:
   lookup: Lookup
   dns: DNS
   ntp: NTP
+  utils: Utils
   speedtest: Speedtest
 state:
   idle: idle
@@ -62,6 +63,8 @@ common:
   no_custom_history: No custom servers yet
   cancel: Cancel
   copy: Copy
+  yes: "yes"
+  no: "no"
   copy_all: Copy all
   export: Export
   target: Target
@@ -410,3 +413,109 @@ tls:
     san_emails: SAN email
     san_uris: SAN URI
   not_checked: not checked
+
+
+utils:
+  tools:
+    subnet: Subnet
+    wol: Wake-on-LAN
+    ports: Ports
+    mac: MAC Vendor
+    timestamp: Timestamp
+  subnet:
+    input: Address
+    hint: "Examples: 192.168.1.10/24, 10.0.0.7/255.255.255.0, 2001:db8::1/64"
+    empty: Enter an IPv4 or IPv6 address to calculate the subnet.
+    input_field: Input
+    family: Family
+    cidr: CIDR
+    network: Network
+    broadcast: Broadcast
+    netmask: Netmask
+    wildcard: Wildcard
+    first: First address
+    last: Last address
+    total: Total addresses
+    usable: Usable addresses
+    scope: Scope
+    address_binary: Address (binary)
+    mask_binary: Netmask (binary)
+    expanded: Expanded
+    interface_id: Interface ID
+    ipv6_no_broadcast: IPv6 has no broadcast address; every address in the prefix is usable.
+  wol:
+    mac: MAC address
+    broadcast: Broadcast
+    detect: Detect
+    no_broadcast: No local IPv4 broadcast address found
+    port: Port
+    repeat: Repeat
+    interval: Interval
+    secure_on: SecureOn (optional)
+    hint: Sends a standard magic packet over IPv4 UDP broadcast.
+    send: Send
+    result: Result
+    packets: Packets
+    bytes: Bytes
+    elapsed: Elapsed
+    empty: Send a magic packet to see the result.
+  ports:
+    search: Search
+    search_hint: Port, range, service or keyword
+    transport: Transport
+    view: View
+    ports_view: Ports
+    protocols_view: IP protocols
+    count: "%{count} entries"
+    range_hint: "Search 230 to include range rows such as 225-241."
+    port: Port
+    service: Service
+    description: Description
+    number: Number
+    keyword: Keyword
+    protocol: Protocol
+  mac:
+    input: MAC / OUI
+    online: Online lookup
+    allow_online: Allow online fallback
+    privacy: Only the OUI prefix is sent to the online service.
+    query: Lookup
+    result: Result
+    prefix: OUI prefix
+    vendor: Vendor
+    block_type: Block type
+    updated: Updated
+    country: Country
+    address: Address
+    result_source: Source
+    local: local
+    online_source: online
+    source: "Online source:"
+    source_online: MACLookup.app (derived from IEEE registries)
+    terms: Terms
+    empty: Enter a MAC address or OUI prefix.
+    not_found_local: Not found in the local table. Enable online lookup for a broader search.
+  timestamp:
+    input: Timestamp
+    now: Now
+    unit: Unit
+    unit_auto: Auto
+    unit_seconds: Seconds
+    unit_milliseconds: Milliseconds
+    unit_microseconds: Microseconds
+    unit_nanoseconds: Nanoseconds
+    source_zone: Source timezone
+    target_zones: Target timezones
+    add_zone: Add timezone
+    zone_search: Search timezones
+    zone_limit: Up to eight target timezones.
+    hint: "Accepts Unix timestamps, RFC 3339 and YYYY-MM-DD HH:MM:SS."
+    empty: Enter a timestamp or date/time to convert.
+    zone: Timezone
+    date_time: Date/time
+    offset: Offset
+    abbreviation: Abbrev.
+    used_unit: Unit used
+    weekday: Weekday
+    iso_week: ISO week
+    relative: Relative
