@@ -233,6 +233,54 @@ impl Default for NtpSettings {
     }
 }
 
+/// Settings for the TLS tab: certificate, protocol and security checks for one
+/// or more targets.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TlsSettings {
+    /// Targets separated by newlines or commas.
+    pub targets: String,
+    /// Default port used when a target does not specify one.
+    pub port: u16,
+    pub ip_version: IpVersion,
+    /// Timeout for one target and each auxiliary request, in milliseconds.
+    pub timeout_ms: u64,
+    /// Maximum number of targets checked at the same time.
+    pub concurrency: usize,
+    /// Certificates expiring within this many days are marked as warnings.
+    pub warn_days: u32,
+    /// Probe whether the server supports TLS 1.2 and TLS 1.3 separately.
+    pub probe_versions: bool,
+    /// Probe ALPN negotiation for h2 and http/1.1.
+    pub probe_alpn: bool,
+    /// Check certificate revocation through OCSP or CRL.
+    pub check_revocation: bool,
+    /// Read the HSTS response header from the target.
+    pub check_hsts: bool,
+    /// Inspect embedded certificate transparency SCTs.
+    pub check_ct: bool,
+    /// Query CAA records for the target domain.
+    pub check_caa: bool,
+}
+
+impl Default for TlsSettings {
+    fn default() -> Self {
+        Self {
+            targets: "example.com".into(),
+            port: 443,
+            ip_version: IpVersion::Auto,
+            timeout_ms: 10_000,
+            concurrency: 4,
+            warn_days: 30,
+            probe_versions: true,
+            probe_alpn: true,
+            check_revocation: true,
+            check_hsts: true,
+            check_ct: true,
+            check_caa: true,
+        }
+    }
+}
+
 /// Settings for the LibreSpeed sub-tool.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LibreSpeedSettings {
@@ -453,6 +501,9 @@ pub struct AppConfig {
     /// Added after the first release, so older config files still load.
     #[serde(default)]
     pub speedtest: SpeedtestSettings,
+    /// Added after the first release, so older config files still load.
+    #[serde(default)]
+    pub tls: TlsSettings,
 }
 
 impl Default for AppConfig {
@@ -471,6 +522,7 @@ impl Default for AppConfig {
             dns: DnsSettings::default(),
             ntp: NtpSettings::default(),
             speedtest: SpeedtestSettings::default(),
+            tls: TlsSettings::default(),
         }
     }
 }
@@ -511,6 +563,10 @@ mod tests {
             back.speedtest.iperf3_server.port,
             cfg.speedtest.iperf3_server.port
         );
+        assert_eq!(back.tls.port, cfg.tls.port);
+        assert_eq!(back.tls.concurrency, cfg.tls.concurrency);
+        assert_eq!(back.tls.probe_alpn, cfg.tls.probe_alpn);
+        assert_eq!(back.tls.check_revocation, cfg.tls.check_revocation);
     }
 
     #[test]
@@ -575,6 +631,19 @@ mod tests {
     }
 
     #[test]
+    fn old_config_without_tls_still_loads() {
+        let mut value = toml::Value::try_from(AppConfig::default()).unwrap();
+        value
+            .as_table_mut()
+            .expect("config is a table")
+            .remove("tls");
+        let text = toml::to_string(&value).unwrap();
+        let back: AppConfig = toml::from_str(&text).unwrap();
+        assert_eq!(back.tls.port, 443);
+        assert_eq!(back.tls.concurrency, 4);
+    }
+
+    #[test]
     fn history_records_dedupes_and_caps() {
         let mut history = InputHistory::default();
         // Duplicates are moved to the front instead of stored twice.
@@ -630,5 +699,10 @@ mod tests {
         assert!(speed.iperf3.duration_s > 0);
         let server = Iperf3ServerSettings::default();
         assert!(server.port > 0);
+        let tls = TlsSettings::default();
+        assert!(!tls.targets.is_empty());
+        assert!(tls.port > 0);
+        assert!((1..=10).contains(&tls.concurrency));
+        assert!(tls.timeout_ms > 0);
     }
 }

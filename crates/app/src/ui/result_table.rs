@@ -87,17 +87,42 @@ pub fn key_value_table(
     value_header: &str,
     rows: &[(String, String)],
 ) {
+    // Keep the field column wide enough for its longest label. Without an
+    // explicit minimum, a long unbreakable value (fingerprint, SAN list) can
+    // squeeze the field labels into a very narrow column.
+    let font_id = egui::TextStyle::Body.resolve(ui.style());
+    let measure = |text: &str| {
+        ui.ctx().fonts_mut(|fonts| {
+            fonts
+                .layout_no_wrap(text.to_owned(), font_id.clone(), egui::Color32::WHITE)
+                .size()
+                .x
+        })
+    };
+    let key_width = rows
+        .iter()
+        .map(|(key, _)| measure(key))
+        .fold(measure(key_header), f32::max);
+    let min_col_width = key_width + ui.spacing().item_spacing.x + 4.0;
+
     egui::Grid::new(id)
         .num_columns(2)
         .striped(true)
+        .min_col_width(min_col_width)
         .spacing([16.0, 4.0])
         .show(ui, |ui| {
-            ui.strong(key_header);
-            ui.strong(value_header);
+            ui.add(
+                egui::Label::new(egui::RichText::new(key_header).strong())
+                    .wrap_mode(egui::TextWrapMode::Extend),
+            );
+            ui.add(
+                egui::Label::new(egui::RichText::new(value_header).strong())
+                    .wrap_mode(egui::TextWrapMode::Extend),
+            );
             ui.end_row();
             for (key, value) in rows {
-                ui.label(key);
-                ui.label(value);
+                ui.add(egui::Label::new(key).wrap_mode(egui::TextWrapMode::Extend));
+                ui.add(egui::Label::new(value).wrap_mode(egui::TextWrapMode::Wrap));
                 ui.end_row();
             }
         });
@@ -150,6 +175,53 @@ fn table_impl<H: AsRef<str>>(
                 row_fn(row.index(), &mut row);
             });
         });
+}
+
+/// Clickable table with explicit columns and a fixed visible row count.
+///
+/// Returns the index of a row clicked in this frame. Long cell content is
+/// truncated, so callers should expose the full value in a tooltip.
+pub fn table_selectable_with_columns<H: AsRef<str>>(
+    ui: &mut egui::Ui,
+    headers: &[H],
+    num_rows: usize,
+    rows: usize,
+    selected: Option<usize>,
+    columns: impl IntoIterator<Item = Column>,
+    mut row_fn: impl FnMut(usize, &mut TableRow<'_, '_>),
+) -> Option<usize> {
+    ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Truncate);
+    let height = ROW_HEIGHT * rows as f32;
+    let mut builder = TableBuilder::new(ui)
+        .striped(true)
+        .resizable(false)
+        .sense(egui::Sense::click())
+        .max_scroll_height(height)
+        .min_scrolled_height(height)
+        .auto_shrink([false, false]);
+    for column in columns {
+        builder = builder.column(column);
+    }
+    let mut clicked = None;
+    builder
+        .header(HEADER_HEIGHT, |mut header| {
+            for h in headers {
+                header.col(|ui| {
+                    ui.strong(h.as_ref());
+                });
+            }
+        })
+        .body(|body| {
+            body.rows(ROW_HEIGHT, num_rows, |mut row| {
+                let index = row.index();
+                row.set_selected(selected == Some(index));
+                row_fn(index, &mut row);
+                if row.response().clicked() {
+                    clicked = Some(index);
+                }
+            });
+        });
+    clicked
 }
 
 #[cfg(test)]

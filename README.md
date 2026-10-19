@@ -22,6 +22,7 @@ it.
 | Ping | Continuous ICMP/UDP ping with live chart and RTT histogram, loss, min/avg/max, standard deviation and P50/P95/P99 percentiles. |
 | MTR | Parallel hop-by-hop probing with continuous refresh and multiple responders per hop. |
 | HTTP Ping | Multi-method requests with DNS, connect, TLS, TTFB and total timings, plus total-time percentiles and histogram. |
+| TLS | Batch certificate and chain inspection, SAN, key details, expiry warnings, TLS/ALPN support, revocation (OCSP/CRL), HSTS, CT and CAA checks. |
 | Port Scan | TCP connect, SYN half-open and UDP scans, with banner grabbing. |
 | IP Insight | Parallel IP geolocation queries across multiple providers. |
 | Lookup | RDAP domain/IP lookup with JSON tree, parsed contacts and parent-domain fallback. |
@@ -32,6 +33,12 @@ it.
 Continuous probes support **Start / Pause / Stop**; one-shot tools and servers
 use **Start / Stop**. Pressing **Enter** in a target field restarts the task with
 the new target.
+
+TLS targets accept one entry per line or comma-separated values in the form
+`host`, `host:port`, `[IPv6]:port` or an HTTPS URL. The TLS tab sends a TLS
+handshake and reads certificate details; the optional revocation, HSTS, CT and
+CAA checks add OCSP/CRL downloads, a single `HEAD /` request and DNS lookups.
+Concurrency is capped at ten targets.
 
 ## Screenshots
 

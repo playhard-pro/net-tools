@@ -20,6 +20,7 @@ tab:
   ping: Ping
   mtr: MTR
   http: HTTP Ping
+  tls: TLS
   portscan: Port Scan
   ip_insight: IP Insight
   lookup: Lookup
@@ -311,3 +312,101 @@ server:
   client: Client
   sent: Sent (Mbps)
   received: Received (Mbps)
+
+tls:
+  warn_days: Warn threshold (days)
+  probe_versions: Probe TLS 1.2 / 1.3
+  probe_alpn: Probe ALPN (h2 / http/1.1)
+  security_checks: Security checks
+  security_hint: "Revocation and HSTS checks make extra network requests."
+  check_revocation: Revocation (OCSP / CRL)
+  check_hsts: HSTS header
+  check_ct: Certificate Transparency (embedded SCT)
+  check_caa: CAA records
+  target_hint: "One target per line or comma separated: host, host:port, [IPv6]:port"
+  targets: Targets
+  pending: pending…
+  progress: "%{done} / %{total} checked"
+  yes: "yes"
+  no: "no"
+  unknown: "unknown"
+  health:
+    ok: ok
+    expiring: expiring soon
+    expired: expired
+    revoked: revoked
+    hostname_mismatch: hostname mismatch
+    untrusted: untrusted
+    error: error
+  column:
+    status: Status
+    protocol: TLS
+    cipher: Cipher
+    certificate: Certificate
+    expires: Expires
+    days: Days
+    revocation: Revoked
+  connection: Connection
+  resolved_ip: Resolved IP
+  elapsed: Elapsed
+  protocol: Protocol
+  cipher: Cipher suite
+  key_exchange: Key exchange
+  alpn: ALPN
+  chain_valid: Chain valid
+  chain_error: Chain error
+  capabilities: "TLS 1.2: %{tls12} · TLS 1.3: %{tls13} · h2: %{h2} · http/1.1: %{http1}"
+  expiry_banner: "Expires in %{days} days (%{date})"
+  expired_banner: "Expired %{days} days ago"
+  days: "%{days} d"
+  days_expired: "-%{days} d"
+  summary:
+    total: "Total: %{count}"
+    ok: "OK: %{count}"
+    expiring: "Expiring: %{count}"
+    risky: "Expired: %{expired} · Revoked: %{revoked}"
+    failed: "Failed: %{count}"
+    pending: "Pending: %{count}"
+  revocation:
+    title: Revocation
+    good: good
+    revoked: revoked
+    unknown: unknown
+    unavailable: unavailable
+    error: error
+  hsts:
+    title: HSTS
+    enabled: enabled
+    disabled: disabled (max-age=0)
+    missing: not present
+    max_age: "max-age=%{value}"
+    include_subdomains: includeSubDomains
+    preload: preload declared
+  ct:
+    title: Certificate Transparency
+    missing: no embedded SCT found
+    counts: "%{total} SCT (verified %{verified}, unknown logs %{unknown}, invalid %{invalid})"
+  caa:
+    title: CAA
+    source: "effective at %{source}"
+    missing: no CAA records
+  certificate_chain: Certificate chain
+  chain_hint: The server normally sends the leaf and intermediate certificates; roots are usually omitted.
+  field: Field
+  value: Value
+  cert:
+    role: Role
+    subject: Subject
+    issuer: Issuer
+    common_name: Common name
+    serial: Serial
+    not_before: Not before
+    not_after: Not after
+    key: Key
+    signature: Signature
+    fingerprint: SHA-256 fingerprint
+    san_dns: SAN DNS
+    san_ips: SAN IP
+    san_emails: SAN email
+    san_uris: SAN URI
+  not_checked: not checked

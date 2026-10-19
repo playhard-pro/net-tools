@@ -20,6 +20,7 @@ tab:
   ping: Ping
   mtr: MTR
   http: HTTP Ping
+  tls: TLS
   portscan: 端口扫描
   ip_insight: IP 洞察
   lookup: 注册查询
@@ -311,3 +312,101 @@ server:
   client: 客户端
   sent: 发送（Mbps）
   received: 接收（Mbps）
+
+tls:
+  warn_days: 提醒阈值（天）
+  probe_versions: 探测 TLS 1.2 / 1.3
+  probe_alpn: 探测 ALPN（h2 / http/1.1）
+  security_checks: 安全检查
+  security_hint: "吊销和 HSTS 检查会产生额外网络请求。"
+  check_revocation: 吊销状态（OCSP / CRL）
+  check_hsts: HSTS 响应头
+  check_ct: Certificate Transparency（内嵌 SCT）
+  check_caa: CAA 记录
+  target_hint: "每行一个或用逗号分隔：host、host:port、[IPv6]:port"
+  targets: 目标
+  pending: 等待检查…
+  progress: "已完成 %{done} / %{total}"
+  yes: "支持"
+  no: "不支持"
+  unknown: "未知"
+  health:
+    ok: 正常
+    expiring: 即将过期
+    expired: 已过期
+    revoked: 已吊销
+    hostname_mismatch: 域名不匹配
+    untrusted: 不受信任
+    error: 错误
+  column:
+    status: 状态
+    protocol: TLS
+    cipher: 加密套件
+    certificate: 证书
+    expires: 到期时间
+    days: 剩余
+    revocation: 吊销
+  connection: 连接信息
+  resolved_ip: 解析地址
+  elapsed: 耗时
+  protocol: 协议版本
+  cipher: 加密套件
+  key_exchange: 密钥交换
+  alpn: ALPN
+  chain_valid: 链校验
+  chain_error: 链校验错误
+  capabilities: "TLS 1.2：%{tls12} · TLS 1.3：%{tls13} · h2：%{h2} · http/1.1：%{http1}"
+  expiry_banner: "剩余 %{days} 天（%{date}）"
+  expired_banner: "已过期 %{days} 天"
+  days: "%{days} 天"
+  days_expired: "-%{days} 天"
+  summary:
+    total: "共 %{count}"
+    ok: "正常 %{count}"
+    expiring: "即将过期 %{count}"
+    risky: "已过期 %{expired} · 已吊销 %{revoked}"
+    failed: "失败 %{count}"
+    pending: "等待 %{count}"
+  revocation:
+    title: 吊销状态
+    good: 正常
+    revoked: 已吊销
+    unknown: 未知
+    unavailable: 不可用
+    error: 错误
+  hsts:
+    title: HSTS
+    enabled: 已启用
+    disabled: 已禁用（max-age=0）
+    missing: 未配置
+    max_age: "max-age=%{value}"
+    include_subdomains: 包含子域
+    preload: 声明了 preload
+  ct:
+    title: Certificate Transparency
+    missing: 未发现内嵌 SCT
+    counts: "%{total} 个 SCT（已验证 %{verified}，未知日志 %{unknown}，无效 %{invalid}）"
+  caa:
+    title: CAA
+    source: "生效于 %{source}"
+    missing: 未配置 CAA
+  certificate_chain: 证书链
+  chain_hint: 服务器通常只发送叶子证书和中间证书，根证书一般不在链中。
+  field: 字段
+  value: 值
+  cert:
+    role: 角色
+    subject: 主题
+    issuer: 颁发者
+    common_name: 通用名
+    serial: 序列号
+    not_before: 生效时间
+    not_after: 到期时间
+    key: 密钥
+    signature: 签名算法
+    fingerprint: SHA-256 指纹
+    san_dns: SAN 域名
+    san_ips: SAN IP
+    san_emails: SAN 邮箱
+    san_uris: SAN URI
+  not_checked: 未检查

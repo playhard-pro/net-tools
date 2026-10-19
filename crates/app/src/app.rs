@@ -15,6 +15,7 @@ use crate::tabs::overview::OverviewTab;
 use crate::tabs::ping::PingTab;
 use crate::tabs::port_scan::PortScanTab;
 use crate::tabs::speedtest::SpeedtestTab;
+use crate::tabs::tls::TlsTab;
 use crate::ui::theme::Palette;
 
 /// Project homepage, shown as the title link. Taken from the manifest so the
@@ -41,6 +42,7 @@ pub enum Tab {
     Ping,
     Mtr,
     Http,
+    Tls,
     PortScan,
     IpInsight,
     Lookup,
@@ -52,11 +54,12 @@ pub enum Tab {
 impl Tab {
     /// Built-in order. The overview is pinned first and missing tabs are
     /// appended when a saved order is loaded.
-    pub const ALL: [Tab; 10] = [
+    pub const ALL: [Tab; 11] = [
         Tab::Overview,
         Tab::Ping,
         Tab::Mtr,
         Tab::Http,
+        Tab::Tls,
         Tab::PortScan,
         Tab::IpInsight,
         Tab::Lookup,
@@ -73,6 +76,7 @@ impl Tab {
             Tab::Ping => "ping",
             Tab::Mtr => "mtr",
             Tab::Http => "http",
+            Tab::Tls => "tls",
             Tab::PortScan => "port_scan",
             Tab::IpInsight => "ip_insight",
             Tab::Lookup => "lookup",
@@ -98,6 +102,7 @@ pub struct App {
     pub ping: PingTab,
     pub mtr: MtrTab,
     pub http: HttpPingTab,
+    pub tls: TlsTab,
     pub portscan: PortScanTab,
     pub ip_insight: IpInsightTab,
     pub lookup: LookupTab,
@@ -131,6 +136,7 @@ impl App {
             ping: PingTab::new(),
             mtr: MtrTab::new(),
             http: HttpPingTab::new(),
+            tls: TlsTab::new(),
             portscan: PortScanTab::new(),
             ip_insight: IpInsightTab::new(),
             lookup: LookupTab::new(),
@@ -160,6 +166,11 @@ impl App {
         // progress, while completed session history stays available.
         if self.tab == Tab::Speedtest && tab != Tab::Speedtest {
             self.speedtest.clear_on_hide();
+        }
+        // Leaving the TLS tab stops a running batch and drops its rows, so no
+        // OCSP/CRL download or target connection continues in the background.
+        if self.tab == Tab::Tls && tab != Tab::Tls {
+            self.tls.clear_on_hide();
         }
         self.tab = tab;
     }
@@ -246,7 +257,7 @@ impl App {
         }
     }
 
-    /// Global controls shown at the right side of the top bar. In a
+    /// Global controls shown at the bottom-right of the window. In a
     /// right-to-left layout this produces the visual order
     /// `Theme, Language, About, privileges`.
     fn app_controls(&mut self, ui: &mut egui::Ui) {
@@ -260,39 +271,6 @@ impl App {
         ui.label(t!("common.language"));
         self.theme_selector(ui);
         ui.label(t!("common.theme"));
-    }
-
-    /// Approximate the width of the tab strip. This only decides whether the
-    /// top bar can use one row; a small safety margin covers button rounding.
-    fn tabs_width(&self, ui: &egui::Ui) -> f32 {
-        let spacing = ui.spacing().item_spacing.x;
-        let padding = ui.spacing().button_padding.x * 2.0;
-        let mut width = 0.0;
-        for tab in &self.tab_order {
-            width += text_width(ui, &tab_label(*tab), egui::TextStyle::Button) + padding;
-        }
-        width + spacing * self.tab_order.len().saturating_sub(1) as f32 + 12.0
-    }
-
-    /// Approximate the width of the right-hand control group.
-    fn controls_width(&self, ui: &egui::Ui) -> f32 {
-        let spacing = ui.spacing().item_spacing.x;
-        let padding = ui.spacing().button_padding.x * 2.0;
-        let text = |value: String| text_width(ui, &value, egui::TextStyle::Body);
-
-        let mut width = text(t!("common.theme").to_string()) + 76.0;
-        width += text(t!("common.language").to_string()) + 84.0;
-        width += text(t!("about.button").to_string()) + padding;
-        width += text(privilege_label(&self.privilege));
-        if self.privilege.hint.is_some() {
-            width += spacing + text(t!("privilege.copy_cmd").to_string()) + padding;
-        }
-
-        // Two separators plus item spacing between all controls.
-        let items: usize = if self.privilege.hint.is_some() { 9 } else { 8 };
-        width += 2.0 * (spacing + 1.0) + spacing * items.saturating_sub(1) as f32;
-        // Safety margin for button rounding, combo arrows and separators.
-        width + 60.0
     }
 
     fn language_selector(&mut self, ui: &mut egui::Ui) {
@@ -380,40 +358,31 @@ impl App {
         }
     }
 
-    /// Render the top bar and return its final rectangle. The returned rect is
-    /// used by layout tests to verify that the panel height stays stable.
+    /// Render the top tab strip. The global controls live in the bottom bar,
+    /// so the tab strip has the full window width.
     fn top_bar(&mut self, ui: &mut egui::Ui) -> egui::Rect {
         egui::Panel::top("top_bar")
             .show(ui, |ui| {
                 ui.spacing_mut().item_spacing.x = 6.0;
                 ui.add_space(2.0);
-
-                let available = ui.available_width();
-                let one_row = self.tabs_width(ui) + self.controls_width(ui) <= available - 12.0;
-                if one_row {
-                    let tabs_width = (available - self.controls_width(ui) - 12.0).max(200.0);
-                    ui.horizontal(|ui| {
-                        ui.scope(|ui| {
-                            ui.set_max_width(tabs_width);
-                            self.tab_bar(ui);
-                        });
-                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            self.app_controls(ui);
-                        });
-                    });
-                } else {
-                    self.tab_bar(ui);
-                    ui.add_space(4.0);
-                    ui.horizontal(|ui| {
-                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            self.app_controls(ui);
-                        });
-                    });
-                }
+                self.tab_bar(ui);
                 ui.add_space(6.0);
             })
             .response
             .rect
+    }
+
+    /// Render the global controls in the bottom-right corner.
+    fn bottom_bar(&mut self, ui: &mut egui::Ui) {
+        egui::Panel::bottom("bottom_bar").show(ui, |ui| {
+            ui.add_space(2.0);
+            ui.horizontal(|ui| {
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    self.app_controls(ui);
+                });
+            });
+            ui.add_space(2.0);
+        });
     }
 
     /// About dialog: version, author, contact links and license. Values are read
@@ -474,6 +443,7 @@ fn tab_label(tab: Tab) -> String {
         Tab::Ping => t!("tab.ping"),
         Tab::Mtr => t!("tab.mtr"),
         Tab::Http => t!("tab.http"),
+        Tab::Tls => t!("tab.tls"),
         Tab::PortScan => t!("tab.portscan"),
         Tab::IpInsight => t!("tab.ip_insight"),
         Tab::Lookup => t!("tab.lookup"),
@@ -532,27 +502,6 @@ fn move_tab(order: &mut Vec<Tab>, dragged: Tab, target: Tab, after: bool) {
     order.insert(to, dragged);
 }
 
-/// Measure a single line of text with the given style.
-fn text_width(ui: &egui::Ui, text: &str, style: egui::TextStyle) -> f32 {
-    let font_id = style.resolve(ui.style());
-    ui.ctx().fonts_mut(|fonts| {
-        fonts
-            .layout_no_wrap(text.to_owned(), font_id, egui::Color32::WHITE)
-            .size()
-            .x
-    })
-}
-
-/// Localized privilege badge label for the current capability state.
-fn privilege_label(status: &PrivilegeStatus) -> String {
-    match (status.icmp, status.raw) {
-        (true, true) => t!("privilege.ok"),
-        (true, false) => t!("privilege.partial"),
-        (false, _) => t!("privilege.limited"),
-    }
-    .to_string()
-}
-
 /// Map the persisted theme value to egui's preference type.
 fn theme_preference_from_key(key: &str) -> egui::ThemePreference {
     match key {
@@ -592,6 +541,7 @@ fn language_display_name(code: &str) -> String {
 impl eframe::App for App {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         self.top_bar(ui);
+        self.bottom_bar(ui);
 
         // Capture the history revision before rendering so edits made by the
         // input widgets can be written to disk immediately afterwards.
@@ -619,6 +569,13 @@ impl eframe::App for App {
             Tab::Http => self.http.ui(
                 ui,
                 &mut self.cfg.http,
+                &mut self.cfg.history,
+                &self.rt,
+                settings_expanded,
+            ),
+            Tab::Tls => self.tls.ui(
+                ui,
+                &mut self.cfg.tls,
                 &mut self.cfg.history,
                 &self.rt,
                 settings_expanded,
@@ -682,6 +639,7 @@ impl eframe::App for App {
         // Stop a running speed test so its hidden worker does not outlive the
         // application.
         self.speedtest.clear_on_hide();
+        self.tls.clear_on_hide();
         crate::config_store::save(&self.cfg);
     }
 }
@@ -768,6 +726,7 @@ mod tests {
             ping: PingTab::new(),
             mtr: MtrTab::new(),
             http: HttpPingTab::new(),
+            tls: TlsTab::new(),
             portscan: PortScanTab::new(),
             ip_insight: IpInsightTab::new(),
             lookup: LookupTab::new(),

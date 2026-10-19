@@ -29,6 +29,23 @@ webpki-roots = "1"
 url = "2"
 riperf3 = { version = "0.8", default-features = false }
 
+# TLS certificate inspection, revocation, HSTS, CT and CAA checks.
+x509-parser = "0.18"
+x509-cert = "0.2"
+x509-ocsp = { version = "0.2", features = ["builder", "std"] }
+pkix-revocation = { version = "0.3", features = ["ocsp", "crl"] }
+pkix-path = "0.3"
+der = "0.7"
+sha1 = { version = "0.10", features = ["oid"] }
+sha2 = "0.10"
+sct = "0.7"
+ct-logs = "0.9"
+base64 = "0.22"
+percent-encoding = "2"
+
+[dev-dependencies]
+rcgen = "0.14"
+
 [target.'cfg(windows)'.dependencies]
 # Used by the ICMPv6 engine to read the reply hop limit via WSARecvMsg, which
 # socket2 and tokio do not expose.

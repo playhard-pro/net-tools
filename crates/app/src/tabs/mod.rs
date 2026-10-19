@@ -11,3 +11,4 @@ pub mod overview;
 pub mod ping;
 pub mod port_scan;
 pub mod speedtest;
+pub mod tls;

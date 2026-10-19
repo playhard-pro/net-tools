@@ -351,6 +351,197 @@ impl LookupResult {
     }
 }
 
+/// Overall health of a TLS target.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum TlsHealth {
+    Ok,
+    ExpiringSoon,
+    Expired,
+    Revoked,
+    HostnameMismatch,
+    Untrusted,
+    Error,
+}
+
+impl TlsHealth {
+    pub fn label(&self) -> &'static str {
+        match self {
+            TlsHealth::Ok => "ok",
+            TlsHealth::ExpiringSoon => "expiring soon",
+            TlsHealth::Expired => "expired",
+            TlsHealth::Revoked => "revoked",
+            TlsHealth::HostnameMismatch => "hostname mismatch",
+            TlsHealth::Untrusted => "untrusted",
+            TlsHealth::Error => "error",
+        }
+    }
+}
+
+/// Parsed fields of one certificate in the server-provided chain.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TlsCertInfo {
+    /// `leaf`, `intermediate` or `self-signed`.
+    pub role: String,
+    pub subject: String,
+    pub issuer: String,
+    pub common_name: Option<String>,
+    pub serial: String,
+    /// Validity start formatted as UTC.
+    pub not_before: String,
+    /// Validity end formatted as UTC.
+    pub not_after: String,
+    /// Validity end as a Unix timestamp, used for live day calculations.
+    pub not_after_unix: i64,
+    pub signature_algorithm: String,
+    pub key_algorithm: String,
+    pub key_bits: Option<u32>,
+    pub curve: Option<String>,
+    pub san_dns: Vec<String>,
+    pub san_ips: Vec<String>,
+    pub san_emails: Vec<String>,
+    pub san_uris: Vec<String>,
+    /// SHA-256 fingerprint formatted as colon-separated uppercase hex.
+    pub fingerprint_sha256: String,
+}
+
+impl TlsCertInfo {
+    /// Whole days until the certificate expires; negative after expiry.
+    pub fn days_remaining(&self, now_unix: i64) -> i64 {
+        (self.not_after_unix - now_unix).div_euclid(86_400)
+    }
+}
+
+/// Result of a revocation check.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum RevocationStatus {
+    Good,
+    Revoked,
+    Unknown,
+    Unavailable,
+    Error,
+}
+
+impl RevocationStatus {
+    pub fn label(&self) -> &'static str {
+        match self {
+            RevocationStatus::Good => "good",
+            RevocationStatus::Revoked => "revoked",
+            RevocationStatus::Unknown => "unknown",
+            RevocationStatus::Unavailable => "unavailable",
+            RevocationStatus::Error => "error",
+        }
+    }
+}
+
+/// Revocation details, including which source produced the result.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RevocationCheck {
+    pub status: RevocationStatus,
+    /// `stapled OCSP`, `OCSP`, `CRL` or `none`.
+    pub source: Option<String>,
+    pub detail: Option<String>,
+    pub this_update: Option<String>,
+    pub next_update: Option<String>,
+}
+
+impl Default for RevocationCheck {
+    fn default() -> Self {
+        Self {
+            status: RevocationStatus::Unavailable,
+            source: None,
+            detail: None,
+            this_update: None,
+            next_update: None,
+        }
+    }
+}
+
+/// Parsed HSTS response header.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct HstsCheck {
+    pub present: bool,
+    pub enabled: bool,
+    /// HTTP status code of the HEAD response, when available.
+    pub status: Option<u16>,
+    pub header: Option<String>,
+    pub max_age: Option<u64>,
+    pub include_subdomains: bool,
+    pub preload: bool,
+    pub error: Option<String>,
+}
+
+/// Certificate Transparency result for embedded SCTs.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct CtCheck {
+    pub sct_count: usize,
+    pub verified: usize,
+    pub unknown_logs: usize,
+    pub invalid: usize,
+    /// Hexadecimal log IDs, in certificate order.
+    pub log_ids: Vec<String>,
+    pub error: Option<String>,
+}
+
+/// One effective CAA record.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CaaRecordInfo {
+    pub flags: u8,
+    pub tag: String,
+    pub value: String,
+    pub critical: bool,
+}
+
+/// Effective CAA policy for a domain.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct CaaCheck {
+    /// Domain where the first non-empty CAA RRset was found.
+    pub source: Option<String>,
+    pub records: Vec<CaaRecordInfo>,
+    pub error: Option<String>,
+}
+
+/// Security checks collected for one TLS target.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct TlsSecurity {
+    pub revocation: RevocationCheck,
+    pub hsts: HstsCheck,
+    pub ct: CtCheck,
+    pub caa: CaaCheck,
+}
+
+/// Result of checking one TLS target.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TlsResult {
+    /// Index in the user-supplied target list, so the UI can keep input order.
+    pub index: usize,
+    pub target: String,
+    pub host: String,
+    pub port: u16,
+    pub resolved_ip: Option<String>,
+    pub elapsed_ms: f64,
+    pub protocol: Option<String>,
+    pub cipher_suite: Option<String>,
+    pub key_exchange: Option<String>,
+    pub alpn_negotiated: Option<String>,
+    pub alpn_h2_supported: Option<bool>,
+    pub alpn_http1_supported: Option<bool>,
+    pub tls12_supported: Option<bool>,
+    pub tls13_supported: Option<bool>,
+    pub chain_valid: bool,
+    pub chain_error: Option<String>,
+    pub health: TlsHealth,
+    pub certs: Vec<TlsCertInfo>,
+    pub security: TlsSecurity,
+    pub error: Option<String>,
+}
+
+/// Progress of a batch TLS check.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct TlsProgress {
+    pub done: usize,
+    pub total: usize,
+}
+
 /// Result of a single NTP query.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NtpResult {
@@ -641,6 +832,10 @@ pub enum ProbeEvent {
     DnsText(String),
     /// An NTP query result.
     Ntp(NtpResult),
+    /// A TLS target result.
+    Tls(Box<TlsResult>),
+    /// Progress of a batch TLS check.
+    TlsProgress(TlsProgress),
     /// A speed test result.
     SpeedResult(SpeedResult),
     /// Live speed test progress.
