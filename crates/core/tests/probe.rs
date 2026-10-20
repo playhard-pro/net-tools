@@ -52,17 +52,9 @@ async fn udp_ping_loopback_echo() {
     srv.abort();
 }
 
+#[cfg(not(windows))]
 #[tokio::test]
 async fn tcp_ping_open_and_closed_loopback() {
-    // Keep the Windows CI runner deterministic: the interactive TCP/UAC paths
-    // are covered manually, while the unprivileged TCP ping path is still
-    // exercised on Linux and macOS.
-    #[cfg(windows)]
-    {
-        eprintln!("skipping tcp ping test on Windows CI");
-        return;
-    }
-
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let open_port = listener.local_addr().unwrap().port();
     let srv = tokio::spawn(async move {
@@ -93,15 +85,6 @@ async fn tcp_ping_open_and_closed_loopback() {
     );
     srv.abort();
 
-    // Windows hosted runners can report a dropped loopback listener differently
-    // from a refused connection; the open-port case above still covers the TCP
-    // reachability path there.
-    #[cfg(windows)]
-    {
-        eprintln!("skipping closed TCP port assertion on Windows CI");
-        return;
-    }
-
     // Closed port: the refusal still proves the host answered.
     let probe = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let closed_port = probe.local_addr().unwrap().port();
@@ -123,16 +106,9 @@ async fn tcp_ping_open_and_closed_loopback() {
     );
 }
 
+#[cfg(not(windows))]
 #[tokio::test]
 async fn pmtu_loopback_binary_search() {
-    // Path MTU uses a raw ICMP socket and the UAC helper on Windows; skip the
-    // interactive path on the Windows CI runner.
-    #[cfg(windows)]
-    {
-        eprintln!("skipping pmtu test on Windows CI");
-        return;
-    }
-
     let mut s = PingSettings::default();
     s.common.target = "127.0.0.1".into();
     s.common.ip_version = IpVersion::V4;
@@ -233,16 +209,9 @@ async fn icmp_mtr_loopback() {
     );
 }
 
+#[cfg(not(windows))]
 #[tokio::test]
 async fn tcp_mtr_loopback() {
-    // Raw ICMP capture and the UAC helper are interactive paths; skip them on
-    // the Windows CI runner, which cannot approve a prompt.
-    #[cfg(windows)]
-    {
-        eprintln!("skipping tcp mtr test on Windows CI");
-        return;
-    }
-
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let port = listener.local_addr().unwrap().port();
     let srv = tokio::spawn(async move {
