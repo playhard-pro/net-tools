@@ -13,14 +13,13 @@ cargo about generate about.md.hbs -o THIRD_PARTY_LICENSES.md
 
 ## Overview
 
-- **MIT License** (497)
-- **Apache License 2.0** (21)
-- **ISC License** (21)
+- **MIT License** (493)
+- **Apache License 2.0** (20)
+- **ISC License** (19)
 - **Unicode License v3** (19)
-- **BSD 3-Clause "New" or "Revised" License** (4)
+- **BSD 3-Clause "New" or "Revised" License** (3)
 - **Boost Software License 1.0** (2)
 - **Community Data License Agreement Permissive 2.0** (1)
-- **MIT No Attribution** (1)
 - **Mozilla Public License 2.0** (1)
 - **SIL Open Font License 1.1** (1)
 - **Ubuntu Font Licence v1.0** (1)
@@ -2009,7 +2008,6 @@ Apache License
 Used by:
 
 - accesskit_winit 0.32.2 — https://github.com/AccessKit/accesskit
-- aws-lc-sys 0.45.0 — https://github.com/aws/aws-lc-rs
 - gl_generator 0.14.0 — https://github.com/brendanzab/gl-rs/
 - khronos_api 3.1.0 — https://github.com/brendanzab/gl-rs/
 - rpassword 5.0.1 — https://github.com/conradkleinespel/rpassword
@@ -2199,27 +2197,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 Used by:
 
-- aws-lc-sys 0.45.0 — https://github.com/aws/aws-lc-rs
-
-```text
-Copyright (c) <year> <owner>. 
-
-Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
-
-1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
-
-2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
-
-3. Neither the name of the copyright holder nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-```
-
-### BSD 3-Clause "New" or "Revised" License
-
-Used by:
-
 - encoding_rs 0.8.42 — https://github.com/hsivonen/encoding_rs
 
 ```text
@@ -2306,7 +2283,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 Used by:
 
-- webpki-roots 1.0.9 — https://github.com/rustls/webpki-roots
+- webpki-roots 1.0.10 — https://github.com/rustls/webpki-roots
 
 ```text
 # Community Data License Agreement - Permissive - Version 2.0
@@ -2974,7 +2951,7 @@ THIS SOFTWARE.
 
 Used by:
 
-- rustls-webpki 0.103.15 — https://github.com/rustls/webpki
+- rustls-webpki 0.103.16 — https://github.com/rustls/webpki
 
 ```text
 Except as otherwise noted, this project is licensed under the following
@@ -2996,25 +2973,6 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 The files under third-party/chromium are licensed as described in
 third-party/chromium/LICENSE.
-
-```
-
-### ISC License
-
-Used by:
-
-- aws-lc-rs 1.18.1 — https://github.com/aws/aws-lc-rs
-- aws-lc-sys 0.45.0 — https://github.com/aws/aws-lc-rs
-
-```text
-ISC License:
-
-Copyright (c) 2004-2010 by Internet Systems Consortium, Inc. ("ISC")
-Copyright (c) 1995-2003 by Internet Software Consortium
-
-Permission to use, copy, modify, and/or distribute this software for any purpose with or without fee is hereby granted, provided that the above copyright notice and this permission notice appear in all copies.
-
-THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 ```
 
@@ -3373,9 +3331,7 @@ Used by:
 
 - cc 1.6.0 — https://github.com/rust-lang/cc-rs
 - cfg-if 1.0.5 — https://github.com/rust-lang/cfg-if
-- cmake 0.1.58 — https://github.com/rust-lang/cmake-rs
 - find-msvc-tools 0.1.14 — https://github.com/rust-lang/cc-rs
-- jobserver 0.1.35 — https://github.com/rust-lang/jobserver-rs
 - openssl-probe 0.2.1 — https://github.com/rustls/openssl-probe
 - pkg-config 0.3.34 — https://github.com/rust-lang/pkg-config-rs
 - scoped-tls 1.0.1 — https://github.com/alexcrichton/scoped-tls
@@ -7770,37 +7726,6 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 Used by:
 
-- fs_extra 1.3.0 — https://github.com/webdesus/fs_extra
-
-```text
-MIT License
-
-Copyright (c) 2017 Denis Kurilenko
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-
-```
-
-### MIT License
-
-Used by:
-
 - static_assertions 1.1.0 — https://github.com/nvzqz/static-assertions-rs
 
 ```text
@@ -9421,38 +9346,6 @@ SOFTWARE.
 
 Used by:
 
-- aws-lc-sys 0.45.0 — https://github.com/aws/aws-lc-rs
-
-```text
-The MIT License (MIT)
-
-Copyright (c) 2015-2020 the fiat-crypto authors (see
-https://github.com/mit-plv/fiat-crypto/blob/master/AUTHORS).
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-
-```
-
-### MIT License
-
-Used by:
-
 - webbrowser 1.2.4 — https://github.com/amodm/webbrowser-rs
 
 ```text
@@ -9990,32 +9883,6 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
-
-```
-
-### MIT No Attribution
-
-Used by:
-
-- dunce 1.0.5 — https://gitlab.com/kornelski/dunce
-
-```text
-MIT No Attribution
-
-Copyright <YEAR> <COPYRIGHT HOLDER>
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this
-software and associated documentation files (the "Software"), to deal in the Software
-without restriction, including without limitation the rights to use, copy, modify,
-merge, publish, distribute, sublicense, and/or sell copies of the Software, and to
-permit persons to whom the Software is furnished to do so.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
-INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
-PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
-SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ```
 

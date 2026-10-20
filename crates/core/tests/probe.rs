@@ -107,6 +107,13 @@ async fn tcp_ping_open_and_closed_loopback() {
 
 #[tokio::test]
 async fn pmtu_loopback_binary_search() {
+    // Path MTU uses a raw ICMP socket on Windows, so skip the UAC path in CI.
+    #[cfg(windows)]
+    if !net_tools_core::elevation::is_elevated() {
+        eprintln!("skipping pmtu test (administrator privileges required)");
+        return;
+    }
+
     let mut s = PingSettings::default();
     s.common.target = "127.0.0.1".into();
     s.common.ip_version = IpVersion::V4;
@@ -209,6 +216,14 @@ async fn icmp_mtr_loopback() {
 
 #[tokio::test]
 async fn tcp_mtr_loopback() {
+    // Raw ICMP capture needs elevation on Windows; do not start the UAC helper
+    // from an automated test runner.
+    #[cfg(windows)]
+    if !net_tools_core::elevation::is_elevated() {
+        eprintln!("skipping tcp mtr test (administrator privileges required)");
+        return;
+    }
+
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let port = listener.local_addr().unwrap().port();
     let srv = tokio::spawn(async move {
