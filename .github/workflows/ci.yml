@@ -45,6 +45,9 @@ jobs:
             tail -200 clippy.log
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+          grep -E '^(error|warning)(\[|:)' clippy.log | head -30 | while IFS= read -r line; do
+            echo "::error title=Clippy::$line"
+          done
 
       - name: Check formatting
         run: cargo fmt --check
