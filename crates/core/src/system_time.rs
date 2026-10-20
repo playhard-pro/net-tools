@@ -238,20 +238,6 @@ fn set_windows(utc: OffsetDateTime) -> Result<(), SetTimeError> {
 /// keeps the applied time fresh even if the prompt stayed open for a while.
 #[cfg(windows)]
 fn set_system_time_elevated_windows(server: &str, timeout_ms: u64) -> Result<(), SetTimeError> {
-    use std::mem::size_of;
-
-    use windows_sys::Win32::Foundation::CloseHandle;
-    use windows_sys::Win32::System::Com::{
-        CoInitializeEx, CoUninitialize, COINIT_APARTMENTTHREADED,
-    };
-    use windows_sys::Win32::System::Threading::{
-        GetExitCodeProcess, WaitForSingleObject, INFINITE,
-    };
-    use windows_sys::Win32::UI::Shell::{
-        ShellExecuteExW, SEE_MASK_NOASYNC, SEE_MASK_NOCLOSEPROCESS, SHELLEXECUTEINFOW,
-    };
-    use windows_sys::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
-
     // The server is appended to the helper command line, so reject characters
     // that would change how the arguments are split.
     if server.trim().is_empty()
@@ -265,111 +251,27 @@ fn set_system_time_elevated_windows(server: &str, timeout_ms: u64) -> Result<(),
         });
     }
 
-    let exe = std::env::current_exe().map_err(|error| SetTimeError {
-        message: format!("failed to locate the application executable: {error}"),
-        permission_denied: false,
-    })?;
     let parameters = format!("--set-system-time-from-ntp {server} {timeout_ms}");
-
-    let verb = wide(std::ffi::OsStr::new("runas"));
-    let file = wide(exe.as_os_str());
-    let parameters = wide(std::ffi::OsStr::new(&parameters));
-
-    // ShellExecuteEx may use COM internally; initialize it for the calling
-    // thread and ignore the mode-already-initialized result.
-    let com_result = unsafe { CoInitializeEx(std::ptr::null(), COINIT_APARTMENTTHREADED as u32) };
-
-    // Safety: every pointer in the structure points to a NUL-terminated buffer
-    // that lives until ShellExecuteExW returns.
-    unsafe {
-        let mut info: SHELLEXECUTEINFOW = std::mem::zeroed();
-        info.cbSize = size_of::<SHELLEXECUTEINFOW>() as u32;
-        info.fMask = SEE_MASK_NOCLOSEPROCESS | SEE_MASK_NOASYNC;
-        info.lpVerb = verb.as_ptr();
-        info.lpFile = file.as_ptr();
-        info.lpParameters = parameters.as_ptr();
-        info.nShow = SW_SHOWNORMAL;
-
-        let launched = ShellExecuteExW(&mut info);
-        let launch_error = std::io::Error::last_os_error();
-        if com_result >= 0 {
-            CoUninitialize();
-        }
-        if launched == 0 {
-            return Err(elevation_launch_error(launch_error));
-        }
-        if info.hProcess.is_null() {
-            return Err(SetTimeError {
-                message: "the elevated helper did not start".to_string(),
-                permission_denied: false,
-            });
-        }
-
-        let waited = WaitForSingleObject(info.hProcess, INFINITE);
-        let mut exit_code = 0u32;
-        let got_exit_code = GetExitCodeProcess(info.hProcess, &mut exit_code);
-        CloseHandle(info.hProcess);
-
-        if waited != 0 {
-            return Err(SetTimeError {
-                message: format!(
-                    "failed while waiting for the elevated helper: {}",
-                    std::io::Error::last_os_error()
-                ),
-                permission_denied: false,
-            });
-        }
-        if got_exit_code == 0 {
-            return Err(SetTimeError {
-                message: format!(
-                    "failed to read the elevated helper result: {}",
-                    std::io::Error::last_os_error()
-                ),
-                permission_denied: false,
-            });
-        }
-        if exit_code != 0 {
-            return Err(match exit_code {
-                2 => SetTimeError {
-                    message: "the elevated helper could not query the NTP server".to_string(),
-                    permission_denied: false,
-                },
-                3 => SetTimeError {
-                    message: "the elevated helper could not set the system time".to_string(),
-                    permission_denied: false,
-                },
-                other => SetTimeError {
-                    message: format!("the elevated helper failed with exit code {other}"),
-                    permission_denied: false,
-                },
-            });
-        }
-        Ok(())
-    }
-}
-
-/// Turn a ShellExecuteEx failure into a readable error, including the common
-/// case where the user dismisses the UAC prompt.
-#[cfg(windows)]
-fn elevation_launch_error(error: std::io::Error) -> SetTimeError {
-    const ERROR_CANCELLED: i32 = 1223;
-    if error.raw_os_error() == Some(ERROR_CANCELLED) {
-        return SetTimeError {
-            message: "administrator approval was cancelled".to_string(),
+    let exit_code =
+        crate::elevation::launch_and_wait(&parameters).map_err(|message| SetTimeError {
+            message,
             permission_denied: false,
-        };
+        })?;
+    match exit_code {
+        0 => Ok(()),
+        2 => Err(SetTimeError {
+            message: "the elevated helper could not query the NTP server".to_string(),
+            permission_denied: false,
+        }),
+        3 => Err(SetTimeError {
+            message: "the elevated helper could not set the system time".to_string(),
+            permission_denied: false,
+        }),
+        other => Err(SetTimeError {
+            message: format!("the elevated helper failed with exit code {other}"),
+            permission_denied: false,
+        }),
     }
-    SetTimeError {
-        message: format!("failed to request administrator approval: {error}"),
-        permission_denied: false,
-    }
-}
-
-/// Convert an OS string to the NUL-terminated UTF-16 form used by Win32 APIs.
-#[cfg(windows)]
-fn wide(value: &std::ffi::OsStr) -> Vec<u16> {
-    use std::os::windows::ffi::OsStrExt;
-    value.encode_wide().chain(std::iter::once(0)).collect()
 }
 
 #[cfg(test)]

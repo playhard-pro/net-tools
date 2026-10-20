@@ -39,10 +39,11 @@ privilege:
   limited: "权限: 受限"
   icmp_ok: "ICMP ping / MTR: 可用"
   icmp_limited: "ICMP ping / MTR: 不可用（需要提权）"
-  raw_ok: "UDP MTR / SYN 扫描: 可用"
-  raw_limited: "UDP MTR / SYN 扫描: 需要提权"
+  raw_ok: 'UDP MTR / TCP MTR / 路径 MTU / SYN 扫描: 可用'
+  raw_limited: 'UDP MTR / TCP MTR / 路径 MTU / SYN 扫描: 需要提权'
   copy_cmd: 复制命令
   needs_icmp: "ICMP 探测无法创建套接字，请以提权方式运行："
+  needs_raw_tcp_mtr: 'TCP MTR 需要原始 ICMP 套接字，请以提权方式运行：'
   needs_raw_udp_mtr: "UDP MTR 需要原始套接字，请以提权方式运行："
   needs_raw_syn: "SYN 扫描需要原始套接字，请以提权方式运行："
 common:
@@ -50,6 +51,8 @@ common:
   theme: 主题
   advanced: 高级
   language: 语言
+  elevation_title: 需要管理员权限
+  continue: 继续
   start: 开始
   pause: 暂停
   resume: 继续
@@ -117,6 +120,22 @@ mtr:
   best_ms: 最优(ms)
   worst_ms: 最差(ms)
   stdev_ms: 标准差(ms)
+  elevation_reason: "UDP 和 TCP MTR 需要原始套接字来读取路由器的响应。继续后 Windows 将请求管理员授权。"
+pmtu:
+  title: 路径 MTU
+  hint: "使用带 DF 位的 ICMP Echo；复用上方的目标和超时设置。"
+  min_mtu: 最小 MTU
+  max_mtu: 最大 MTU
+  attempts: 每尺寸尝试次数
+  discover: 开始探测
+  summary: "路径 MTU：%{mtu} 字节（载荷 %{payload} 字节 + 头部 %{overhead} 字节）"
+  range: "范围 %{min}–%{max} 字节 · %{ip}"
+  step_mtu: MTU
+  step_payload: 载荷
+  step_outcome: 结果
+  step_detail: 详情
+  elevation_reason: "Windows 上的路径 MTU 探测需要原始 ICMP 套接字。继续后 Windows 将请求管理员授权。"
+
 http:
   url: URL
   method: 方法

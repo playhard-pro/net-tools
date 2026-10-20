@@ -1146,9 +1146,13 @@ fn routes_table(ui: &mut egui::Ui, snapshot: &NetworkSnapshot) {
         .len()
         .clamp(ROUTE_MIN_VISIBLE_ROWS, ROUTE_VISIBLE_ROWS);
 
-    // The table scrolls vertically, so reserve the scrollbar width to keep the
-    // column widths from spilling into the second overview column.
-    let table_width = (ui.available_width() - ui.spacing().scroll.allocated_width()).max(1.0);
+    // The table scrolls vertically, so reserve the scrollbar width and the
+    // spacing between columns. TableBuilder adds the inter-column spacing on
+    // top of the exact widths, which would otherwise push the right edge into
+    // the second overview column.
+    let spacing = ui.spacing().item_spacing.x * (headers.len().saturating_sub(1)) as f32;
+    let table_width =
+        (ui.available_width() - ui.spacing().scroll.allocated_width() - spacing).max(1.0);
     let columns = ROUTE_COLUMN_WEIGHTS.map(|weight| Column::exact(table_width * weight));
 
     table_fixed_rows_with_columns(

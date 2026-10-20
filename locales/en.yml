@@ -40,10 +40,11 @@ privilege:
   limited: "privileges: limited"
   icmp_ok: "ICMP ping / MTR: available"
   icmp_limited: "ICMP ping / MTR: unavailable (elevation required)"
-  raw_ok: "UDP MTR / SYN scan: available"
-  raw_limited: "UDP MTR / SYN scan: requires elevation"
+  raw_ok: 'UDP MTR / TCP MTR / Path MTU / SYN scan: available'
+  raw_limited: 'UDP MTR / TCP MTR / Path MTU / SYN scan: requires elevation'
   copy_cmd: copy cmd
   needs_icmp: "ICMP probing needs a socket. Run with elevation:"
+  needs_raw_tcp_mtr: 'TCP MTR needs a raw ICMP socket. Run with elevation:'
   needs_raw_udp_mtr: "UDP MTR needs a raw socket. Run with elevation:"
   needs_raw_syn: "SYN scan needs a raw socket. Run with elevation:"
 common:
@@ -51,6 +52,8 @@ common:
   theme: Theme
   advanced: Advanced
   language: Language
+  elevation_title: Administrator permission required
+  continue: Continue
   start: Start
   pause: Pause
   resume: Resume
@@ -118,6 +121,22 @@ mtr:
   best_ms: Best (ms)
   worst_ms: Worst (ms)
   stdev_ms: StDev (ms)
+  elevation_reason: "UDP and TCP MTR need a raw socket to read router responses. Windows will ask for administrator approval after you continue."
+pmtu:
+  title: Path MTU
+  hint: "ICMP echo with the Don't Fragment bit; the target and timeout above are reused."
+  min_mtu: Minimum MTU
+  max_mtu: Maximum MTU
+  attempts: Attempts per size
+  discover: Discover
+  summary: "Path MTU: %{mtu} B (payload %{payload} B + headers %{overhead} B)"
+  range: "range %{min}–%{max} B · %{ip}"
+  step_mtu: MTU
+  step_payload: Payload
+  step_outcome: Result
+  step_detail: Detail
+  elevation_reason: "Path MTU needs a raw ICMP socket on Windows. Windows will ask for administrator approval after you continue."
+
 http:
   url: URL
   method: Method

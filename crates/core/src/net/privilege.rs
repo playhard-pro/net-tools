@@ -48,6 +48,14 @@ fn can_icmp() -> bool {
 /// UDP MTR mode (raw ICMP) need. Neither ICMP ping nor ICMP MTR needs it on
 /// Linux, where the datagram socket is enough.
 fn can_raw() -> bool {
+    // On Windows raw socket creation alone is not a reliable capability test:
+    // a non-elevated process may create the socket but still receive no ICMP
+    // errors. Require an elevated token so the status badge and UAC prompt are
+    // accurate.
+    #[cfg(windows)]
+    if !crate::elevation::is_elevated() {
+        return false;
+    }
     raw_socket_available(Domain::IPV4, Protocol::TCP)
         || raw_socket_available(Domain::IPV4, Protocol::ICMPV4)
         || raw_socket_available(Domain::IPV6, Protocol::ICMPV6)

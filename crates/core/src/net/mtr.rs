@@ -5,9 +5,7 @@
 //! interval, so each individual hop is probed at that interval.
 
 use std::collections::HashMap;
-use std::net::IpAddr;
-#[cfg(unix)]
-use std::net::Ipv4Addr;
+use std::net::{IpAddr, Ipv4Addr};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -19,7 +17,7 @@ use tokio::task::JoinSet;
 use crate::config::MtrSettings;
 use crate::control::ProbeHandle;
 use crate::model::{HopNode, HopStats, ProbeEvent};
-use crate::net::{dns, icmp, privilege};
+use crate::net::{dns, icmp, privilege, raw_icmp};
 
 /// Upper bound on the distinct responders remembered for one hop, so a heavily
 /// load-balanced hop cannot grow without limit.
@@ -192,6 +190,7 @@ pub async fn run_mtr(handle: &ProbeHandle<ProbeEvent>, settings: &MtrSettings) {
     match settings.mode {
         crate::model::ProbeMode::Icmp => mtr_icmp(handle, settings, ip).await,
         crate::model::ProbeMode::Udp => mtr_udp(handle, settings, ip).await,
+        crate::model::ProbeMode::Tcp => mtr_tcp(handle, settings, ip).await,
     }
 
     handle.send(ProbeEvent::Finished);
@@ -464,129 +463,382 @@ async fn mtr_icmp_surge(handle: &ProbeHandle<ProbeEvent>, settings: &MtrSettings
     }
 }
 
-async fn mtr_udp(handle: &ProbeHandle<ProbeEvent>, settings: &MtrSettings, ip: IpAddr) {
-    #[cfg(not(unix))]
+/// TCP traceroute: send a TCP SYN with an increasing TTL and capture the
+/// routers' ICMP errors. The TCP handshake also marks the target as reached.
+async fn mtr_tcp(handle: &ProbeHandle<ProbeEvent>, settings: &MtrSettings, ip: IpAddr) {
+    // On Windows the intermediate router errors are only visible through a raw
+    // ICMP socket, which requires administrator rights. Probe the capability
+    // once up front, then request UAC instead of failing after the first hop.
+    #[cfg(windows)]
     {
-        // Not built on this platform; mark the arguments as used.
-        let _ = (settings, ip);
-        // A missing platform backend is not a privilege problem, so no hint.
-        handle.send(ProbeEvent::Error {
-            message: "UDP MTR requires Unix raw sockets (Windows support pending)".into(),
-            hint: None,
-        });
-    }
-
-    #[cfg(unix)]
-    {
-        let target_v4 = match ip {
-            IpAddr::V4(v4) => v4,
-            IpAddr::V6(_) => {
-                handle.send(ProbeEvent::Error {
-                    message: "IPv6 UDP MTR is not supported yet; use ICMP mode".into(),
-                    hint: None,
-                });
+        if !crate::elevation::is_elevated() {
+            crate::elevation::run_elevated(
+                handle,
+                &crate::elevation::HelperRequest::Mtr(settings.clone()),
+            )
+            .await;
+            return;
+        }
+        if let Err(e) = raw_icmp::Capture::open_capture(ip) {
+            if e.kind() == std::io::ErrorKind::PermissionDenied {
+                crate::elevation::run_elevated(
+                    handle,
+                    &crate::elevation::HelperRequest::Mtr(settings.clone()),
+                )
+                .await;
                 return;
             }
-        };
-
-        // Pre-check: the raw ICMP socket the probe loop needs. Report the real
-        // error and only mention elevation when that is what is missing.
-        if let Err(e) = socket2::Socket::new(
-            socket2::Domain::IPV4,
-            socket2::Type::RAW,
-            Some(socket2::Protocol::ICMPV4),
-        ) {
             handle.send(ProbeEvent::Error {
-                message: format!("UDP MTR needs a raw ICMP socket: {e}"),
-                hint: privilege::hint_for(e.kind() == std::io::ErrorKind::PermissionDenied),
+                message: format!("TCP MTR needs a raw ICMP socket: {e}"),
+                hint: None,
             });
             return;
         }
+    }
 
-        let max_hops = settings.max_hops.max(1);
-        let payload = Arc::new(vec![0x75u8; settings.common.packet_size]);
-        let timeout = Duration::from_millis(settings.common.timeout_ms);
-        let interval = Duration::from_millis(settings.common.interval_ms);
+    let max_hops = settings.max_hops.max(1);
+    let timeout = Duration::from_millis(settings.common.timeout_ms);
+    let interval = Duration::from_millis(settings.common.interval_ms);
 
-        let mut accums: Vec<HopAccum> = (1..=max_hops).map(HopAccum::new).collect();
-        let mut reverse: HashMap<IpAddr, Option<String>> = HashMap::new();
-        let mut target_hop: Option<u8> = None;
+    let mut accums: Vec<HopAccum> = (1..=max_hops).map(HopAccum::new).collect();
+    let mut reverse: HashMap<IpAddr, Option<String>> = HashMap::new();
+    let mut target_hop: Option<u8> = None;
 
-        loop {
+    loop {
+        if handle.is_cancelled() {
+            return;
+        }
+        handle.wait_if_paused().await;
+        if handle.is_cancelled() {
+            return;
+        }
+
+        let active = target_hop.unwrap_or(max_hops);
+        let started = Instant::now();
+        let mut set = JoinSet::new();
+
+        for hop in 1..=active {
+            let target = ip;
+            let port = settings.tcp_port;
+            set.spawn_blocking(move || {
+                let result = tcp_probe(target, port, hop as u32, timeout);
+                (hop, result)
+            });
+        }
+
+        let mut reached_hop: Option<u8> = None;
+        while let Some(joined) = set.join_next().await {
             if handle.is_cancelled() {
                 return;
             }
-            handle.wait_if_paused().await;
-            if handle.is_cancelled() {
-                return;
-            }
-
-            let active = target_hop.unwrap_or(max_hops);
-            let started = Instant::now();
-            let mut set = JoinSet::new();
-
-            for hop in 1..=active {
-                let payload = payload.clone();
-                let port = settings.udp_port;
-                set.spawn_blocking(move || {
-                    let result = udp_probe_v4(target_v4, port, hop as u32, &payload, timeout);
-                    (hop, result)
-                });
-            }
-
-            let mut reached_hop: Option<u8> = None;
-            while let Some(joined) = set.join_next().await {
-                if handle.is_cancelled() {
+            match joined {
+                Ok((hop, Ok(Some(probe)))) => {
+                    if probe.reached {
+                        reached_hop = Some(reached_hop.map_or(hop, |h| h.min(hop)));
+                    }
+                    accums[hop as usize - 1].record(probe);
+                }
+                Ok((hop, Ok(None))) => accums[hop as usize - 1].record(HopProbe::timeout()),
+                Ok((_hop, Err(e))) => {
+                    // Raw ICMP capture is required for the intermediate hops.
+                    // Report the real error and only mention elevation when
+                    // that is what is missing.
+                    handle.send(ProbeEvent::Error {
+                        message: format!("TCP MTR needs a raw ICMP socket: {e}"),
+                        hint: privilege::hint_for(e.kind() == std::io::ErrorKind::PermissionDenied),
+                    });
                     return;
                 }
-                match joined {
-                    Ok((hop, Some((icmp_type, src, rtt)))) => {
-                        // A destination-unreachable from the target proves the
-                        // path ended; a time-exceeded message is a router.
-                        let reached = icmp_type == 3;
-                        if reached {
-                            reached_hop = Some(reached_hop.map_or(hop, |h| h.min(hop)));
-                        }
-                        accums[hop as usize - 1].record(HopProbe::reply(
-                            reached,
-                            IpAddr::V4(src),
-                            rtt,
-                        ));
-                    }
-                    Ok((hop, None)) => accums[hop as usize - 1].record(HopProbe::timeout()),
-                    Err(_) => {
-                        handle.send(ProbeEvent::Error {
-                            message: "UDP MTR probe task panicked".into(),
-                            hint: None,
-                        });
-                        return;
-                    }
+                Err(_) => {
+                    handle.send(ProbeEvent::Error {
+                        message: "TCP MTR probe task panicked".into(),
+                        hint: None,
+                    });
+                    return;
                 }
             }
+        }
 
-            if let Some(hop) = reached_hop {
-                target_hop = Some(target_hop.map_or(hop, |t| t.min(hop)));
-            }
-            let active = target_hop.unwrap_or(max_hops) as usize;
+        if let Some(hop) = reached_hop {
+            target_hop = Some(target_hop.map_or(hop, |t| t.min(hop)));
+        }
+        let active = target_hop.unwrap_or(max_hops) as usize;
 
-            if settings.common.reverse_dns {
-                resolve_reverse(&accums[..active], &mut reverse).await;
-            }
-            for acc in &accums[..active] {
-                handle.send(ProbeEvent::Hop(acc.stats(&reverse)));
-            }
+        if settings.common.reverse_dns {
+            resolve_reverse(&accums[..active], &mut reverse).await;
+        }
+        for acc in &accums[..active] {
+            handle.send(ProbeEvent::Hop(acc.stats(&reverse)));
+        }
 
-            let elapsed = started.elapsed();
-            if elapsed < interval && handle.sleep(interval - elapsed).await {
-                return;
+        let elapsed = started.elapsed();
+        if elapsed < interval && handle.sleep(interval - elapsed).await {
+            return;
+        }
+    }
+}
+
+/// Blocking single TCP traceroute probe. Returns `None` on timeout.
+fn tcp_probe(
+    target: IpAddr,
+    port: u16,
+    ttl: u32,
+    timeout: Duration,
+) -> std::io::Result<Option<HopProbe>> {
+    use socket2::{Domain, Protocol, SockAddr, Socket, Type};
+    use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr};
+
+    let v6 = target.is_ipv6();
+    let (domain, protocol) = if v6 {
+        (Domain::IPV6, Protocol::TCP)
+    } else {
+        (Domain::IPV4, Protocol::TCP)
+    };
+    let bind: SocketAddr = if v6 {
+        SocketAddr::new(IpAddr::V6(Ipv6Addr::UNSPECIFIED), 0)
+    } else {
+        SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 0)
+    };
+
+    // Open the capture socket first, so a router cannot answer before the
+    // capture is ready.
+    let capture = raw_icmp::Capture::open_capture(target)?;
+
+    let tcp = Socket::new(domain, Type::STREAM, Some(protocol))?;
+    tcp.bind(&SockAddr::from(bind))?;
+    if v6 {
+        tcp.set_unicast_hops_v6(ttl)?;
+    } else {
+        tcp.set_ttl_v4(ttl)?;
+    }
+    let local = tcp
+        .local_addr()?
+        .as_socket()
+        .ok_or_else(|| std::io::Error::other("TCP socket has no local address"))?;
+    let local_port = local.port();
+    tcp.set_nonblocking(true)?;
+
+    let destination = SocketAddr::new(target, port);
+    let started = Instant::now();
+    let deadline = started + timeout;
+    match tcp.connect(&SockAddr::from(destination)) {
+        Ok(()) => {
+            return Ok(Some(HopProbe::reply(true, target, started.elapsed())));
+        }
+        Err(e) if tcp_connect_pending(&e) => {}
+        Err(e) if tcp_error_reaches(&e) => {
+            return Ok(Some(HopProbe::reply(true, target, started.elapsed())));
+        }
+        Err(_) => return Ok(None),
+    }
+
+    loop {
+        let now = Instant::now();
+        if now >= deadline {
+            return Ok(None);
+        }
+        let remaining = deadline - now;
+        let (raw_ready, tcp_ready) = raw_icmp::poll_pair(capture.socket(), &tcp, remaining)?;
+
+        if raw_ready {
+            // Drain every ready message; unrelated ICMP traffic is common on a
+            // raw socket, so a single read is not enough to find our reply.
+            while let Some(message) = capture.recv()? {
+                let Some(quoted) = message.quoted else {
+                    continue;
+                };
+                if quoted.protocol != 6
+                    || quoted.dst != target
+                    || quoted.src_port != local_port
+                    || quoted.dst_port != port
+                {
+                    continue;
+                }
+                let rtt = started.elapsed();
+                return match message.kind {
+                    raw_icmp::MessageKind::TimeExceeded | raw_icmp::MessageKind::PacketTooBig => {
+                        Ok(Some(HopProbe::reply(false, message.from, rtt)))
+                    }
+                    raw_icmp::MessageKind::Unreachable => {
+                        Ok(Some(HopProbe::reply(true, message.from, rtt)))
+                    }
+                    _ => continue,
+                };
+            }
+        }
+
+        if tcp_ready {
+            match tcp.take_error()? {
+                None => return Ok(Some(HopProbe::reply(true, target, started.elapsed()))),
+                Some(e) if tcp_error_reaches(&e) => {
+                    return Ok(Some(HopProbe::reply(true, target, started.elapsed())));
+                }
+                // A route error without a usable responder is reported as a
+                // timeout, so the round can continue without inventing a hop.
+                Some(_) => return Ok(None),
             }
         }
     }
 }
 
-/// Blocking single UDP probe (Unix): send a UDP datagram and read the raw ICMP
-/// error. Returns (icmp_type, responder, RTT); `None` on timeout.
-#[cfg(unix)]
+/// Whether a non-blocking connect is still in progress.
+fn tcp_connect_pending(error: &std::io::Error) -> bool {
+    if error.kind() == std::io::ErrorKind::WouldBlock {
+        return true;
+    }
+    #[cfg(unix)]
+    if error.raw_os_error() == Some(libc::EINPROGRESS) {
+        return true;
+    }
+    #[cfg(windows)]
+    if error.raw_os_error() == Some(windows_sys::Win32::Networking::WinSock::WSAEWOULDBLOCK as i32)
+    {
+        return true;
+    }
+    false
+}
+
+/// Whether a connect error still proves that the target host answered.
+fn tcp_error_reaches(error: &std::io::Error) -> bool {
+    matches!(
+        error.kind(),
+        std::io::ErrorKind::ConnectionRefused | std::io::ErrorKind::ConnectionReset
+    )
+}
+
+async fn mtr_udp(handle: &ProbeHandle<ProbeEvent>, settings: &MtrSettings, ip: IpAddr) {
+    let target_v4 = match ip {
+        IpAddr::V4(v4) => v4,
+        IpAddr::V6(_) => {
+            handle.send(ProbeEvent::Error {
+                message: "IPv6 UDP MTR is not supported yet; use ICMP or TCP mode".into(),
+                hint: None,
+            });
+            return;
+        }
+    };
+
+    // Windows needs administrator rights for the raw ICMP socket. Request UAC
+    // once, then run the whole trace in the elevated helper.
+    #[cfg(windows)]
+    {
+        if !crate::elevation::is_elevated() {
+            crate::elevation::run_elevated(
+                handle,
+                &crate::elevation::HelperRequest::Mtr(settings.clone()),
+            )
+            .await;
+            return;
+        }
+        if let Err(e) = raw_icmp::Capture::open_capture(ip) {
+            if e.kind() == std::io::ErrorKind::PermissionDenied {
+                crate::elevation::run_elevated(
+                    handle,
+                    &crate::elevation::HelperRequest::Mtr(settings.clone()),
+                )
+                .await;
+                return;
+            }
+            handle.send(ProbeEvent::Error {
+                message: format!("UDP MTR needs a raw ICMP socket: {e}"),
+                hint: None,
+            });
+            return;
+        }
+    }
+
+    // Pre-check: the raw ICMP socket the probe loop needs. Report the real
+    // error and only mention elevation when that is what is missing.
+    if let Err(e) = socket2::Socket::new(
+        socket2::Domain::IPV4,
+        socket2::Type::RAW,
+        Some(socket2::Protocol::ICMPV4),
+    ) {
+        handle.send(ProbeEvent::Error {
+            message: format!("UDP MTR needs a raw ICMP socket: {e}"),
+            hint: privilege::hint_for(e.kind() == std::io::ErrorKind::PermissionDenied),
+        });
+        return;
+    }
+
+    let max_hops = settings.max_hops.max(1);
+    let payload = Arc::new(vec![0x75u8; settings.common.packet_size]);
+    let timeout = Duration::from_millis(settings.common.timeout_ms);
+    let interval = Duration::from_millis(settings.common.interval_ms);
+
+    let mut accums: Vec<HopAccum> = (1..=max_hops).map(HopAccum::new).collect();
+    let mut reverse: HashMap<IpAddr, Option<String>> = HashMap::new();
+    let mut target_hop: Option<u8> = None;
+
+    loop {
+        if handle.is_cancelled() {
+            return;
+        }
+        handle.wait_if_paused().await;
+        if handle.is_cancelled() {
+            return;
+        }
+
+        let active = target_hop.unwrap_or(max_hops);
+        let started = Instant::now();
+        let mut set = JoinSet::new();
+
+        for hop in 1..=active {
+            let payload = payload.clone();
+            let port = settings.udp_port;
+            set.spawn_blocking(move || {
+                let result = udp_probe_v4(target_v4, port, hop as u32, &payload, timeout);
+                (hop, result)
+            });
+        }
+
+        let mut reached_hop: Option<u8> = None;
+        while let Some(joined) = set.join_next().await {
+            if handle.is_cancelled() {
+                return;
+            }
+            match joined {
+                Ok((hop, Some((icmp_type, src, rtt)))) => {
+                    // A destination-unreachable from the target proves the
+                    // path ended; a time-exceeded message is a router.
+                    let reached = icmp_type == 3;
+                    if reached {
+                        reached_hop = Some(reached_hop.map_or(hop, |h| h.min(hop)));
+                    }
+                    accums[hop as usize - 1].record(HopProbe::reply(reached, IpAddr::V4(src), rtt));
+                }
+                Ok((hop, None)) => accums[hop as usize - 1].record(HopProbe::timeout()),
+                Err(_) => {
+                    handle.send(ProbeEvent::Error {
+                        message: "UDP MTR probe task panicked".into(),
+                        hint: None,
+                    });
+                    return;
+                }
+            }
+        }
+
+        if let Some(hop) = reached_hop {
+            target_hop = Some(target_hop.map_or(hop, |t| t.min(hop)));
+        }
+        let active = target_hop.unwrap_or(max_hops) as usize;
+
+        if settings.common.reverse_dns {
+            resolve_reverse(&accums[..active], &mut reverse).await;
+        }
+        for acc in &accums[..active] {
+            handle.send(ProbeEvent::Hop(acc.stats(&reverse)));
+        }
+
+        let elapsed = started.elapsed();
+        if elapsed < interval && handle.sleep(interval - elapsed).await {
+            return;
+        }
+    }
+}
+
+/// Blocking single UDP probe: send a UDP datagram and read the raw ICMP error.
+/// Returns (icmp_type, responder, RTT); `None` on timeout.
 fn udp_probe_v4(
     target: Ipv4Addr,
     port: u16,
@@ -600,31 +852,44 @@ fn udp_probe_v4(
     udp.set_ttl_v4(ttl).ok()?;
     let dst: std::net::SocketAddr = (target, port).into();
     udp.connect(&SockAddr::from(dst)).ok()?;
-    let local_port = udp.local_addr().ok()?.as_socket_ipv4().map(|s| s.port())?;
+    let local = udp.local_addr().ok()?.as_socket_ipv4()?;
+    let local_port = local.port();
 
-    let raw = Socket::new(Domain::IPV4, Type::RAW, Some(Protocol::ICMPV4)).ok()?;
-    raw.set_read_timeout(Some(timeout)).ok()?;
-
+    let capture = raw_icmp::Capture::open_capture(IpAddr::V4(target)).ok()?;
     let start = Instant::now();
+    let deadline = start + timeout;
     udp.send(payload).ok()?;
 
-    let mut buf = [std::mem::MaybeUninit::<u8>::uninit(); 2048];
     loop {
-        let n = raw.recv(&mut buf).ok()?;
-        let buf = unsafe { std::slice::from_raw_parts(buf.as_ptr() as *const u8, n) };
-        if n < 36 {
-            continue;
+        let now = Instant::now();
+        if now >= deadline {
+            return None;
         }
-        let icmp_type = buf[0];
-        let src = Ipv4Addr::new(buf[12], buf[13], buf[14], buf[15]);
-        // The quoted IP header follows the ICMP header, then the UDP header.
-        let q = 8;
-        let q_dst = Ipv4Addr::new(buf[q + 16], buf[q + 17], buf[q + 18], buf[q + 19]);
-        let q_src_port = u16::from_be_bytes([buf[q + 20], buf[q + 21]]);
-        if q_dst == target && q_src_port == local_port {
-            return Some((icmp_type, src, start.elapsed()));
+        let ready = raw_icmp::poll_read(capture.socket(), deadline - now).ok()?;
+        if !ready {
+            return None;
         }
-        // Not our probe: keep waiting.
+        while let Some(message) = capture.recv().ok()? {
+            let Some(quoted) = message.quoted else {
+                continue;
+            };
+            if quoted.protocol != 17
+                || quoted.dst != IpAddr::V4(target)
+                || quoted.src_port != local_port
+                || quoted.dst_port != port
+            {
+                continue;
+            }
+            let icmp_type = match message.kind {
+                raw_icmp::MessageKind::TimeExceeded => 11,
+                raw_icmp::MessageKind::Unreachable | raw_icmp::MessageKind::PacketTooBig => 3,
+                _ => continue,
+            };
+            let IpAddr::V4(source) = message.from else {
+                continue;
+            };
+            return Some((icmp_type, source, start.elapsed()));
+        }
     }
 }
 

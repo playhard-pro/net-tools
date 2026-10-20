@@ -27,6 +27,7 @@ pub enum ProbeMode {
     #[default]
     Icmp,
     Udp,
+    Tcp,
 }
 
 impl ProbeMode {
@@ -34,6 +35,7 @@ impl ProbeMode {
         match self {
             ProbeMode::Icmp => "ICMP",
             ProbeMode::Udp => "UDP",
+            ProbeMode::Tcp => "TCP",
         }
     }
 }
@@ -92,6 +94,77 @@ pub struct ProbeSample {
     pub from: String,
     /// Reply payload size in bytes.
     pub size: usize,
+}
+
+/// Outcome of one Path MTU probe at a given packet size.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PmtuOutcome {
+    /// The probe was answered, so the size passes the path.
+    Passed,
+    /// The network reported that the packet is too large.
+    TooLarge,
+    /// No answer arrived within the timeout.
+    Timeout,
+    /// The probe failed locally (socket, address family, ...).
+    Error,
+}
+
+impl PmtuOutcome {
+    pub fn label(&self) -> &'static str {
+        match self {
+            PmtuOutcome::Passed => "passed",
+            PmtuOutcome::TooLarge => "too large",
+            PmtuOutcome::Timeout => "timeout",
+            PmtuOutcome::Error => "error",
+        }
+    }
+}
+
+/// One step of a Path MTU binary search.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PmtuStep {
+    /// MTU value tested by this step.
+    pub mtu: u16,
+    /// ICMP payload size derived from `mtu`.
+    pub payload_bytes: usize,
+    pub outcome: PmtuOutcome,
+    /// Router or target that answered, when known.
+    pub responder: Option<String>,
+    pub rtt_ms: Option<f64>,
+    /// Additional detail such as the exact ICMP error.
+    pub detail: Option<String>,
+}
+
+/// Final result of one Path MTU discovery run.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PmtuResult {
+    /// Target as entered by the user.
+    pub target: String,
+    /// Resolved address that was probed.
+    pub ip: String,
+    /// Lower bound of the search range.
+    pub min_mtu: u16,
+    /// Upper bound of the search range.
+    pub max_mtu: u16,
+    /// Largest MTU confirmed to pass, when discovery succeeded.
+    pub path_mtu: Option<u16>,
+    /// Payload size that corresponds to `path_mtu`.
+    pub payload_bytes: Option<usize>,
+    /// IP + ICMP header bytes added to the payload.
+    pub overhead: usize,
+    /// Every size tried during the search, in order.
+    pub steps: Vec<PmtuStep>,
+    /// Total run time in milliseconds.
+    pub elapsed_ms: f64,
+    /// Why discovery stopped without a usable result.
+    pub error: Option<String>,
+}
+
+impl PmtuResult {
+    /// Whether discovery found a usable path MTU.
+    pub fn succeeded(&self) -> bool {
+        self.path_mtu.is_some() && self.error.is_none()
+    }
 }
 
 /// One responder observed at an MTR hop.
@@ -948,7 +1021,7 @@ pub struct LibreSpeedServer {
 }
 
 /// Unified event streamed from a probe task back to the UI.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ProbeEvent {
     /// Informational message (resolved address, etc.).
     Info(String),
@@ -961,6 +1034,10 @@ pub enum ProbeEvent {
     Latency(ProbeSample),
     /// A ping timeout.
     Timeout { seq: u64 },
+    /// One Path MTU search step.
+    PmtuStep(PmtuStep),
+    /// Final Path MTU result.
+    Pmtu(PmtuResult),
     /// Updated MTR hop statistics.
     Hop(HopStats),
     /// An HTTP result.

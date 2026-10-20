@@ -4,6 +4,7 @@
 pub mod clock;
 pub mod config;
 pub mod control;
+pub mod elevation;
 pub mod model;
 pub mod net;
 pub mod system_time;

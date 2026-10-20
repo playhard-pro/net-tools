@@ -13,10 +13,13 @@ pub mod mac_vendor;
 pub mod mtr;
 pub mod ntp;
 pub mod overview;
+pub mod pmtu;
 pub mod ports;
 pub mod portscan;
 pub mod privilege;
+pub mod raw_icmp;
 pub mod rdap;
+pub mod tcp;
 pub mod tls;
 pub mod udp;
 #[cfg(windows)]

@@ -53,6 +53,93 @@ async fn udp_ping_loopback_echo() {
 }
 
 #[tokio::test]
+async fn tcp_ping_open_and_closed_loopback() {
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let open_port = listener.local_addr().unwrap().port();
+    let srv = tokio::spawn(async move {
+        loop {
+            if listener.accept().await.is_err() {
+                break;
+            }
+        }
+    });
+
+    // Open port: the handshake succeeds.
+    let mut open = settings("127.0.0.1", 0);
+    open.mode = net_tools_core::model::ProbeMode::Tcp;
+    open.tcp_port = open_port;
+    let mut ctrl: TaskController<ProbeEvent> = TaskController::new();
+    ctrl.start(&tokio::runtime::Handle::current(), move |h| async move {
+        net_tools_core::net::tcp::run_ping_tcp(&h, &open).await
+    });
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    ctrl.stop();
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    let events = ctrl.drain();
+    assert!(
+        events
+            .iter()
+            .any(|e| matches!(e, ProbeEvent::Latency(sample) if sample.rtt_ms >= 0.0)),
+        "expected a TCP latency on an open port, got {events:?}"
+    );
+    srv.abort();
+
+    // Closed port: the refusal still proves the host answered.
+    let probe = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let closed_port = probe.local_addr().unwrap().port();
+    drop(probe);
+    let mut closed = settings("127.0.0.1", 0);
+    closed.mode = net_tools_core::model::ProbeMode::Tcp;
+    closed.tcp_port = closed_port;
+    let mut ctrl: TaskController<ProbeEvent> = TaskController::new();
+    ctrl.start(&tokio::runtime::Handle::current(), move |h| async move {
+        net_tools_core::net::tcp::run_ping_tcp(&h, &closed).await
+    });
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    ctrl.stop();
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    let events = ctrl.drain();
+    assert!(
+        events.iter().any(|e| matches!(e, ProbeEvent::Latency(_))),
+        "expected a refused TCP connection to count as reachable, got {events:?}"
+    );
+}
+
+#[tokio::test]
+async fn pmtu_loopback_binary_search() {
+    let mut s = PingSettings::default();
+    s.common.target = "127.0.0.1".into();
+    s.common.ip_version = IpVersion::V4;
+    s.common.timeout_ms = 300;
+    s.pmtu.min_mtu = 576;
+    s.pmtu.max_mtu = 1200;
+    s.pmtu.attempts = 1;
+
+    let mut ctrl: TaskController<ProbeEvent> = TaskController::new();
+    ctrl.start(&tokio::runtime::Handle::current(), move |h| async move {
+        net_tools_core::net::pmtu::run_pmtu(&h, &s).await
+    });
+    let events = wait_and_drain(&mut ctrl).await;
+    if events.iter().any(|e| matches!(e, ProbeEvent::Error { .. })) {
+        eprintln!("skipping pmtu test (environment lacks capability): {events:?}");
+        return;
+    }
+    let result = events
+        .iter()
+        .find_map(|e| match e {
+            ProbeEvent::Pmtu(result) => Some(result),
+            _ => None,
+        })
+        .unwrap_or_else(|| panic!("expected a Path MTU result, got {events:?}"));
+    assert!(!result.steps.is_empty());
+    if let Some(error) = &result.error {
+        eprintln!("skipping pmtu assertion (environment reported {error})");
+        return;
+    }
+    assert_eq!(result.path_mtu, Some(1200));
+}
+
+#[tokio::test]
 async fn icmp_ping_loopback() {
     let s = settings("127.0.0.1", 0);
     let mut ctrl: TaskController<ProbeEvent> = TaskController::new();
@@ -117,6 +204,58 @@ async fn icmp_mtr_loopback() {
     assert!(
         hops.iter().any(|h| h.reached),
         "expected to reach loopback target, got {hops:?}"
+    );
+}
+
+#[tokio::test]
+async fn tcp_mtr_loopback() {
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let srv = tokio::spawn(async move {
+        loop {
+            if listener.accept().await.is_err() {
+                break;
+            }
+        }
+    });
+
+    let mut s = MtrSettings::default();
+    s.common.target = "127.0.0.1".into();
+    s.common.ip_version = IpVersion::V4;
+    s.common.timeout_ms = 300;
+    s.common.interval_ms = 50;
+    s.mode = net_tools_core::model::ProbeMode::Tcp;
+    s.tcp_port = port;
+    s.max_hops = 2;
+
+    let mut ctrl: TaskController<ProbeEvent> = TaskController::new();
+    ctrl.start(&tokio::runtime::Handle::current(), move |h| async move {
+        mtr::run_mtr(&h, &s).await
+    });
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    ctrl.stop();
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    let events = ctrl.drain();
+    srv.abort();
+
+    if events.iter().any(|e| matches!(e, ProbeEvent::Error { .. })) {
+        eprintln!("skipping tcp mtr test (environment lacks raw sockets): {events:?}");
+        return;
+    }
+    let hops: Vec<_> = events
+        .iter()
+        .filter_map(|e| match e {
+            ProbeEvent::Hop(h) => Some(h),
+            _ => None,
+        })
+        .collect();
+    assert!(
+        !hops.is_empty(),
+        "expected at least one hop, got {events:?}"
+    );
+    assert!(
+        hops.iter().any(|h| h.reached),
+        "expected the TCP handshake to reach loopback, got {hops:?}"
     );
 }
 

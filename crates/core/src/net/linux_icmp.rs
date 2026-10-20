@@ -47,6 +47,10 @@ pub(super) struct Reply {
     pub ttl: Option<u8>,
     pub rtt: Duration,
     pub reached: bool,
+    /// ICMP error type from the socket error queue, when this reply is an error.
+    pub error_type: Option<u8>,
+    /// ICMP error code paired with `error_type`.
+    pub error_code: Option<u8>,
 }
 
 /// What a single read from the socket produced.
@@ -166,6 +170,112 @@ pub(super) fn probe(
     }
 }
 
+/// Open a datagram ICMP socket configured for Path MTU probing.
+fn open_mtu(ip: IpAddr) -> io::Result<Socket> {
+    let socket = open(ip, None, true)?;
+    if ip.is_ipv6() {
+        set_int_option(
+            &socket,
+            libc::IPPROTO_IPV6,
+            libc::IPV6_MTU_DISCOVER,
+            libc::IP_PMTUDISC_DO,
+        )?;
+    } else {
+        set_int_option(
+            &socket,
+            libc::IPPROTO_IP,
+            libc::IP_MTU_DISCOVER,
+            libc::IP_PMTUDISC_DO,
+        )?;
+    }
+    Ok(socket)
+}
+
+/// Run one Path MTU probe through the unprivileged Linux ping socket.
+///
+/// Returns `Err` when the socket cannot be set up, so the caller can fall back
+/// to a raw socket. A probe that ran but timed out is reported as
+/// `MtuProbe::Timeout`.
+pub(super) fn probe_mtu(
+    target: IpAddr,
+    payload_bytes: usize,
+    timeout: Duration,
+    _ident: u16,
+    seq: u16,
+) -> io::Result<crate::net::pmtu::MtuProbe> {
+    use crate::net::pmtu::MtuProbe;
+
+    let socket = open_mtu(target)?;
+    let payload = vec![0x7au8; payload_bytes];
+    let packet = echo_request(target, seq, &payload);
+    if let Err(e) = socket.send_to(&packet, &SockAddr::from(SocketAddr::new(target, 0))) {
+        if e.raw_os_error() == Some(libc::EMSGSIZE) {
+            return Ok(MtuProbe::TooLarge {
+                responder: None,
+                rtt: None,
+                detail: Some("local send reported EMSGSIZE".to_string()),
+            });
+        }
+        return Err(e);
+    }
+
+    let start = Instant::now();
+    let deadline = start + timeout;
+    let fd = socket.as_raw_fd();
+    loop {
+        let now = Instant::now();
+        if now >= deadline {
+            return Ok(MtuProbe::Timeout);
+        }
+        let remaining_ms = (deadline - now).as_millis().min(i32::MAX as u128) as i32;
+        let mut poll_fd = libc::pollfd {
+            fd,
+            events: libc::POLLIN | libc::POLLERR,
+            revents: 0,
+        };
+        let ready = unsafe { libc::poll(&mut poll_fd, 1, remaining_ms) };
+        if ready < 0 {
+            let error = io::Error::last_os_error();
+            if error.kind() == io::ErrorKind::Interrupted {
+                continue;
+            }
+            return Err(error);
+        }
+        if ready == 0 {
+            return Ok(MtuProbe::Timeout);
+        }
+
+        if let Read::Reply(reply) = read_error(&socket, seq, start)? {
+            if let (Some(icmp_type), Some(code)) = (reply.error_type, reply.error_code) {
+                // IPv4 type 3 code 4 is fragmentation needed; ICMPv6 type 2 is
+                // packet too big. Other errors still mean this size did not
+                // pass, so they are reported with their exact type/code.
+                let too_big = (target.is_ipv6() && icmp_type == 2)
+                    || (!target.is_ipv6() && icmp_type == 3 && code == 4);
+                return Ok(MtuProbe::TooLarge {
+                    responder: Some(reply.from),
+                    rtt: Some(reply.rtt),
+                    detail: Some(if too_big {
+                        format!("ICMP packet too big (type {icmp_type} code {code})")
+                    } else {
+                        format!("ICMP error (type {icmp_type} code {code})")
+                    }),
+                });
+            }
+        }
+        if let Read::Reply(reply) = read_normal(&socket, target, seq, start)? {
+            return Ok(MtuProbe::Passed {
+                responder: Some(reply.from),
+                rtt: reply.rtt,
+            });
+        }
+
+        if poll_fd.revents & libc::POLLIN == 0 {
+            std::thread::sleep(Duration::from_millis(1));
+        }
+    }
+}
+
 /// Read one message from the normal receive path (echo reply).
 fn read_normal(socket: &Socket, target: IpAddr, seq: u16, start: Instant) -> io::Result<Read> {
     let mut buf = [0u8; 1500];
@@ -203,6 +313,8 @@ fn read_normal(socket: &Socket, target: IpAddr, seq: u16, start: Instant) -> io:
         ttl: read_ttl(&msg),
         rtt: start.elapsed(),
         reached: true,
+        error_type: None,
+        error_code: None,
     }))
 }
 
@@ -248,6 +360,8 @@ fn read_error(socket: &Socket, seq: u16, start: Instant) -> io::Result<Read> {
                     ttl: None,
                     rtt: start.elapsed(),
                     reached,
+                    error_type: Some(extended.ee_type),
+                    error_code: Some(extended.ee_code),
                 })),
                 None => Ok(Read::Stale),
             };

@@ -41,12 +41,46 @@ impl Default for CommonProbe {
     }
 }
 
+/// Default destination port for TCP probing. HTTPS is commonly reachable even
+/// on hosts that drop ICMP.
+pub fn default_tcp_port() -> u16 {
+    443
+}
+
+/// Settings for the Path MTU discovery tool inside the Ping tab.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PmtuSettings {
+    /// Smallest MTU included in the binary search.
+    pub min_mtu: u16,
+    /// Largest MTU included in the binary search.
+    pub max_mtu: u16,
+    /// Attempts per packet size, so a single lost probe does not decide the
+    /// search.
+    pub attempts: u8,
+}
+
+impl Default for PmtuSettings {
+    fn default() -> Self {
+        Self {
+            min_mtu: 576,
+            max_mtu: 1500,
+            attempts: 2,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PingSettings {
     pub common: CommonProbe,
     pub mode: ProbeMode,
     /// Destination UDP port used in UDP mode.
     pub udp_port: u16,
+    /// Destination TCP port used in TCP mode.
+    #[serde(default = "default_tcp_port")]
+    pub tcp_port: u16,
+    /// Path MTU discovery settings; independent from the continuous ping mode.
+    #[serde(default)]
+    pub pmtu: PmtuSettings,
 }
 
 impl Default for PingSettings {
@@ -55,6 +89,8 @@ impl Default for PingSettings {
             common: CommonProbe::default(),
             mode: ProbeMode::Icmp,
             udp_port: 33434,
+            tcp_port: default_tcp_port(),
+            pmtu: PmtuSettings::default(),
         }
     }
 }
@@ -66,6 +102,9 @@ pub struct MtrSettings {
     /// Maximum number of hops to probe.
     pub max_hops: u8,
     pub udp_port: u16,
+    /// Destination TCP port used in TCP mode.
+    #[serde(default = "default_tcp_port")]
+    pub tcp_port: u16,
 }
 
 impl Default for MtrSettings {
@@ -75,6 +114,7 @@ impl Default for MtrSettings {
             mode: ProbeMode::Icmp,
             max_hops: 30,
             udp_port: 33434,
+            tcp_port: default_tcp_port(),
         }
     }
 }
@@ -675,7 +715,10 @@ mod tests {
         assert_eq!(back.theme, cfg.theme);
         assert_eq!(back.tab_order, cfg.tab_order);
         assert_eq!(back.ping.udp_port, cfg.ping.udp_port);
+        assert_eq!(back.ping.tcp_port, cfg.ping.tcp_port);
+        assert_eq!(back.ping.pmtu.max_mtu, cfg.ping.pmtu.max_mtu);
         assert_eq!(back.mtr.max_hops, cfg.mtr.max_hops);
+        assert_eq!(back.mtr.tcp_port, cfg.mtr.tcp_port);
         assert_eq!(back.http.method, cfg.http.method);
         assert_eq!(back.port_scan.concurrency, cfg.port_scan.concurrency);
         assert_eq!(back.ip_insight.target, cfg.ip_insight.target);
@@ -744,6 +787,32 @@ mod tests {
         let text = toml::to_string_pretty(&cfg).unwrap();
         let back: AppConfig = toml::from_str(&text).unwrap();
         assert_eq!(back.tab_order, cfg.tab_order);
+    }
+
+    #[test]
+    fn old_probe_config_without_tcp_or_pmtu_still_loads() {
+        let mut value = toml::Value::try_from(AppConfig::default()).unwrap();
+        let table = value.as_table_mut().expect("config is a table");
+        table
+            .get_mut("ping")
+            .and_then(toml::Value::as_table_mut)
+            .expect("ping table")
+            .remove("tcp_port");
+        table
+            .get_mut("ping")
+            .and_then(toml::Value::as_table_mut)
+            .expect("ping table")
+            .remove("pmtu");
+        table
+            .get_mut("mtr")
+            .and_then(toml::Value::as_table_mut)
+            .expect("mtr table")
+            .remove("tcp_port");
+        let text = toml::to_string(&value).unwrap();
+        let back: AppConfig = toml::from_str(&text).unwrap();
+        assert_eq!(back.ping.tcp_port, default_tcp_port());
+        assert_eq!(back.mtr.tcp_port, default_tcp_port());
+        assert_eq!(back.ping.pmtu.max_mtu, PmtuSettings::default().max_mtu);
     }
 
     #[test]
@@ -820,8 +889,12 @@ mod tests {
         let p = PingSettings::default();
         assert!(p.common.timeout_ms > 0);
         assert!(p.common.interval_ms > 0);
+        assert!(p.tcp_port > 0);
+        assert!(p.pmtu.min_mtu <= p.pmtu.max_mtu);
+        assert!(p.pmtu.attempts > 0);
         let m = MtrSettings::default();
         assert!(m.max_hops > 0);
+        assert!(m.tcp_port > 0);
         let ps = PortScanSettings::default();
         assert!(ps.concurrency > 0);
         let ii = IpInsightSettings::default();

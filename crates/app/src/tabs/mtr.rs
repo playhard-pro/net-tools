@@ -7,19 +7,23 @@ use net_tools_core::model::{HopStats, ProbeEvent, ProbeMode};
 use net_tools_core::net::privilege::PrivilegeStatus;
 use rust_i18n::t;
 
-use crate::ui::common::{error_banner, info_line, privilege_note, state_badge};
+use crate::ui::common::{error_banner, info_line, state_badge};
 use crate::ui::history_input;
 use crate::ui::result_table::table;
 use crate::ui::settings;
 
 /// History bucket for the target input.
 const TARGET_HISTORY_KEY: &str = "mtr.target";
+/// History bucket for the TCP port input.
+const TCP_PORT_HISTORY_KEY: &str = "mtr.tcp_port";
 
 pub struct MtrTab {
     pub ctrl: TaskController<ProbeEvent>,
     pub hops: Vec<HopStats>,
     pub info: Vec<String>,
     pub error: Option<(String, Option<String>)>,
+    /// Settings waiting for the user to confirm the explanation before UAC.
+    pending_elevated_start: Option<MtrSettings>,
 }
 
 impl Default for MtrTab {
@@ -35,6 +39,7 @@ impl MtrTab {
             hops: Vec::new(),
             info: Vec::new(),
             error: None,
+            pending_elevated_start: None,
         }
     }
 
@@ -95,7 +100,7 @@ impl MtrTab {
         s: &mut MtrSettings,
         history: &mut InputHistory,
         rt: &tokio::runtime::Handle,
-        privilege: &PrivilegeStatus,
+        _privilege: &PrivilegeStatus,
         settings_expanded: bool,
     ) -> bool {
         self.drain();
@@ -124,20 +129,18 @@ impl MtrTab {
                         ui.add(egui::DragValue::new(&mut s.udp_port).range(1..=65_535));
                         ui.end_row();
                     }
+                    if s.mode == ProbeMode::Tcp {
+                        ui.label(t!("common.port"));
+                        settings::tcp_port_input(
+                            ui,
+                            TCP_PORT_HISTORY_KEY,
+                            &mut s.tcp_port,
+                            history,
+                        );
+                        ui.end_row();
+                    }
                 });
             let submit = settings::common_probe(ui, &mut s.common, history, TARGET_HISTORY_KEY);
-
-            // UDP MTR needs a raw socket, so warn only when that mode is
-            // selected and the capability is missing (Unix only: Windows has
-            // no backend).
-            if s.mode == ProbeMode::Udp && cfg!(unix) {
-                privilege_note(
-                    ui,
-                    privilege.raw,
-                    privilege,
-                    &t!("privilege.needs_raw_udp_mtr"),
-                );
-            }
 
             ui.add_space(6.0);
             ui.horizontal(|ui| {
@@ -155,9 +158,9 @@ impl MtrTab {
         });
 
         if submit == Some(true) {
-            history_input::record_fields(history, &[(TARGET_HISTORY_KEY, &s.common.target)]);
-            self.restart(s, rt);
+            self.request_start(s, history, rt);
         }
+        self.elevation_dialog(ui.ctx(), rt);
 
         crate::ui::layout::results_panel(ui, |ui| {
             self.toolbar(ui);
@@ -229,6 +232,71 @@ impl MtrTab {
         }
     }
 
+    /// Whether starting this mode should explain the upcoming UAC prompt first.
+    fn needs_elevation_confirmation(s: &MtrSettings) -> bool {
+        cfg!(windows)
+            && !net_tools_core::elevation::in_helper_process()
+            && !net_tools_core::elevation::is_elevated()
+            && matches!(s.mode, ProbeMode::Udp | ProbeMode::Tcp)
+    }
+
+    /// Start immediately, or show the explanation dialog before the core probe
+    /// requests UAC.
+    fn request_start(
+        &mut self,
+        s: &MtrSettings,
+        history: &mut InputHistory,
+        rt: &tokio::runtime::Handle,
+    ) {
+        self.record_inputs(history, s);
+        if Self::needs_elevation_confirmation(s) {
+            self.pending_elevated_start = Some(s.clone());
+        } else {
+            self.start(s, rt);
+        }
+    }
+
+    /// Explain why administrator rights are needed before the core probe opens
+    /// the UAC prompt.
+    fn elevation_dialog(&mut self, ctx: &egui::Context, rt: &tokio::runtime::Handle) {
+        let Some(settings) = self.pending_elevated_start.clone() else {
+            return;
+        };
+        let mut proceed = false;
+        let mut cancel = false;
+        let modal = egui::Modal::new(egui::Id::new("mtr_elevation_confirm")).show(ctx, |ui| {
+            ui.set_width(460.0);
+            ui.heading(t!("common.elevation_title"));
+            ui.add_space(4.0);
+            ui.label(t!("mtr.elevation_reason"));
+            ui.add_space(8.0);
+            ui.horizontal(|ui| {
+                if ui.button(t!("common.continue")).clicked() {
+                    proceed = true;
+                }
+                if ui.button(t!("common.cancel")).clicked() {
+                    cancel = true;
+                }
+            });
+        });
+        if proceed {
+            self.pending_elevated_start = None;
+            self.start(&settings, rt);
+        } else if cancel || modal.should_close() {
+            self.pending_elevated_start = None;
+        }
+    }
+
+    /// Remember the target and, in TCP mode, the destination port.
+    fn record_inputs(&self, history: &mut InputHistory, s: &MtrSettings) {
+        let port = s.tcp_port.to_string();
+        let mut fields = vec![(TARGET_HISTORY_KEY, s.common.target.as_str())];
+        if s.mode == ProbeMode::Tcp {
+            fields.push((TCP_PORT_HISTORY_KEY, port.as_str()));
+        }
+        history_input::record_fields(history, &fields);
+    }
+
     fn control_row(
         &mut self,
         ui: &mut egui::Ui,
@@ -240,11 +308,7 @@ impl MtrTab {
             net_tools_core::control::TaskState::Idle
             | net_tools_core::control::TaskState::Finished => {
                 if ui.button(t!("common.start")).clicked() {
-                    history_input::record_fields(
-                        history,
-                        &[(TARGET_HISTORY_KEY, &s.common.target)],
-                    );
-                    self.start(s, rt);
+                    self.request_start(s, history, rt);
                 }
             }
             net_tools_core::control::TaskState::Running => {

@@ -75,15 +75,63 @@ pub fn ip_version_selector(ui: &mut egui::Ui, v: &mut IpVersion) {
         });
 }
 
-/// Probe mode (ICMP / UDP) dropdown.
+/// Probe mode (ICMP / UDP / TCP) dropdown.
 pub fn probe_mode_selector(ui: &mut egui::Ui, m: &mut ProbeMode) {
     egui::ComboBox::from_id_salt("probe_mode")
         .selected_text(m.label())
         .show_ui(ui, |ui| {
-            for x in [ProbeMode::Icmp, ProbeMode::Udp] {
+            for x in [ProbeMode::Icmp, ProbeMode::Udp, ProbeMode::Tcp] {
                 ui.selectable_value(m, x, x.label());
             }
         });
+}
+
+/// Common destination ports offered as quick selections for TCP probing.
+const TCP_PORT_PRESETS: &[(&str, u16)] = &[
+    ("HTTPS", 443),
+    ("HTTP", 80),
+    ("SSH", 22),
+    ("SMTP", 25),
+    ("RDP", 3389),
+];
+
+/// Editable TCP destination port with common presets and the ports recorded by
+/// previous runs.
+///
+/// The stored configuration keeps a numeric port; the history list is read
+/// from `InputHistory` and validated when an entry is picked.
+pub fn tcp_port_input(ui: &mut egui::Ui, key: &str, port: &mut u16, history: &InputHistory) {
+    ui.add(egui::DragValue::new(port).range(1..=65_535));
+
+    // Presets and custom history share one drop-down so the port row does not
+    // consume the horizontal space of two separate controls.
+    let entries: Vec<u16> = history
+        .entries(key)
+        .iter()
+        .filter_map(|entry| entry.parse().ok())
+        .filter(|value| (1..=u16::MAX).contains(value))
+        .filter(|value| !TCP_PORT_PRESETS.iter().any(|(_, preset)| preset == value))
+        .collect();
+    ui.push_id(("tcp_port_menu", key), |ui| {
+        egui::ComboBox::from_id_salt("tcp_port_menu")
+            .selected_text(t!("common.history"))
+            .width(82.0)
+            .show_ui(ui, |ui| {
+                ui.weak(t!("common.presets"));
+                for (label, value) in TCP_PORT_PRESETS {
+                    ui.selectable_value(port, *value, format!("{label} ({value})"));
+                }
+                ui.separator();
+                ui.weak(t!("common.history"));
+                if entries.is_empty() {
+                    ui.weak(t!("common.history_empty"));
+                } else {
+                    for value in entries {
+                        ui.selectable_value(port, value, value.to_string());
+                    }
+                }
+            });
+    });
 }
 
 /// Scan mode dropdown.

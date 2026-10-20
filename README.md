@@ -19,8 +19,8 @@ it.
 | Tab | Highlights |
 |-----|------------|
 | Overview | Interfaces, addresses, gateways, DNS and routes; live RX/TX charts; public IPv4/IPv6 egress with location, ASN and ISP. |
-| Ping | Continuous ICMP/UDP ping with live chart and RTT histogram, loss, min/avg/max, standard deviation and P50/P95/P99 percentiles. |
-| MTR | Parallel hop-by-hop probing with continuous refresh and multiple responders per hop. |
+| Ping | Continuous ICMP/UDP/TCP ping with live chart and RTT histogram, loss, min/avg/max, standard deviation and P50/P95/P99 percentiles; independent Path MTU discovery over IPv4/IPv6. |
+| MTR | Parallel hop-by-hop probing over ICMP, UDP or TCP with continuous refresh and multiple responders per hop. |
 | HTTP Ping | Multi-method requests with DNS, connect, TLS, TTFB and total timings, plus total-time percentiles and histogram. |
 | TLS | Batch certificate and chain inspection, SAN, key details, expiry warnings, TLS/ALPN support, revocation (OCSP/CRL), HSTS, CT and CAA checks. |
 | Port Scan | TCP connect, SYN half-open and UDP scans, with banner grabbing. |
@@ -34,6 +34,12 @@ it.
 Continuous probes support **Start / Pause / Stop**; one-shot tools and servers
 use **Start / Stop**. Pressing **Enter** in a target field restarts the task with
 the new target.
+
+TCP Ping uses a normal TCP connect (SYN) and therefore works on hosts that drop
+ICMP, without elevation; it does not report a reply TTL. TCP Traceroute captures
+the routers' ICMP errors and needs a raw socket. Path MTU sends ICMP echo probes
+with the Don't Fragment bit (IPv6 disables local fragmentation) and binary-searches
+the largest passing MTU; it is independent from the continuous ping.
 
 TLS targets accept one entry per line or comma-separated values in the form
 `host`, `host:port`, `[IPv6]:port` or an HTTPS URL. The TLS tab sends a TLS
@@ -165,9 +171,9 @@ Raw-socket features show a clear message when permissions are missing:
 
 | Platform | Available unprivileged | Requires privileges |
 |----------|------------------------|---------------------|
-| Linux | ICMP ping (ping socket), UDP ping, TCP connect scan | ICMP MTR, SYN scan, UDP MTR |
-| macOS | UDP ping, TCP connect scan | ICMP, MTR, SYN |
-| Windows | ICMP ping (system API) | SYN scan, UDP MTR |
+| Linux | ICMP ping (ping socket), UDP ping, TCP ping, Path MTU (ping socket), TCP connect scan | ICMP MTR, TCP MTR, SYN scan, UDP MTR |
+| macOS | UDP ping, TCP ping, TCP connect scan | ICMP, MTR, TCP MTR, Path MTU, SYN |
+| Windows | ICMP ping (system API), UDP ping, TCP ping | TCP MTR, Path MTU, SYN scan, UDP MTR |
 
 ### Granting privileges
 
@@ -180,7 +186,10 @@ Raw-socket features show a clear message when permissions are missing:
   `cap_sys_time` is only needed by NTP **Set time**; network probes need
   `cap_net_raw`. Alternatively run `sudo ./net-tools`.
 - **macOS**: `sudo ./net-tools`.
-- **Windows**: right-click and choose **Run as administrator**.
+- **Windows**: right-click and choose **Run as administrator**. When a TCP MTR,
+  UDP MTR or Path MTU run needs a raw socket, the app offers to restart the probe
+  through the UAC prompt; cancelling the prompt is reported without stopping the
+  UI.
 
 The status bar tracks probing and raw-socket capabilities separately and only
 shows permission hints for real permission errors.

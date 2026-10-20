@@ -47,6 +47,11 @@ fn main() -> eframe::Result {
         std::process::exit(code);
     }
 
+    // Privileged TCP MTR / Path MTU runs in an elevated copy of this process.
+    if let Some(code) = net_tools_core::elevation::handle_helper_request() {
+        std::process::exit(code);
+    }
+
     prefer_x11_on_wslg();
 
     // Logging.
