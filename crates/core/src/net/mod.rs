@@ -1,5 +1,18 @@
 //! Network probing modules.
 
+use std::sync::Once;
+
+/// Install the rustls ring provider once for reqwest and manual TLS clients.
+///
+/// reqwest is built with `rustls-no-provider`, so it needs an explicitly
+/// installed provider before the first client is created.
+pub fn ensure_crypto_provider() {
+    static PROVIDER: Once = Once::new();
+    PROVIDER.call_once(|| {
+        let _ = rustls::crypto::ring::default_provider().install_default();
+    });
+}
+
 pub mod dns;
 pub mod dns_tool;
 pub mod http;

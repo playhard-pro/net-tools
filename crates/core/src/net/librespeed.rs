@@ -48,6 +48,7 @@ pub async fn run_server_list(
     timeout_ms: u64,
     ip_version: crate::model::IpVersion,
 ) {
+    crate::net::ensure_crypto_provider();
     match fetch_servers(timeout_ms, ip_version).await {
         Ok(servers) => handle.send(ProbeEvent::LibreSpeedServers(servers)),
         Err(message) => handle.send(ProbeEvent::Error {
@@ -62,6 +63,7 @@ pub async fn fetch_servers(
     timeout_ms: u64,
     ip_version: crate::model::IpVersion,
 ) -> Result<Vec<LibreSpeedServer>, String> {
+    crate::net::ensure_crypto_provider();
     let client = build_client(&[SERVER_LIST_URL], timeout_ms, ip_version, None).await?;
     let response = client
         .get(SERVER_LIST_URL)
@@ -89,6 +91,7 @@ pub async fn fetch_servers(
 
 /// Run one complete LibreSpeed test.
 pub async fn run_test(handle: &ProbeHandle<ProbeEvent>, settings: &LibreSpeedSettings) {
+    crate::net::ensure_crypto_provider();
     if let Err(message) = run_test_inner(handle, settings).await {
         handle.send(ProbeEvent::Error {
             message,

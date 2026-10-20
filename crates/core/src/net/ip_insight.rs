@@ -56,6 +56,7 @@ pub const IP_API_PROVIDERS: &[IpApiProvider] = &[
 /// Query all providers concurrently and stream one event per provider back to
 /// the UI, followed by a final `Finished` event.
 pub async fn run_ip_insight(handle: &ProbeHandle<ProbeEvent>, settings: &IpInsightSettings) {
+    crate::net::ensure_crypto_provider();
     let ip = settings.target.trim().to_string();
     if ip.is_empty() {
         handle.send(ProbeEvent::Error {

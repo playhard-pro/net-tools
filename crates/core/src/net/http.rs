@@ -15,6 +15,7 @@ use crate::config::HttpSettings;
 use crate::control::ProbeHandle;
 use crate::model::{HttpResult, ProbeEvent};
 use crate::net::dns;
+use crate::net::ensure_crypto_provider;
 
 const MAX_BODY: usize = 1024 * 1024; // 1 MiB
 const MAX_REDIRECTS: usize = 5;
@@ -297,6 +298,7 @@ fn parse_status_and_location(buf: &[u8]) -> (Option<u16>, Option<String>) {
 }
 
 fn tls_config(verify: bool) -> rustls::ClientConfig {
+    ensure_crypto_provider();
     if verify {
         let mut roots = rustls::RootCertStore::empty();
         roots.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
@@ -345,8 +347,18 @@ impl ServerCertVerifier for NoVerifier {
     }
 
     fn supported_verify_schemes(&self) -> Vec<rustls::SignatureScheme> {
-        rustls::crypto::aws_lc_rs::default_provider()
-            .signature_verification_algorithms
-            .supported_schemes()
+        // Use whichever provider has been installed (ring in this build), so
+        // the verifier does not hard-code a specific crypto backend.
+        rustls::crypto::CryptoProvider::get_default()
+            .map(|provider| {
+                provider
+                    .signature_verification_algorithms
+                    .supported_schemes()
+            })
+            .unwrap_or_else(|| {
+                rustls::crypto::ring::default_provider()
+                    .signature_verification_algorithms
+                    .supported_schemes()
+            })
     }
 }

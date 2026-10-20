@@ -41,6 +41,7 @@ pub fn local_ip_addresses() -> Vec<String> {
 
 /// Fetch the public server list and send it to the UI.
 pub async fn run_server_list(handle: &ProbeHandle<ProbeEvent>, timeout_ms: u64) {
+    crate::net::ensure_crypto_provider();
     match fetch_servers(timeout_ms).await {
         Ok(servers) => handle.send(ProbeEvent::Iperf3Servers(servers)),
         Err(message) => handle.send(ProbeEvent::Error {
@@ -52,6 +53,7 @@ pub async fn run_server_list(handle: &ProbeHandle<ProbeEvent>, timeout_ms: u64) 
 
 /// Fetch and parse the public iperf3 server directory.
 pub async fn fetch_servers(timeout_ms: u64) -> Result<Vec<Iperf3Server>, String> {
+    crate::net::ensure_crypto_provider();
     let client = reqwest::Client::builder()
         .timeout(Duration::from_millis(timeout_ms.max(1_000)))
         .user_agent(format!("net-tools/{}", env!("CARGO_PKG_VERSION")))

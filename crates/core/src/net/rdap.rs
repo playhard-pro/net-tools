@@ -96,6 +96,7 @@ pub fn lookup_candidates(target: &str, kind: LookupKind) -> Vec<String> {
 /// The request is cancellation aware, so stopping the task aborts the in-flight
 /// HTTP request.
 pub async fn run_lookup(handle: &ProbeHandle<ProbeEvent>, settings: &LookupSettings) {
+    crate::net::ensure_crypto_provider();
     let original = settings.target.trim().to_string();
     let (kind, _) = match lookup_url(&original) {
         Ok(pair) => pair,

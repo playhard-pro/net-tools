@@ -259,6 +259,7 @@ fn client_config(
     versions: Option<&[&'static rustls::SupportedProtocolVersion]>,
     alpn: &[&[u8]],
 ) -> (Arc<rustls::ClientConfig>, Arc<Mutex<VerificationRecord>>) {
+    crate::net::ensure_crypto_provider();
     let verifier = RecordingVerifier::new();
     let record = verifier.record();
     let builder = match versions {
@@ -1275,6 +1276,7 @@ async fn check_target(
 
 /// Run a batch of TLS checks with bounded concurrency.
 pub async fn run_check(handle: &ProbeHandle<ProbeEvent>, settings: &TlsSettings) {
+    crate::net::ensure_crypto_provider();
     use crate::model::TlsProgress;
 
     let targets = parse_targets(&settings.targets, settings.port);

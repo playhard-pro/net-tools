@@ -148,6 +148,7 @@ pub fn collect() -> Result<NetworkSnapshot, String> {
 /// network still shows the reachable side. Both requests share one client and
 /// therefore the caller-provided timeout.
 pub async fn public_egress(timeout: Duration) -> PublicEgress {
+    crate::net::ensure_crypto_provider();
     let client = match reqwest::Client::builder()
         .timeout(timeout)
         .user_agent("net-tools")

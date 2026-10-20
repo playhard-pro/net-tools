@@ -197,6 +197,7 @@ struct OnlineResponse {
 /// Only the first six hexadecimal digits are sent. A `404` and a valid response
 /// with `found = false` both mean "no vendor", which is not an error.
 pub async fn query_online(oui: &str, timeout_ms: u64) -> Result<Option<MacVendorResult>, String> {
+    crate::net::ensure_crypto_provider();
     let oui = oui.trim().to_ascii_uppercase();
     if oui.len() != 6 || !oui.chars().all(|c| c.is_ascii_hexdigit()) {
         return Err("online lookup requires a six-digit OUI prefix".to_string());
@@ -270,6 +271,7 @@ fn format_prefix_display(hex: &str) -> String {
 
 /// Online lookup task started by the UI after a local miss.
 pub async fn run_online_lookup(handle: &ProbeHandle<ProbeEvent>, input: &str, timeout_ms: u64) {
+    crate::net::ensure_crypto_provider();
     let mac = match normalize_mac(input) {
         Ok(mac) => mac,
         Err(message) => {
