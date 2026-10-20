@@ -36,16 +36,24 @@ use **Start / Stop**. Pressing **Enter** in a target field restarts the task wit
 the new target.
 
 TCP Ping uses a normal TCP connect (SYN) and therefore works on hosts that drop
-ICMP, without elevation; it does not report a reply TTL. TCP Traceroute captures
-the routers' ICMP errors and needs a raw socket. Path MTU sends ICMP echo probes
-with the Don't Fragment bit (IPv6 disables local fragmentation) and binary-searches
-the largest passing MTU; it is independent from the continuous ping.
+ICMP, without elevation; it does not report a reply TTL. The TCP destination port
+accepts common presets and remembers recent custom values. TCP Traceroute captures
+the routers' ICMP errors and needs a raw socket. On Windows, UDP MTR, TCP MTR and
+Path MTU request administrator rights through a confirmation dialog followed by
+the system UAC prompt.
+
+Path MTU sends ICMP echo probes with the Don't Fragment bit (IPv6 disables local
+fragmentation) and binary-searches the largest passing MTU. It is independent from
+the continuous ping, and the IPv6 result is an estimate that does not account for
+extension headers.
 
 TLS targets accept one entry per line or comma-separated values in the form
 `host`, `host:port`, `[IPv6]:port` or an HTTPS URL. The TLS tab sends a TLS
 handshake and reads certificate details; the optional revocation, HSTS, CT and
 CAA checks add OCSP/CRL downloads, a single `HEAD /` request and DNS lookups.
-Concurrency is capped at ten targets.
+Concurrency is capped at ten targets. TLS uses the rustls `ring` provider, so
+post-quantum hybrid key-exchange groups are not offered; TLS 1.2/1.3 and the
+standard cipher suites are unaffected.
 
 The Utils port reference is generated from the IANA service-name and port-number
 registry, which IANA and IETF dedicate to the public domain under CC0 1.0. The
@@ -93,7 +101,7 @@ toolchain is required.
 | Windows | arm64 | `net-tools_<version>_windows_arm64.zip` |
 | macOS | Apple Silicon (arm64) | `net-tools_<version>_macos_aarch64.dmg` |
 
-`<version>` is the release version, for example `0.2.6`. Check your architecture
+`<version>` is the release version, for example `0.3.4`. Check your architecture
 with `uname -m` on Linux/macOS (`x86_64`, `aarch64` or `arm64`), or under
 *Settings → System → About → System type* on Windows.
 
@@ -122,9 +130,10 @@ If FUSE is unavailable, install `libfuse2` or append
 
 ### Windows
 
-Extract the zip and run `net-tools.exe`. Use **Run as administrator** for
-raw-socket probes. SmartScreen may warn because the archive is not code-signed;
-choose *More info → Run anyway* if you trust the source.
+Extract the zip and run `net-tools.exe`. Raw-socket probes request administrator
+rights through UAC, so the app can also be started normally. SmartScreen may warn
+because the archive is not code-signed; choose *More info → Run anyway* if you
+trust the source.
 
 ### macOS
 
@@ -143,8 +152,10 @@ Raw-socket probes require `sudo` (see
 
 ### First run
 
-Features start unprivileged except raw-socket probes. The status bar reports any
-missing capability, and `copy cmd` offers the matching authorization command.
+Features start unprivileged except raw-socket probes. On Windows, probes that need
+a raw socket show an explanation dialog and then request UAC. On other platforms,
+the status bar reports any missing capability, and `copy cmd` offers the matching
+authorization command.
 
 ## Build and run
 
@@ -167,7 +178,8 @@ Windows and macOS need no extra libraries.
 
 ## Privileges (unprivileged, best effort)
 
-Raw-socket features show a clear message when permissions are missing:
+Raw-socket features either request elevation or show a clear message when
+permissions are missing:
 
 | Platform | Available unprivileged | Requires privileges |
 |----------|------------------------|---------------------|
@@ -186,10 +198,10 @@ Raw-socket features show a clear message when permissions are missing:
   `cap_sys_time` is only needed by NTP **Set time**; network probes need
   `cap_net_raw`. Alternatively run `sudo ./net-tools`.
 - **macOS**: `sudo ./net-tools`.
-- **Windows**: right-click and choose **Run as administrator**. When a TCP MTR,
-  UDP MTR or Path MTU run needs a raw socket, the app offers to restart the probe
-  through the UAC prompt; cancelling the prompt is reported without stopping the
-  UI.
+- **Windows**: no manual elevation is required. Starting UDP MTR, TCP MTR or
+  Path MTU shows a short explanation and then requests UAC; cancelling the prompt
+  is reported without stopping the UI. Running the app as administrator remains
+  available for environments that prefer it.
 
 The status bar tracks probing and raw-socket capabilities separately and only
 shows permission hints for real permission errors.
