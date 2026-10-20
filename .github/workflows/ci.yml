@@ -39,15 +39,17 @@ jobs:
         if: failure()
         shell: bash
         run: |
+          set +e
           {
             echo '### Clippy output'
             echo '```'
             tail -200 clippy.log
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
-          grep -E '^(error|warning)(\[|:)' clippy.log | head -30 | while IFS= read -r line; do
+          grep -iE 'error|warning|failed|cannot|mismatch|expected' clippy.log | head -50 | while IFS= read -r line; do
             echo "::error title=Clippy::$line"
           done
+          exit 0
 
       - name: Check formatting
         run: cargo fmt --check
