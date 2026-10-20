@@ -30,7 +30,21 @@ jobs:
         run: cargo test -p net-tools-core
 
       - name: Clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo clippy --workspace --all-targets -- -D warnings 2>&1 | tee clippy.log
+
+      - name: Publish Clippy diagnostics
+        if: failure()
+        shell: bash
+        run: |
+          {
+            echo '### Clippy output'
+            echo '```'
+            tail -200 clippy.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Check formatting
         run: cargo fmt --check
