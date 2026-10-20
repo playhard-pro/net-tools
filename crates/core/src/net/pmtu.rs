@@ -424,7 +424,7 @@ fn is_message_too_long(error: &io::Error) -> bool {
         return true;
     }
     #[cfg(windows)]
-    if error.raw_os_error() == Some(windows_sys::Win32::Networking::WinSock::WSAEMSGSIZE as i32) {
+    if error.raw_os_error() == Some(windows_sys::Win32::Networking::WinSock::WSAEMSGSIZE) {
         return true;
     }
     false

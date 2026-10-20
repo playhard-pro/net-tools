@@ -691,8 +691,7 @@ fn tcp_connect_pending(error: &std::io::Error) -> bool {
         return true;
     }
     #[cfg(windows)]
-    if error.raw_os_error() == Some(windows_sys::Win32::Networking::WinSock::WSAEWOULDBLOCK as i32)
-    {
+    if error.raw_os_error() == Some(windows_sys::Win32::Networking::WinSock::WSAEWOULDBLOCK) {
         return true;
     }
     false
