@@ -454,8 +454,8 @@ pub(crate) fn poll_pair(
         exceptfds.fd_array[0] = raw_fd;
         exceptfds.fd_array[1] = tcp_fd;
         let timeout = TIMEVAL {
-            tv_sec: (remaining_ms / 1000) as i32,
-            tv_usec: ((remaining_ms % 1000) * 1000) as i32,
+            tv_sec: remaining_ms / 1000,
+            tv_usec: (remaining_ms % 1000) * 1000,
         };
         let ready = unsafe { select(0, &mut readfds, &mut writefds, &mut exceptfds, &timeout) };
         if ready == SOCKET_ERROR {
@@ -516,8 +516,8 @@ pub(crate) fn poll_read(raw: &Socket, timeout: std::time::Duration) -> io::Resul
         };
         exceptfds.fd_array[0] = raw_fd;
         let timeout = TIMEVAL {
-            tv_sec: (remaining_ms / 1000) as i32,
-            tv_usec: ((remaining_ms % 1000) * 1000) as i32,
+            tv_sec: remaining_ms / 1000,
+            tv_usec: (remaining_ms % 1000) * 1000,
         };
         let ready = unsafe {
             select(
