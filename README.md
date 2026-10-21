@@ -24,6 +24,7 @@ it.
 | HTTP Ping | Multi-method requests with DNS, connect, TLS, TTFB and total timings, plus total-time percentiles and histogram. |
 | TLS | Batch certificate and chain inspection, SAN, key details, expiry warnings, TLS/ALPN support, revocation (OCSP/CRL), HSTS, CT and CAA checks. |
 | Port Scan | TCP connect, SYN half-open and UDP scans, with banner grabbing. |
+| Connections | Local TCP/UDP socket inventory with process/PID, state and remote endpoint, filters, process termination and best-effort connection close. |
 | IP Insight | Parallel IP geolocation queries across multiple providers. |
 | Lookup | RDAP domain/IP lookup with JSON tree, parsed contacts and parent-domain fallback. |
 | DNS | dig-like queries, custom server, UDP with TCP fallback, and iterative trace from the root servers. |
@@ -34,6 +35,25 @@ it.
 Continuous probes support **Start / Pause / Stop**; one-shot tools and servers
 use **Start / Stop**. Pressing **Enter** in a target field restarts the task with
 the new target.
+
+### Connections viewer
+
+The Connections tab provides a local, netstat/ss-style view of the host:
+
+- Lists TCP and UDP listening sockets, bound ports and active connections with
+  local/remote endpoints, normalized TCP state, PID, process name and owner UID
+  when the operating system exposes them.
+- Filters by process name or PID, local port, remote address/port, protocol and
+  connection state.
+- Supports automatic refresh with an adjustable interval, manual refresh, and
+  copy/CSV/JSON/HTML export of the visible rows.
+- Selecting a row allows ending the owning process, with an optional forced
+  termination confirmation, or closing the connection on a best-effort basis.
+
+Process names and destructive actions require appropriate privileges. Closing a
+connection is platform-dependent: Linux uses `ss -K` (root and kernel
+`SOCK_DESTROY` support required), Windows supports IPv4 TCP only, and macOS
+cannot close another process's socket, so end the process instead.
 
 TCP Ping uses a normal TCP connect (SYN) and therefore works on hosts that drop
 ICMP, without elevation; it does not report a reply TTL. The TCP destination port
@@ -100,6 +120,7 @@ toolchain is required.
 | Windows | x64 | `net-tools_<version>_windows_x64.zip` |
 | Windows | arm64 | `net-tools_<version>_windows_arm64.zip` |
 | macOS | Apple Silicon (arm64) | `net-tools_<version>_macos_aarch64.dmg` |
+| macOS | Intel (x86_64) | `net-tools_<version>_macos_x86_64.dmg` |
 
 `<version>` is the release version, for example `0.3.4`. Check your architecture
 with `uname -m` on Linux/macOS (`x86_64`, `aarch64` or `arm64`), or under
@@ -219,7 +240,7 @@ cargo build --release
 
 # Linux (x86_64 and arm64)
 cargo packager -c packager.toml -f deb,appimage   # needs patchelf squashfs-tools file
-# macOS (Apple Silicon)
+# macOS (Apple Silicon and Intel, run on the matching architecture)
 bash scripts/package_macos.sh
 # Windows (x86_64 and arm64)
 pwsh scripts/package_windows.ps1 -Arch x64
@@ -280,8 +301,9 @@ Building from Linux needs the Apple SDK and
 usually simpler:
 
 ```bash
-rustup target add aarch64-apple-darwin
+rustup target add aarch64-apple-darwin x86_64-apple-darwin
 cargo build --release --target aarch64-apple-darwin -p net-tools
+cargo build --release --target x86_64-apple-darwin -p net-tools
 ```
 
 ### Notes
@@ -293,10 +315,10 @@ cargo build --release --target aarch64-apple-darwin -p net-tools
 ## CI and releases
 
 - `.github/workflows/ci.yml`: build, tests, clippy (warnings are errors) and
-  formatting checks on Linux, Windows and macOS.
+  formatting checks on Linux, Windows, macOS Intel and macOS Apple Silicon.
 - `.github/workflows/release.yml`: on a `v*` tag, build and package Linux
-  (.deb/.AppImage), Windows (.zip) and macOS (.dmg) artifacts, then publish one
-  GitHub Release.
+  (.deb/.AppImage), Windows (.zip) and macOS (.dmg for Apple Silicon and Intel)
+  artifacts, then publish one GitHub Release.
 
 ### macOS signing and notarization
 

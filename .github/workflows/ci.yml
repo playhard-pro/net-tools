@@ -10,7 +10,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        # Use explicit macOS labels so both Intel and Apple Silicon builds run.
+        # `macos-latest` moves to newer images over time and may not cover both.
+        os:
+          - ubuntu-latest
+          - windows-latest
+          - macos-15-intel
+          - macos-15
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7

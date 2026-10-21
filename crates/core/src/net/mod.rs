@@ -13,6 +13,7 @@ pub fn ensure_crypto_provider() {
     });
 }
 
+pub mod connections;
 pub mod dns;
 pub mod dns_tool;
 pub mod http;

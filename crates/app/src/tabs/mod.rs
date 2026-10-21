@@ -1,5 +1,6 @@
 //! Feature tabs.
 
+pub mod connections;
 pub mod dns;
 pub mod http_ping;
 pub mod ip_insight;

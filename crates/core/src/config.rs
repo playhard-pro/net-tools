@@ -191,6 +191,24 @@ impl Default for PortScanSettings {
     }
 }
 
+/// Settings for the Connections tab: local socket inventory refresh behavior.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConnectionSettings {
+    /// Whether the socket table refreshes automatically while the tab is open.
+    pub auto_refresh: bool,
+    /// Delay between automatic refreshes, in milliseconds.
+    pub interval_ms: u64,
+}
+
+impl Default for ConnectionSettings {
+    fn default() -> Self {
+        Self {
+            auto_refresh: true,
+            interval_ms: 2000,
+        }
+    }
+}
+
 /// Settings for the IP insight tab: a target IP queried against several online
 /// geolocation APIs at once.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -656,6 +674,9 @@ pub struct AppConfig {
     pub port_scan: PortScanSettings,
     /// Added after the first release, so older config files still load.
     #[serde(default)]
+    pub connections: ConnectionSettings,
+    /// Added after the first release, so older config files still load.
+    #[serde(default)]
     pub ip_insight: IpInsightSettings,
     /// Added after the first release, so older config files still load.
     #[serde(default)]
@@ -690,6 +711,7 @@ impl Default for AppConfig {
             mtr: MtrSettings::default(),
             http: HttpSettings::default(),
             port_scan: PortScanSettings::default(),
+            connections: ConnectionSettings::default(),
             ip_insight: IpInsightSettings::default(),
             lookup: LookupSettings::default(),
             history: InputHistory::default(),
@@ -721,6 +743,8 @@ mod tests {
         assert_eq!(back.mtr.tcp_port, cfg.mtr.tcp_port);
         assert_eq!(back.http.method, cfg.http.method);
         assert_eq!(back.port_scan.concurrency, cfg.port_scan.concurrency);
+        assert_eq!(back.connections.auto_refresh, cfg.connections.auto_refresh);
+        assert_eq!(back.connections.interval_ms, cfg.connections.interval_ms);
         assert_eq!(back.ip_insight.target, cfg.ip_insight.target);
         assert_eq!(back.lookup.target, cfg.lookup.target);
         assert_eq!(
@@ -897,6 +921,9 @@ mod tests {
         assert!(m.tcp_port > 0);
         let ps = PortScanSettings::default();
         assert!(ps.concurrency > 0);
+        let connections = ConnectionSettings::default();
+        assert!(connections.auto_refresh);
+        assert!(connections.interval_ms > 0);
         let ii = IpInsightSettings::default();
         assert!(!ii.target.is_empty());
         assert!(ii.timeout_ms > 0);

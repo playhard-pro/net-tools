@@ -5,6 +5,7 @@ use net_tools_core::config::AppConfig;
 use net_tools_core::net::privilege::PrivilegeStatus;
 use rust_i18n::t;
 
+use crate::tabs::connections::ConnectionsTab;
 use crate::tabs::dns::DnsTab;
 use crate::tabs::http_ping::HttpPingTab;
 use crate::tabs::ip_insight::IpInsightTab;
@@ -45,6 +46,7 @@ pub enum Tab {
     Http,
     Tls,
     PortScan,
+    Connections,
     IpInsight,
     Lookup,
     Dns,
@@ -56,13 +58,14 @@ pub enum Tab {
 impl Tab {
     /// Built-in order. The overview is pinned first and missing tabs are
     /// appended when a saved order is loaded.
-    pub const ALL: [Tab; 12] = [
+    pub const ALL: [Tab; 13] = [
         Tab::Overview,
         Tab::Ping,
         Tab::Mtr,
         Tab::Http,
         Tab::Tls,
         Tab::PortScan,
+        Tab::Connections,
         Tab::IpInsight,
         Tab::Lookup,
         Tab::Dns,
@@ -81,6 +84,7 @@ impl Tab {
             Tab::Http => "http",
             Tab::Tls => "tls",
             Tab::PortScan => "port_scan",
+            Tab::Connections => "connections",
             Tab::IpInsight => "ip_insight",
             Tab::Lookup => "lookup",
             Tab::Dns => "dns",
@@ -108,6 +112,7 @@ pub struct App {
     pub http: HttpPingTab,
     pub tls: TlsTab,
     pub portscan: PortScanTab,
+    pub connections: ConnectionsTab,
     pub ip_insight: IpInsightTab,
     pub lookup: LookupTab,
     pub dns: DnsTab,
@@ -143,6 +148,7 @@ impl App {
             http: HttpPingTab::new(),
             tls: TlsTab::new(),
             portscan: PortScanTab::new(),
+            connections: ConnectionsTab::new(),
             ip_insight: IpInsightTab::new(),
             lookup: LookupTab::new(),
             dns: DnsTab::new(),
@@ -182,6 +188,11 @@ impl App {
         // OCSP/CRL download or target connection continues in the background.
         if self.tab == Tab::Tls && tab != Tab::Tls {
             self.tls.clear_on_hide();
+        }
+        // Leaving the Connections tab stops automatic polling and drops any
+        // outstanding collection result.
+        if self.tab == Tab::Connections && tab != Tab::Connections {
+            self.connections.clear_on_hide();
         }
         self.tab = tab;
     }
@@ -456,6 +467,7 @@ fn tab_label(tab: Tab) -> String {
         Tab::Http => t!("tab.http"),
         Tab::Tls => t!("tab.tls"),
         Tab::PortScan => t!("tab.portscan"),
+        Tab::Connections => t!("tab.connections"),
         Tab::IpInsight => t!("tab.ip_insight"),
         Tab::Lookup => t!("tab.lookup"),
         Tab::Dns => t!("tab.dns"),
@@ -600,6 +612,10 @@ impl eframe::App for App {
                 &self.privilege,
                 settings_expanded,
             ),
+            Tab::Connections => {
+                self.connections
+                    .ui(ui, &mut self.cfg.connections, settings_expanded)
+            }
             Tab::IpInsight => self.ip_insight.ui(
                 ui,
                 &mut self.cfg.ip_insight,
@@ -747,6 +763,7 @@ mod tests {
             http: HttpPingTab::new(),
             tls: TlsTab::new(),
             portscan: PortScanTab::new(),
+            connections: ConnectionsTab::new(),
             ip_insight: IpInsightTab::new(),
             lookup: LookupTab::new(),
             dns: DnsTab::new(),

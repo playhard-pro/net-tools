@@ -188,16 +188,50 @@ pub fn table_selectable_with_columns<H: AsRef<str>>(
     rows: usize,
     selected: Option<usize>,
     columns: impl IntoIterator<Item = Column>,
+    row_fn: impl FnMut(usize, &mut TableRow<'_, '_>),
+) -> Option<usize> {
+    table_selectable_impl(ui, headers, num_rows, Some(rows), selected, columns, row_fn)
+}
+
+/// Clickable table with explicit columns that fills the remaining height.
+///
+/// Unlike [`table_selectable_with_columns`], the body grows to the available
+/// space instead of keeping a fixed number of rows visible. Returns the index
+/// of a row clicked in this frame.
+pub fn table_selectable_fill_with_columns<H: AsRef<str>>(
+    ui: &mut egui::Ui,
+    headers: &[H],
+    num_rows: usize,
+    selected: Option<usize>,
+    columns: impl IntoIterator<Item = Column>,
+    row_fn: impl FnMut(usize, &mut TableRow<'_, '_>),
+) -> Option<usize> {
+    table_selectable_impl(ui, headers, num_rows, None, selected, columns, row_fn)
+}
+
+fn table_selectable_impl<H: AsRef<str>>(
+    ui: &mut egui::Ui,
+    headers: &[H],
+    num_rows: usize,
+    fixed_rows: Option<usize>,
+    selected: Option<usize>,
+    columns: impl IntoIterator<Item = Column>,
     mut row_fn: impl FnMut(usize, &mut TableRow<'_, '_>),
 ) -> Option<usize> {
     ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Truncate);
-    let height = ROW_HEIGHT * rows as f32;
+    let (max_height, min_height) = match fixed_rows {
+        Some(rows) => {
+            let height = ROW_HEIGHT * rows as f32;
+            (height, height)
+        }
+        None => (ui.available_height().max(120.0), 80.0),
+    };
     let mut builder = TableBuilder::new(ui)
         .striped(true)
         .resizable(false)
         .sense(egui::Sense::click())
-        .max_scroll_height(height)
-        .min_scrolled_height(height)
+        .max_scroll_height(max_height)
+        .min_scrolled_height(min_height)
         .auto_shrink([false, false]);
     for column in columns {
         builder = builder.column(column);

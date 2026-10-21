@@ -22,6 +22,7 @@ tab:
   http: HTTP Ping
   tls: TLS
   portscan: Port Scan
+  connections: Connections
   ip_insight: IP Insight
   lookup: Lookup
   dns: DNS
@@ -96,6 +97,52 @@ common:
   ttl: TTL
   from: From
   size: Size
+connections:
+  auto_refresh: Auto refresh
+  refresh_interval: Refresh interval
+  refresh_now: Refresh now
+  collecting: Collecting…
+  collect_failed: Unable to collect the local socket table
+  protocol_all: All
+  state_all: All
+  state_listening: Listening / bound
+  state_established: Established
+  state_other: Other
+  filter_process: Process / PID
+  filter_process_hint: name or PID
+  filter_port: Local port
+  filter_port_hint: exact port or text
+  filter_remote: Remote
+  filter_remote_hint: IP, port or endpoint
+  local: Local address
+  remote: Remote address
+  pid: PID
+  process: Process
+  uid: UID
+  captured: Captured
+  total: Total
+  shown: Shown
+  empty: No sockets to display
+  end_process: End process…
+  close_connection: Close connection
+  select_process_hint: Select a row that includes a process ID
+  select_connection_hint: Select a connection with a remote endpoint
+  close_unavailable: This connection cannot be closed
+  close_unsupported_macos: macOS cannot close another process's socket; end the process instead
+  close_unsupported_windows: Closing is only available for IPv4 TCP connections on Windows
+  confirm_terminate_title: End process?
+  confirm_terminate_warning: Ending a critical system process can make the system unstable.
+  confirm_terminate: End process
+  confirm_close_title: Close connection?
+  confirm_close_warning: The selected socket will be destroyed. The owning process may reconnect immediately.
+  confirm_close: Close connection
+  force_kill: Force kill (SIGKILL)
+  windows_force_note: Windows always terminates the process forcefully; there is no graceful signal equivalent.
+  no_pid: The selected row has no process ID
+  terminate_ok: Process termination requested
+  terminate_failed: Failed to end the process
+  close_ok: Connection closed
+  close_failed: Failed to close the connection
 ping:
   stats:
     min: "min: %{v}"

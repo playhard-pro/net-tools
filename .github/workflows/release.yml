@@ -35,9 +35,12 @@ jobs:
             platform: windows
             arch: arm64
             windows_arch: arm64
-          # The bare `macos-15` label points at the arm64 image. The `-arm64`
-          # suffix used by the runner-images directory name is not a valid
-          # workflow label and leaves the job queued forever.
+          # The bare `macos-15` label points at the arm64 image. The
+          # `macos-15-intel` label is the x86_64 image. Both builds run natively
+          # because cargo-packager packages the host binary.
+          - os: macos-15-intel
+            platform: macos
+            arch: x86_64
           - os: macos-15
             platform: macos
             arch: aarch64

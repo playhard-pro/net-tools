@@ -65,9 +65,9 @@ out_dir="$(read_packager_value out_dir)"
 
 identity="${APPLE_SIGNING_IDENTITY:-}"
 
-# cargo-packager names macOS architecture identifiers differently from uname.
+# Keep the dmg architecture suffix aligned with the published artifact names.
 case "$(uname -m)" in
-    x86_64) arch="x64" ;;
+    x86_64) arch="x86_64" ;;
     arm64 | aarch64) arch="aarch64" ;;
     *)
         echo "unsupported macOS architecture: $(uname -m)" >&2
