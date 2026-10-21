@@ -68,7 +68,10 @@ fn parse_lsof(text: &str) -> Vec<ConnectionEntry> {
             "IPv6" => Family::V6,
             _ => continue,
         };
-        let name = columns[8..].join(" ");
+        // The NODE column carries the protocol token and NAME starts right
+        // after it. Joining from NODE keeps the rest of the NAME intact when it
+        // contains spaces around the state marker.
+        let name = columns[7..].join(" ");
         let Some((protocol, endpoint)) = split_protocol_token(&name) else {
             continue;
         };
