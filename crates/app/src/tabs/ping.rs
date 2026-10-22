@@ -11,7 +11,7 @@ use rust_i18n::t;
 use crate::latency_stats::LatencyStats;
 use crate::ui::common::{error_banner, info_line, privilege_note, state_badge};
 use crate::ui::history_input;
-use crate::ui::result_table::table_fixed_rows_with_columns;
+use crate::ui::result_table::{cell_with_tooltip, table_fixed_rows_with_columns};
 use crate::ui::settings;
 
 /// Upper bound on the records kept for the table, chart and exports.
@@ -319,7 +319,8 @@ impl PingTab {
                         ui.end_row();
                     });
             }
-            let submit = settings::common_probe(ui, &mut s.common, history, TARGET_HISTORY_KEY);
+            let submit =
+                settings::common_probe(ui, &mut s.common, history, TARGET_HISTORY_KEY, 160.0);
 
             // ICMP ping needs an ICMP socket. On Linux that is normally
             // available unprivileged, so this only shows on restricted hosts.
@@ -465,7 +466,11 @@ impl PingTab {
                 |i, row| {
                     let sample = &self.samples[i];
                     row.col(|ui| {
-                        ui.monospace(&sample.time).on_hover_text(&sample.time);
+                        cell_with_tooltip(
+                            ui,
+                            egui::RichText::new(&sample.time).monospace(),
+                            &sample.time,
+                        );
                     });
                     row.col(|ui| {
                         ui.monospace(format!("{:.2}", sample.rtt_ms));
@@ -474,7 +479,11 @@ impl PingTab {
                         ui.monospace(sample.ttl.map_or("-".into(), |v| v.to_string()));
                     });
                     row.col(|ui| {
-                        ui.monospace(&sample.from).on_hover_text(&sample.from);
+                        cell_with_tooltip(
+                            ui,
+                            egui::RichText::new(&sample.from).monospace(),
+                            &sample.from,
+                        );
                     });
                     row.col(|ui| {
                         // TCP connect probes do not carry an ICMP payload.
@@ -607,14 +616,18 @@ impl PingTab {
                     });
                     row.col(|ui| {
                         let responder = step.responder.as_deref().unwrap_or("-");
-                        ui.monospace(responder).on_hover_text(responder);
+                        cell_with_tooltip(
+                            ui,
+                            egui::RichText::new(responder).monospace(),
+                            responder,
+                        );
                     });
                     row.col(|ui| {
                         ui.monospace(step.rtt_ms.map_or("-".into(), |v| format!("{v:.2}")));
                     });
                     row.col(|ui| {
                         let detail = step.detail.as_deref().unwrap_or("-");
-                        ui.label(detail).on_hover_text(detail);
+                        cell_with_tooltip(ui, detail, detail);
                     });
                 },
             );

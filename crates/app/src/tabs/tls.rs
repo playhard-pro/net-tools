@@ -13,7 +13,7 @@ use rust_i18n::t;
 
 use crate::ui::common::{error_banner, result_toolbar, state_badge, ToolbarAction};
 use crate::ui::history_input;
-use crate::ui::result_table::table_selectable_with_columns;
+use crate::ui::result_table::{cell_with_tooltip, table_selectable_with_columns};
 use crate::ui::settings;
 use crate::ui::theme::Palette;
 
@@ -375,7 +375,7 @@ impl TlsTab {
                     let label = target.map(|t| t.target.clone()).unwrap_or_default();
                     if result_available(result) {
                         let text = format!("{}:{}", result.unwrap().host, result.unwrap().port);
-                        ui.label(label).on_hover_text(text);
+                        cell_with_tooltip(ui, label, text);
                     } else {
                         ui.weak(label);
                     }
@@ -400,7 +400,7 @@ impl TlsTab {
                     let text = result
                         .and_then(|r| r.cipher_suite.clone())
                         .unwrap_or_else(|| "-".into());
-                    ui.label(&text).on_hover_text(&text);
+                    cell_with_tooltip(ui, &text, &text);
                 });
                 row.col(|ui| {
                     let text = result
@@ -411,7 +411,7 @@ impl TlsTab {
                                 .or_else(|| cert.san_dns.first().cloned())
                         })
                         .unwrap_or_else(|| "-".into());
-                    ui.label(&text).on_hover_text(&text);
+                    cell_with_tooltip(ui, &text, &text);
                 });
                 row.col(|ui| {
                     ui.label(

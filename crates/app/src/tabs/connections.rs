@@ -16,7 +16,7 @@ use net_tools_core::net::connections::{
 use rust_i18n::t;
 
 use crate::ui::common::{error_banner, info_line, result_toolbar, ToolbarAction};
-use crate::ui::result_table::table_selectable_fill_with_columns;
+use crate::ui::result_table::{cell_with_tooltip, table_selectable_fill_with_columns};
 use crate::ui::theme::Palette;
 
 /// Smallest accepted automatic refresh interval.
@@ -536,11 +536,11 @@ impl ConnectionsTab {
                 });
                 row.col(|ui| {
                     let local = entry.local_endpoint();
-                    ui.label(&local).on_hover_text(local);
+                    cell_with_tooltip(ui, &local, &local);
                 });
                 row.col(|ui| {
                     let remote = entry.remote_endpoint();
-                    ui.label(&remote).on_hover_text(remote);
+                    cell_with_tooltip(ui, &remote, &remote);
                 });
                 row.col(|ui| {
                     ui.colored_label(state_color(&palette, entry.state), entry.state.label());
@@ -554,7 +554,7 @@ impl ConnectionsTab {
                 });
                 row.col(|ui| {
                     let process = entry.process.clone().unwrap_or_else(|| "-".to_string());
-                    ui.label(&process).on_hover_text(process);
+                    cell_with_tooltip(ui, &process, &process);
                 });
                 row.col(|ui| {
                     ui.label(

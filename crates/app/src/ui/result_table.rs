@@ -8,6 +8,20 @@ const ROW_HEIGHT: f32 = 18.0;
 /// Header row height.
 const HEADER_HEIGHT: f32 = 20.0;
 
+/// Add a table cell that reveals its complete value in a tooltip.
+///
+/// Truncated labels show a built-in tooltip for the elided text. That default
+/// is disabled here, because combined with the explicit tooltip it would stack
+/// two tooltips on hover.
+pub fn cell_with_tooltip(
+    ui: &mut egui::Ui,
+    text: impl Into<egui::WidgetText>,
+    tooltip: impl Into<egui::WidgetText>,
+) -> egui::Response {
+    ui.add(egui::Label::new(text).show_tooltip_when_elided(false))
+        .on_hover_text(tooltip)
+}
+
 /// Generic table: `headers` are the column titles, `num_rows` the number of data
 /// rows, and `row_fn(index, &mut TableRow)` fills each row.
 ///
@@ -31,6 +45,40 @@ pub fn table<H: AsRef<str>>(
     );
 }
 
+/// Height of the scrollable body needed to show exactly `rows` data rows.
+///
+/// `egui_extras` inserts `item_spacing.y` between rows, so this spacing has to
+/// be part of the fixed height; otherwise the last requested row is partially
+/// clipped.
+fn body_height_for_rows(ui: &egui::Ui, rows: usize) -> f32 {
+    let spacing = ui.spacing().item_spacing.y;
+    let gaps = rows.saturating_sub(1) as f32;
+    ROW_HEIGHT * rows as f32 + spacing * gaps
+}
+
+/// Like [`table`], but with explicit column widths.
+///
+/// Auto columns can be capped, and long cell content is truncated to its
+/// column instead of widening the table. Callers should expose the full value
+/// through a tooltip.
+pub fn table_with_columns<H: AsRef<str>>(
+    ui: &mut egui::Ui,
+    headers: &[H],
+    num_rows: usize,
+    columns: impl IntoIterator<Item = Column>,
+    row_fn: impl FnMut(usize, &mut TableRow<'_, '_>),
+) {
+    table_impl(
+        ui,
+        headers,
+        num_rows,
+        None,
+        Some(columns.into_iter().collect()),
+        egui::TextWrapMode::Truncate,
+        row_fn,
+    );
+}
+
 /// Like [`table`], but the scrollable body keeps a fixed height of `rows`
 /// visible rows instead of adapting to the remaining space. The extra rows
 /// scroll inside the table.
@@ -45,7 +93,7 @@ pub fn table_fixed_rows<H: AsRef<str>>(
         ui,
         headers,
         num_rows,
-        Some(ROW_HEIGHT * rows as f32),
+        Some(body_height_for_rows(ui, rows)),
         None,
         egui::TextWrapMode::Extend,
         row_fn,
@@ -69,7 +117,7 @@ pub fn table_fixed_rows_with_columns<H: AsRef<str>>(
         ui,
         headers,
         num_rows,
-        Some(ROW_HEIGHT * rows as f32),
+        Some(body_height_for_rows(ui, rows)),
         Some(columns.into_iter().collect()),
         egui::TextWrapMode::Truncate,
         row_fn,
@@ -221,7 +269,7 @@ fn table_selectable_impl<H: AsRef<str>>(
     ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Truncate);
     let (max_height, min_height) = match fixed_rows {
         Some(rows) => {
-            let height = ROW_HEIGHT * rows as f32;
+            let height = body_height_for_rows(ui, rows);
             (height, height)
         }
         None => (ui.available_height().max(120.0), 80.0),
@@ -350,6 +398,27 @@ mod tests {
             wide > narrow + 50.0,
             "expected wider content to widen the first column: narrow={narrow}, wide={wide}"
         );
+    }
+
+    /// A fixed-height table must reserve room for the spacing egui_extras adds
+    /// between rows, otherwise the last requested row is clipped.
+    #[test]
+    fn fixed_height_covers_inter_row_spacing() {
+        let ctx = egui::Context::default();
+        ctx.run_ui(egui::RawInput::default(), |ui| {
+            egui::CentralPanel::default().show(ui, |ui| {
+                let spacing = ui.spacing().item_spacing.y;
+                let rows = 4;
+                let expected = ROW_HEIGHT * rows as f32 + spacing * (rows - 1) as f32;
+                let actual = body_height_for_rows(ui, rows);
+                assert!(
+                    (actual - expected).abs() < f32::EPSILON,
+                    "expected {expected}, got {actual}"
+                );
+            });
+        })
+        .textures_delta
+        .clear();
     }
 
     /// A fixed-height table must keep the same height whether it holds fewer

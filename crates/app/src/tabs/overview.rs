@@ -14,7 +14,7 @@ use rust_i18n::t;
 
 use crate::tabs::speedtest::metric_card;
 use crate::ui::common::{error_banner, result_toolbar, ToolbarAction};
-use crate::ui::result_table::table_fixed_rows_with_columns;
+use crate::ui::result_table::{cell_with_tooltip, table_fixed_rows_with_columns};
 use crate::ui::theme::Palette;
 
 /// History key used for the aggregate rate across all non-loopback interfaces.
@@ -1169,14 +1169,21 @@ fn routes_table(ui: &mut egui::Ui, snapshot: &NetworkSnapshot) {
                 ui.label(&route.family);
             });
             row.col(|ui| {
-                ui.monospace(&route.destination)
-                    .on_hover_text(&route.destination);
+                cell_with_tooltip(
+                    ui,
+                    egui::RichText::new(&route.destination).monospace(),
+                    &route.destination,
+                );
             });
             row.col(|ui| {
-                ui.monospace(&route.gateway).on_hover_text(&route.gateway);
+                cell_with_tooltip(
+                    ui,
+                    egui::RichText::new(&route.gateway).monospace(),
+                    &route.gateway,
+                );
             });
             row.col(|ui| {
-                ui.label(&route.interface).on_hover_text(&route.interface);
+                cell_with_tooltip(ui, &route.interface, &route.interface);
             });
             row.col(|ui| {
                 ui.monospace(

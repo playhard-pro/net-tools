@@ -4,9 +4,9 @@
 //! active hops in parallel, then the next round starts after the configured
 //! interval, so each individual hop is probed at that interval.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::net::{IpAddr, Ipv4Addr};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use pnet_packet::icmp::IcmpTypes;
@@ -143,22 +143,170 @@ impl HopAccum {
     }
 }
 
-/// Resolve PTR names for every address seen in `accums`, caching the result so
-/// each address is looked up only once over a long running session.
-async fn resolve_reverse(accums: &[HopAccum], cache: &mut HashMap<IpAddr, Option<String>>) {
-    // Collect the addresses that still need a lookup first, so the map is only
-    // borrowed between awaits, not across them.
+/// Reverse-DNS results shared between the probe loop and the background
+/// resolver.
+type ReverseNames = Arc<Mutex<HashMap<IpAddr, Option<String>>>>;
+
+/// Lock the reverse cache, recovering the map if a resolver task panicked.
+fn lock_reverse(
+    cache: &ReverseNames,
+) -> std::sync::MutexGuard<'_, HashMap<IpAddr, Option<String>>> {
+    cache
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+/// Start resolving PTR names in the background and return the shared cache and
+/// the channel used to submit newly seen addresses.
+///
+/// Probing must not wait for DNS. The probe loop publishes hop statistics on
+/// every round, and the resolver fills the cache as names arrive, so a later
+/// round shows the names without delaying route or latency updates.
+fn start_reverse_resolver(
+    handle: &ProbeHandle<ProbeEvent>,
+) -> (
+    ReverseNames,
+    tokio::sync::mpsc::UnboundedSender<Vec<IpAddr>>,
+    Arc<tokio::sync::Notify>,
+) {
+    let cache: ReverseNames = Arc::new(Mutex::new(HashMap::new()));
+    let (requests, receiver) = tokio::sync::mpsc::unbounded_channel();
+    let names_updated = Arc::new(tokio::sync::Notify::new());
+    tokio::spawn(run_reverse_resolver(
+        handle.clone(),
+        Arc::clone(&cache),
+        receiver,
+        Arc::clone(&names_updated),
+    ));
+    (cache, requests, names_updated)
+}
+
+/// Submit addresses that have no cached name yet to the resolver.
+fn request_reverse_names(
+    accums: &[HopAccum],
+    cache: &ReverseNames,
+    requests: &tokio::sync::mpsc::UnboundedSender<Vec<IpAddr>>,
+) {
     let mut missing: Vec<IpAddr> = Vec::new();
-    for acc in accums {
-        for &ip in &acc.addrs {
-            if !cache.contains_key(&ip) && !missing.contains(&ip) {
-                missing.push(ip);
+    {
+        let known = lock_reverse(cache);
+        for acc in accums {
+            for &ip in &acc.addrs {
+                if !known.contains_key(&ip) && !missing.contains(&ip) {
+                    missing.push(ip);
+                }
             }
         }
     }
-    for ip in missing {
-        let name = dns::reverse(ip).await;
-        cache.insert(ip, name);
+    if !missing.is_empty() {
+        // The resolver exits when the probe ends, so a closed channel is fine.
+        let _ = requests.send(missing);
+    }
+}
+
+/// Background PTR resolver. Each request is a batch of addresses seen by the
+/// probe loop; lookups in a batch run concurrently and results are cached.
+async fn run_reverse_resolver(
+    handle: ProbeHandle<ProbeEvent>,
+    cache: ReverseNames,
+    mut requests: tokio::sync::mpsc::UnboundedReceiver<Vec<IpAddr>>,
+    names_updated: Arc<tokio::sync::Notify>,
+) {
+    let mut inflight: HashSet<IpAddr> = HashSet::new();
+    loop {
+        let addresses = tokio::select! {
+            _ = handle.cancelled() => return,
+            batch = requests.recv() => match batch {
+                Some(addresses) => addresses,
+                None => return,
+            },
+        };
+
+        let mut missing = Vec::new();
+        {
+            let known = lock_reverse(&cache);
+            for ip in addresses {
+                if !known.contains_key(&ip) && inflight.insert(ip) {
+                    missing.push(ip);
+                }
+            }
+        }
+        if missing.is_empty() {
+            continue;
+        }
+
+        let mut lookups = JoinSet::new();
+        for ip in &missing {
+            let ip = *ip;
+            lookups.spawn(async move {
+                let name = dns::reverse(ip).await;
+                (ip, name)
+            });
+        }
+        let mut resolved_any = false;
+        while !lookups.is_empty() {
+            tokio::select! {
+                _ = handle.cancelled() => return,
+                joined = lookups.join_next() => {
+                    if let Some(Ok((ip, name))) = joined {
+                        resolved_any |= name.is_some();
+                        lock_reverse(&cache).insert(ip, name);
+                    }
+                }
+            }
+        }
+        if resolved_any {
+            // Let the probe loop republish the hop rows right away instead of
+            // waiting for the next round.
+            names_updated.notify_waiters();
+        }
+        // Drop the in-flight markers. Addresses that never reached the cache
+        // (for example because a lookup task failed) are retried later; names
+        // that did resolve stay cached.
+        for ip in missing {
+            inflight.remove(&ip);
+        }
+    }
+}
+
+/// Publish the current statistics for the active hops.
+fn publish_hops(
+    handle: &ProbeHandle<ProbeEvent>,
+    accums: &[HopAccum],
+    active: usize,
+    reverse: &ReverseNames,
+) {
+    let names = lock_reverse(reverse);
+    for acc in &accums[..active] {
+        handle.send(ProbeEvent::Hop(acc.stats(&names)));
+    }
+}
+
+/// Publish hop statistics, then keep the per-hop interval. While waiting, a
+/// resolved batch of reverse names refreshes the rows immediately instead of
+/// waiting for the next probe round.
+///
+/// Returns `true` when the probe was cancelled while waiting.
+async fn publish_and_wait(
+    handle: &ProbeHandle<ProbeEvent>,
+    accums: &[HopAccum],
+    active: usize,
+    reverse: &ReverseNames,
+    names_updated: &tokio::sync::Notify,
+    started: Instant,
+    interval: Duration,
+) -> bool {
+    publish_hops(handle, accums, active, reverse);
+    let deadline = started + interval;
+    loop {
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            return false;
+        }
+        tokio::select! {
+            cancelled = handle.sleep(remaining) => return cancelled,
+            _ = names_updated.notified() => publish_hops(handle, accums, active, reverse),
+        }
     }
 }
 
@@ -252,7 +400,7 @@ async fn mtr_icmp_linux(handle: &ProbeHandle<ProbeEvent>, settings: &MtrSettings
     let interval = Duration::from_millis(settings.common.interval_ms);
 
     let mut accums: Vec<HopAccum> = (1..=max_hops).map(HopAccum::new).collect();
-    let mut reverse: HashMap<IpAddr, Option<String>> = HashMap::new();
+    let (reverse, reverse_tx, names_updated) = start_reverse_resolver(handle);
     let mut target_hop: Option<u8> = None;
     let mut seq: u16 = 0;
 
@@ -322,14 +470,19 @@ async fn mtr_icmp_linux(handle: &ProbeHandle<ProbeEvent>, settings: &MtrSettings
         let active = target_hop.unwrap_or(max_hops) as usize;
 
         if settings.common.reverse_dns {
-            resolve_reverse(&accums[..active], &mut reverse).await;
+            request_reverse_names(&accums[..active], &reverse, &reverse_tx);
         }
-        for acc in &accums[..active] {
-            handle.send(ProbeEvent::Hop(acc.stats(&reverse)));
-        }
-
-        let elapsed = started.elapsed();
-        if elapsed < interval && handle.sleep(interval - elapsed).await {
+        if publish_and_wait(
+            handle,
+            &accums,
+            active,
+            &reverse,
+            &names_updated,
+            started,
+            interval,
+        )
+        .await
+        {
             return;
         }
     }
@@ -375,7 +528,7 @@ async fn mtr_icmp_surge(handle: &ProbeHandle<ProbeEvent>, settings: &MtrSettings
     let interval = Duration::from_millis(settings.common.interval_ms);
 
     let mut accums: Vec<HopAccum> = (1..=max_hops).map(HopAccum::new).collect();
-    let mut reverse: HashMap<IpAddr, Option<String>> = HashMap::new();
+    let (reverse, reverse_tx, names_updated) = start_reverse_resolver(handle);
     let mut target_hop: Option<u8> = None;
     let mut seq: u16 = 0;
 
@@ -449,15 +602,19 @@ async fn mtr_icmp_surge(handle: &ProbeHandle<ProbeEvent>, settings: &MtrSettings
         let active = target_hop.unwrap_or(max_hops) as usize;
 
         if settings.common.reverse_dns {
-            resolve_reverse(&accums[..active], &mut reverse).await;
+            request_reverse_names(&accums[..active], &reverse, &reverse_tx);
         }
-        for acc in &accums[..active] {
-            handle.send(ProbeEvent::Hop(acc.stats(&reverse)));
-        }
-
-        // Keep the per-hop probe interval, measured from the start of the round.
-        let elapsed = started.elapsed();
-        if elapsed < interval && handle.sleep(interval - elapsed).await {
+        if publish_and_wait(
+            handle,
+            &accums,
+            active,
+            &reverse,
+            &names_updated,
+            started,
+            interval,
+        )
+        .await
+        {
             return;
         }
     }
@@ -501,7 +658,7 @@ async fn mtr_tcp(handle: &ProbeHandle<ProbeEvent>, settings: &MtrSettings, ip: I
     let interval = Duration::from_millis(settings.common.interval_ms);
 
     let mut accums: Vec<HopAccum> = (1..=max_hops).map(HopAccum::new).collect();
-    let mut reverse: HashMap<IpAddr, Option<String>> = HashMap::new();
+    let (reverse, reverse_tx, names_updated) = start_reverse_resolver(handle);
     let mut target_hop: Option<u8> = None;
 
     loop {
@@ -565,14 +722,19 @@ async fn mtr_tcp(handle: &ProbeHandle<ProbeEvent>, settings: &MtrSettings, ip: I
         let active = target_hop.unwrap_or(max_hops) as usize;
 
         if settings.common.reverse_dns {
-            resolve_reverse(&accums[..active], &mut reverse).await;
+            request_reverse_names(&accums[..active], &reverse, &reverse_tx);
         }
-        for acc in &accums[..active] {
-            handle.send(ProbeEvent::Hop(acc.stats(&reverse)));
-        }
-
-        let elapsed = started.elapsed();
-        if elapsed < interval && handle.sleep(interval - elapsed).await {
+        if publish_and_wait(
+            handle,
+            &accums,
+            active,
+            &reverse,
+            &names_updated,
+            started,
+            interval,
+        )
+        .await
+        {
             return;
         }
     }
@@ -766,7 +928,7 @@ async fn mtr_udp(handle: &ProbeHandle<ProbeEvent>, settings: &MtrSettings, ip: I
     let interval = Duration::from_millis(settings.common.interval_ms);
 
     let mut accums: Vec<HopAccum> = (1..=max_hops).map(HopAccum::new).collect();
-    let mut reverse: HashMap<IpAddr, Option<String>> = HashMap::new();
+    let (reverse, reverse_tx, names_updated) = start_reverse_resolver(handle);
     let mut target_hop: Option<u8> = None;
 
     loop {
@@ -823,14 +985,19 @@ async fn mtr_udp(handle: &ProbeHandle<ProbeEvent>, settings: &MtrSettings, ip: I
         let active = target_hop.unwrap_or(max_hops) as usize;
 
         if settings.common.reverse_dns {
-            resolve_reverse(&accums[..active], &mut reverse).await;
+            request_reverse_names(&accums[..active], &reverse, &reverse_tx);
         }
-        for acc in &accums[..active] {
-            handle.send(ProbeEvent::Hop(acc.stats(&reverse)));
-        }
-
-        let elapsed = started.elapsed();
-        if elapsed < interval && handle.sleep(interval - elapsed).await {
+        if publish_and_wait(
+            handle,
+            &accums,
+            active,
+            &reverse,
+            &names_updated,
+            started,
+            interval,
+        )
+        .await
+        {
             return;
         }
     }

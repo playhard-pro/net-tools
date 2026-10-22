@@ -10,6 +10,14 @@ about:
   repository: "仓库："
   license: "许可证："
   close: 关闭
+  clear_config: 删除配置目录
+  clear_config_title: 删除配置？
+  clear_config_confirm: 永久删除
+  clear_config_warning: 将永久删除下列目录中本程序的配置和输入历史，此操作无法撤销；目录中的其他文件不会被删除。
+  clear_config_path: 目录：
+  clear_config_path_unknown: 无法确定配置目录。
+  clear_config_done: 配置和历史数据已删除。
+  clear_config_failed: "删除配置失败：%{error}"
 update:
   check: 检查更新
   checking: 正在检查…

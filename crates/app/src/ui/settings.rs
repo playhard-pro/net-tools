@@ -11,12 +11,14 @@ use super::history_input;
 /// target input received an Enter key press, so the caller can restart the task
 /// with the new target.
 ///
-/// `key` identifies the target field's history bucket.
+/// `key` identifies the target field's history bucket, and `target_width` sets
+/// the width of the target input.
 pub fn common_probe(
     ui: &mut egui::Ui,
     c: &mut CommonProbe,
     history: &mut InputHistory,
     key: &str,
+    target_width: f32,
 ) -> bool {
     let mut submit = false;
     egui::Grid::new("common_probe_grid")
@@ -24,7 +26,7 @@ pub fn common_probe(
         .spacing([12.0, 10.0])
         .show(ui, |ui| {
             ui.label(t!("common.target"));
-            if history_input::singleline(ui, key, &mut c.target, history, 160.0) {
+            if history_input::singleline(ui, key, &mut c.target, history, target_width) {
                 submit = true;
             }
             ui.end_row();

@@ -3,6 +3,7 @@
 use std::time::Duration;
 
 use eframe::egui;
+use egui_extras::Column;
 use net_tools_core::config::{InputHistory, NatSettings};
 use net_tools_core::control::TaskController;
 use net_tools_core::model::{
@@ -14,7 +15,7 @@ use rust_i18n::t;
 use crate::ui::common::{error_banner, result_toolbar, state_badge, ToolbarAction};
 use crate::ui::export::{csv_field, save_file};
 use crate::ui::history_input;
-use crate::ui::result_table::table_fixed_rows;
+use crate::ui::result_table::{cell_with_tooltip, table_fixed_rows_with_columns};
 use crate::ui::settings::ip_version_selector;
 use crate::ui::theme::Palette;
 
@@ -24,8 +25,21 @@ const SERVER_HISTORY_KEY: &str = "nat.server";
 /// History bucket for the optional local bind address.
 const LOCAL_BIND_HISTORY_KEY: &str = "nat.local_bind";
 
-/// Number of step rows visible before the log scrolls.
-const VISIBLE_STEP_ROWS: usize = 8;
+/// Number of step rows visible before the log scrolls. The results area has
+/// spare vertical room below the table, so keep enough rows visible to avoid
+/// scrolling for a typical run.
+const VISIBLE_STEP_ROWS: usize = 12;
+
+/// Width reserved for the step name column so localized labels stay readable.
+const STEP_NAME_WIDTH: f32 = 112.0;
+
+/// Width reserved for the RTT column; it only holds a number and a unit.
+const STEP_RTT_WIDTH: f32 = 84.0;
+
+/// Relative widths of the remaining step table columns. Endpoint columns get
+/// the largest share, but are still clipped to this table; the full value is
+/// available through a tooltip.
+const STEP_COLUMN_WEIGHTS: [f32; 5] = [0.18, 0.10, 0.28, 0.28, 0.16];
 
 /// Repaint cadence while a discovery run is active.
 const LIVE_REPAINT: Duration = Duration::from_millis(200);
@@ -326,38 +340,64 @@ impl NatTab {
             return;
         }
         let rows = self.steps.len().min(VISIBLE_STEP_ROWS);
-        table_fixed_rows(
+        let headers = [
+            t!("nat.step").to_string(),
+            t!("nat.target").to_string(),
+            t!("nat.change").to_string(),
+            t!("nat.response_from").to_string(),
+            t!("nat.mapped").to_string(),
+            t!("nat.outcome").to_string(),
+            t!("common.rtt_ms").to_string(),
+        ];
+        // TableBuilder adds the inter-column spacing on top of the column
+        // widths, so reserve it here to keep the right edge inside the panel.
+        let spacing = ui.spacing().item_spacing.x * (headers.len().saturating_sub(1)) as f32;
+        let table_width =
+            (ui.available_width() - ui.spacing().scroll.allocated_width() - spacing).max(1.0);
+        let flexible = (table_width - STEP_NAME_WIDTH - STEP_RTT_WIDTH).max(1.0);
+        let columns = [
+            Column::exact(STEP_NAME_WIDTH),
+            Column::exact(flexible * STEP_COLUMN_WEIGHTS[0]),
+            Column::exact(flexible * STEP_COLUMN_WEIGHTS[1]),
+            Column::exact(flexible * STEP_COLUMN_WEIGHTS[2]),
+            Column::exact(flexible * STEP_COLUMN_WEIGHTS[3]),
+            Column::exact(flexible * STEP_COLUMN_WEIGHTS[4]),
+            Column::exact(STEP_RTT_WIDTH),
+        ];
+        table_fixed_rows_with_columns(
             ui,
-            &[
-                t!("nat.step").to_string(),
-                t!("nat.target").to_string(),
-                t!("nat.change").to_string(),
-                t!("nat.response_from").to_string(),
-                t!("nat.mapped").to_string(),
-                t!("nat.outcome").to_string(),
-                t!("common.rtt_ms").to_string(),
-            ],
+            &headers,
             self.steps.len(),
             rows,
+            columns,
             |index, row| {
                 let step = &self.steps[index];
                 row.col(|ui| {
-                    ui.label(step_label(step.kind));
+                    let text = step_label(step.kind);
+                    cell_with_tooltip(ui, &text, &text);
                 });
                 row.col(|ui| {
-                    ui.monospace(&step.target);
+                    cell_with_tooltip(
+                        ui,
+                        egui::RichText::new(&step.target).monospace(),
+                        &step.target,
+                    );
                 });
                 row.col(|ui| {
-                    ui.label(change_label(step.change_ip, step.change_port));
+                    let text = change_label(step.change_ip, step.change_port);
+                    cell_with_tooltip(ui, &text, &text);
                 });
                 row.col(|ui| {
-                    ui.monospace(step.response_from.as_deref().unwrap_or("-"));
+                    let text = step.response_from.as_deref().unwrap_or("-");
+                    cell_with_tooltip(ui, egui::RichText::new(text).monospace(), text);
                 });
                 row.col(|ui| {
-                    ui.monospace(step.mapped_endpoint.as_deref().unwrap_or("-"));
+                    let text = step.mapped_endpoint.as_deref().unwrap_or("-");
+                    cell_with_tooltip(ui, egui::RichText::new(text).monospace(), text);
                 });
                 row.col(|ui| {
-                    ui.label(outcome_label(&step.outcome));
+                    let text = outcome_label(&step.outcome);
+                    cell_with_tooltip(ui, &text, &text);
                 });
                 row.col(|ui| {
                     ui.monospace(

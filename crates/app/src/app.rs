@@ -133,6 +133,10 @@ pub struct App {
     pub settings_expanded: bool,
     /// Whether the About dialog is currently open.
     pub show_about: bool,
+    /// Whether the config deletion confirmation dialog is open.
+    pub show_about_clear_confirm: bool,
+    /// Result of the most recent config deletion, shown in the About dialog.
+    pub about_clear_result: Option<Result<(), String>>,
     /// Background update check state and the result dialog.
     pub update: UpdateChecker,
 }
@@ -168,6 +172,8 @@ impl App {
             theme_preference,
             settings_expanded: true,
             show_about: false,
+            show_about_clear_confirm: false,
+            about_clear_result: None,
             update: UpdateChecker::new(),
         }
     }
@@ -302,6 +308,8 @@ impl App {
         ui.separator();
         if ui.small_button(t!("about.button")).clicked() {
             self.show_about = true;
+            self.show_about_clear_confirm = false;
+            self.about_clear_result = None;
         }
         ui.separator();
 
@@ -506,13 +514,96 @@ impl App {
             ui.label(format!("{} {}", t!("about.license"), PROJECT_LICENSE));
             ui.add_space(8.0);
             ui.separator();
-            if ui.button(t!("about.close")).clicked() {
-                close = true;
+            ui.horizontal(|ui| {
+                if ui.button(t!("about.close")).clicked() {
+                    close = true;
+                }
+                if ui.button(t!("about.clear_config")).clicked() {
+                    self.show_about_clear_confirm = true;
+                }
+            });
+            if let Some(result) = &self.about_clear_result {
+                let palette = Palette::from_ui(ui);
+                match result {
+                    Ok(()) => ui.colored_label(palette.success_text, t!("about.clear_config_done")),
+                    Err(err) => ui.colored_label(
+                        palette.error_text,
+                        t!("about.clear_config_failed", error = err.as_str()),
+                    ),
+                };
             }
         });
-        // Also close when the backdrop is clicked or Escape is pressed.
-        if close || modal.should_close() {
+        // Also close when the backdrop is clicked or Escape is pressed. The
+        // confirmation dialog is modal on top of this one, so ignore its
+        // backdrop while it is open.
+        if close || (!self.show_about_clear_confirm && modal.should_close()) {
             self.show_about = false;
+            self.show_about_clear_confirm = false;
+        }
+    }
+
+    /// Confirmation dialog for deleting the persisted configuration and input
+    /// history. The exact directory is shown so the operation is transparent.
+    fn clear_config_dialog(&mut self, ctx: &egui::Context) {
+        let mut cancel = false;
+        let mut clear = false;
+        let path = crate::config_store::config_dir();
+        let modal = egui::Modal::new(egui::Id::new("about_clear_config")).show(ctx, |ui| {
+            ui.set_width(420.0);
+            ui.heading(t!("about.clear_config_title"));
+            ui.add_space(4.0);
+            let palette = Palette::from_ui(ui);
+            ui.colored_label(palette.warning_text, t!("about.clear_config_warning"));
+            ui.add_space(8.0);
+            ui.label(t!("about.clear_config_path"));
+            match &path {
+                Some(path) => {
+                    ui.add(
+                        egui::Label::new(
+                            egui::RichText::new(path.display().to_string()).monospace(),
+                        )
+                        .wrap_mode(egui::TextWrapMode::Wrap),
+                    );
+                }
+                None => {
+                    ui.weak(t!("about.clear_config_path_unknown"));
+                }
+            }
+            ui.add_space(10.0);
+            ui.separator();
+            ui.horizontal(|ui| {
+                if ui.button(t!("common.cancel")).clicked() {
+                    cancel = true;
+                }
+                if ui
+                    .add_enabled(
+                        path.is_some(),
+                        egui::Button::new(t!("about.clear_config_confirm")),
+                    )
+                    .clicked()
+                {
+                    clear = true;
+                }
+            });
+        });
+
+        if cancel || modal.should_close() {
+            self.show_about_clear_confirm = false;
+        } else if clear {
+            self.show_about_clear_confirm = false;
+            match crate::config_store::reset() {
+                Ok(()) => {
+                    // Replace the in-memory config too, otherwise the next save
+                    // (including the save on exit) would restore the old data.
+                    self.cfg = AppConfig::default();
+                    self.tab_order = normalize_tab_order(&self.cfg.tab_order);
+                    self.theme_preference = theme_preference_from_key(&self.cfg.theme);
+                    ctx.set_theme(self.theme_preference);
+                    rust_i18n::set_locale(&self.cfg.language);
+                    self.about_clear_result = Some(Ok(()));
+                }
+                Err(err) => self.about_clear_result = Some(Err(err.to_string())),
+            }
         }
     }
 }
@@ -736,6 +827,9 @@ impl eframe::App for App {
         if self.show_about {
             self.about_dialog(ui.ctx());
         }
+        if self.show_about_clear_confirm {
+            self.clear_config_dialog(ui.ctx());
+        }
         if self.update.dialog().is_some() {
             self.update_dialog(ui.ctx());
         }
@@ -923,6 +1017,8 @@ mod tests {
             theme_preference: egui::ThemePreference::System,
             settings_expanded: true,
             show_about: false,
+            show_about_clear_confirm: false,
+            about_clear_result: None,
             update: UpdateChecker::new(),
         };
 

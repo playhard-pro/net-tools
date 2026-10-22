@@ -10,6 +10,14 @@ about:
   repository: "Repository:"
   license: "License:"
   close: Close
+  clear_config: Delete config folder
+  clear_config_title: Delete configuration?
+  clear_config_confirm: Delete permanently
+  clear_config_warning: This permanently deletes the application's settings and input history in the folder below. It cannot be undone, and other files in the folder are not touched.
+  clear_config_path: "Folder:"
+  clear_config_path_unknown: The configuration folder could not be determined.
+  clear_config_done: Configuration and history deleted.
+  clear_config_failed: "Failed to delete configuration: %{error}"
 update:
   check: Check update
   checking: Checking…

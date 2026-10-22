@@ -1,6 +1,7 @@
 //! MTR tab: hop-by-hop routing over ICMP / UDP.
 
 use eframe::egui;
+use egui_extras::Column;
 use net_tools_core::config::{InputHistory, MtrSettings};
 use net_tools_core::control::TaskController;
 use net_tools_core::model::{HopStats, ProbeEvent, ProbeMode};
@@ -9,7 +10,7 @@ use rust_i18n::t;
 
 use crate::ui::common::{error_banner, info_line, state_badge};
 use crate::ui::history_input;
-use crate::ui::result_table::table;
+use crate::ui::result_table::{cell_with_tooltip, table_with_columns};
 use crate::ui::settings;
 
 /// History bucket for the target input.
@@ -140,7 +141,8 @@ impl MtrTab {
                         ui.end_row();
                     }
                 });
-            let submit = settings::common_probe(ui, &mut s.common, history, TARGET_HISTORY_KEY);
+            let submit =
+                settings::common_probe(ui, &mut s.common, history, TARGET_HISTORY_KEY, 120.0);
 
             ui.add_space(6.0);
             ui.horizontal(|ui| {
@@ -177,16 +179,19 @@ impl MtrTab {
                 t!("mtr.worst_ms"),
                 t!("mtr.stdev_ms"),
             ];
-            table(ui, &headers, self.hops.len(), |i, row| {
+            let columns = hop_columns(ui, &headers);
+            table_with_columns(ui, &headers, self.hops.len(), columns, |i, row| {
                 let h = &self.hops[i];
                 row.col(|ui| {
                     ui.label(h.hop.to_string());
                 });
                 row.col(|ui| {
-                    ui.label(h.addr_text());
+                    let text = h.addr_text();
+                    cell_with_tooltip(ui, &text, &text);
                 });
                 row.col(|ui| {
-                    ui.label(h.reverse_text());
+                    let text = h.reverse_text();
+                    cell_with_tooltip(ui, &text, &text);
                 });
                 row.col(|ui| {
                     ui.label(format!("{:.1}%", h.loss_ratio() * 100.0));
@@ -362,5 +367,138 @@ impl MtrTab {
 
     pub fn to_html(&self) -> String {
         crate::ui::export::csv_to_html(&self.to_csv())
+    }
+}
+
+/// Upper bound for the address column. It grows with the panel width so wide
+/// rows can show several responders, but stays bounded.
+const ADDR_COLUMN_MAX_WIDTH: f32 = 220.0;
+
+/// Extra room reserved around measured text so bold labels stay intact.
+const COLUMN_PADDING: f32 = 6.0;
+
+/// Build column widths for the hop table.
+///
+/// Numeric columns are sized from their headers so the full header text stays
+/// visible, while the address and reverse DNS columns share the remaining
+/// width. This keeps long PTR names from pushing the table outside the results
+/// panel.
+fn hop_columns<H: AsRef<str>>(ui: &egui::Ui, headers: &[H]) -> Vec<Column> {
+    hop_column_widths(ui, headers)
+        .into_iter()
+        .map(Column::exact)
+        .collect()
+}
+
+/// Compute the display widths used by [`hop_columns`], in column order.
+fn hop_column_widths<H: AsRef<str>>(ui: &egui::Ui, headers: &[H]) -> Vec<f32> {
+    let spacing = ui.spacing().item_spacing.x * (headers.len().saturating_sub(1)) as f32;
+    let table_width =
+        (ui.available_width() - ui.spacing().scroll.allocated_width() - spacing).max(1.0);
+    let font_id = egui::TextStyle::Body.resolve(ui.style());
+    let measure = |text: &str| {
+        ui.ctx().fonts_mut(|fonts| {
+            fonts
+                .layout_no_wrap(text.to_owned(), font_id.clone(), egui::Color32::WHITE)
+                .size()
+                .x
+        })
+    };
+
+    // Hop and the numeric columns only need room for their headers and values.
+    let numeric_headers = [0usize, 3, 4, 5, 6, 7, 8, 9];
+    let fixed_widths: Vec<f32> = numeric_headers
+        .iter()
+        .map(|&index| measure(headers[index].as_ref()) + COLUMN_PADDING)
+        .collect();
+    let fixed_sum: f32 = fixed_widths.iter().sum();
+    let remaining = (table_width - fixed_sum).max(2.0);
+    // Always keep a full IPv4 address visible, then give the address column
+    // more room when the panel allows it. The reverse DNS column keeps enough
+    // space for its header and takes whatever remains.
+    let ipv4_width = measure("255.255.255.255") + COLUMN_PADDING;
+    let reverse_header_width = measure(headers[2].as_ref()) + COLUMN_PADDING;
+    let addr_width = (remaining - reverse_header_width)
+        .max(ipv4_width)
+        .min(ADDR_COLUMN_MAX_WIDTH)
+        .min(remaining)
+        .max(1.0);
+    let reverse_width = (remaining - addr_width).max(1.0);
+
+    // Display order is hop, address, reverse DNS, then the remaining numeric
+    // columns.
+    let mut fixed = fixed_widths.into_iter();
+    let mut widths = Vec::with_capacity(headers.len());
+    widths.push(fixed.next().unwrap_or(1.0));
+    widths.push(addr_width);
+    widths.push(reverse_width);
+    widths.extend(fixed);
+    widths
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The hop table must never grow past the results panel, and the address
+    /// column must be wide enough for a full IPv4 address.
+    #[test]
+    fn hop_columns_fit_and_show_ipv4() {
+        let ctx = egui::Context::default();
+        for panel_width in [680.0, 760.0, 900.0] {
+            let mut widths = Vec::new();
+            let mut available = 0.0;
+            let mut ipv4_width = 0.0;
+            for _ in 0..4 {
+                ctx.run_ui(egui::RawInput::default(), |ui| {
+                    egui::CentralPanel::default().show(ui, |ui| {
+                        ui.allocate_ui_with_layout(
+                            egui::vec2(panel_width, 600.0),
+                            egui::Layout::top_down(egui::Align::Min),
+                            |ui| {
+                                let headers = [
+                                    t!("mtr.hop"),
+                                    t!("mtr.addr"),
+                                    t!("mtr.reverse"),
+                                    t!("mtr.loss"),
+                                    t!("mtr.count"),
+                                    t!("mtr.last_ms"),
+                                    t!("mtr.avg_ms"),
+                                    t!("mtr.best_ms"),
+                                    t!("mtr.worst_ms"),
+                                    t!("mtr.stdev_ms"),
+                                ];
+                                widths = hop_column_widths(ui, &headers);
+                                available = ui.available_width();
+                                let font_id = egui::TextStyle::Body.resolve(ui.style());
+                                ipv4_width = ui.ctx().fonts_mut(|fonts| {
+                                    fonts
+                                        .layout_no_wrap(
+                                            "255.255.255.255".to_owned(),
+                                            font_id,
+                                            egui::Color32::WHITE,
+                                        )
+                                        .size()
+                                        .x
+                                });
+                            },
+                        );
+                    });
+                })
+                .textures_delta
+                .clear();
+            }
+            let total: f32 = widths.iter().sum();
+            assert!(
+                total <= available + 0.5,
+                "panel {panel_width}: columns total {total} exceed {available}"
+            );
+            assert!(
+                widths[1] >= ipv4_width,
+                "panel {panel_width}: address column {} is narrower than an IPv4 address {ipv4_width}",
+                widths[1]
+            );
+            assert!(widths[2] >= 1.0);
+        }
     }
 }
