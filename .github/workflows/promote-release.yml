@@ -44,6 +44,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REQUESTED_TAG: ${{ inputs.tag }}
         run: |
+          set -o pipefail
+          exec > >(tee promote.log) 2>&1
+
           tag="$REQUESTED_TAG"
           if [[ -z "$tag" ]]; then
               version="$(grep -m1 -E '^version[[:space:]]*=[[:space:]]*"[^"]+"' Cargo.toml \
@@ -64,7 +67,17 @@ jobs:
 
           # This is the only state change: the same build becomes the latest
           # normal release, so `/releases/latest/download/update.json` starts
-          # pointing at it.
-          gh release edit "$tag" --prerelease=false --latest
+          # pointing at it. Keep the two updates separate: some gh versions
+          # reject combining the prerelease and latest flags.
+          gh release edit "$tag" --prerelease=false
+          gh release edit "$tag" --latest
 
           echo "promoted ${tag} to the latest stable release"
+
+      - name: Upload promote log
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: promote-log
+          path: promote.log
+          if-no-files-found: ignore

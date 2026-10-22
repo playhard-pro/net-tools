@@ -6,6 +6,7 @@
 #
 # `stable`: publish a normal GitHub release. Only use this after the pre-release
 # has been tested. Pushing this file with the stable channel also refreshes the
-# repository's latest-release pointer without rebuilding anything.
+# repository's latest-release pointer without rebuilding anything. The workflow
+# can be started manually as well.
 [release]
 channel = "stable"
