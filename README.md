@@ -31,6 +31,7 @@ it.
 | NTP | SNTP query, live analog clock, local/UTC time in milliseconds, server metrics, presets and optional system clock update. |
 | Utils | Subnet/CIDR calculator, Wake-on-LAN, IANA port/protocol reference, MAC vendor lookup and timestamp/timezone conversion. |
 | Speedtest | LibreSpeed, iperf3 client and built-in iperf3 server; live throughput, RTT/jitter and TCP/UDP metrics. |
+| NAT | STUN-based NAT type detection over UDP/IPv4/IPv6 with RFC 5780 behavior discovery, RFC 3489 classic classification, step log and practical explanations for P2P, hole punching, port mapping and relay needs. |
 
 Continuous probes support **Start / Pause / Stop**; one-shot tools and servers
 use **Start / Stop**. Pressing **Enter** in a target field restarts the task with
@@ -82,6 +83,14 @@ authority prefixes; when enabled, a local miss may be queried against
 [MACLookup.app](https://maclookup.app), sending only the six-digit OUI prefix.
 See the [MACLookup.app terms](https://maclookup.app/terms-and-conditions) and
 the source notes in the generated data files.
+
+NAT detection uses public STUN servers over UDP and is available for IPv4 and
+IPv6. RFC 5780 reports mapping and filtering behavior and derives a user-facing
+NAT type; RFC 3489 is kept for comparison and is marked obsolete. Public STUN
+servers may be offline or may not support the `CHANGE-REQUEST` extension, so try
+another server when the result is unsupported. STUN only observes the outermost
+mapping and cannot prove the presence of carrier-grade NAT or double NAT on its
+own. Use this tool only on networks you own or are authorized to test.
 
 ## Screenshots
 

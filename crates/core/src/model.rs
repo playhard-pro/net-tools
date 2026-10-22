@@ -1020,6 +1020,182 @@ pub struct LibreSpeedServer {
     pub sponsor_url: String,
 }
 
+/// NAT discovery procedure selected by the user.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum NatTestMode {
+    /// RFC 5780 mapping and filtering behavior discovery.
+    #[default]
+    Rfc5780,
+    /// Classic RFC 3489 combined NAT type discovery.
+    Rfc3489,
+}
+
+impl NatTestMode {
+    pub fn label(&self) -> &'static str {
+        match self {
+            NatTestMode::Rfc5780 => "RFC 5780",
+            NatTestMode::Rfc3489 => "RFC 3489",
+        }
+    }
+}
+
+/// User-facing NAT classification.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum NatType {
+    #[default]
+    Unknown,
+    UnsupportedServer,
+    UdpBlocked,
+    OpenInternet,
+    SymmetricUdpFirewall,
+    FullCone,
+    RestrictedCone,
+    PortRestrictedCone,
+    Symmetric,
+}
+
+impl NatType {
+    pub fn label(&self) -> &'static str {
+        match self {
+            NatType::Unknown => "unknown",
+            NatType::UnsupportedServer => "unsupported server",
+            NatType::UdpBlocked => "UDP blocked",
+            NatType::OpenInternet => "open internet",
+            NatType::SymmetricUdpFirewall => "symmetric UDP firewall",
+            NatType::FullCone => "full cone",
+            NatType::RestrictedCone => "restricted cone",
+            NatType::PortRestrictedCone => "port restricted cone",
+            NatType::Symmetric => "symmetric",
+        }
+    }
+}
+
+/// NAT mapping behavior as defined by the behavior discovery procedure.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum NatMappingBehavior {
+    #[default]
+    Unknown,
+    UnsupportedServer,
+    Direct,
+    EndpointIndependent,
+    AddressDependent,
+    AddressAndPortDependent,
+    Failed,
+}
+
+impl NatMappingBehavior {
+    pub fn label(&self) -> &'static str {
+        match self {
+            NatMappingBehavior::Unknown => "unknown",
+            NatMappingBehavior::UnsupportedServer => "unsupported server",
+            NatMappingBehavior::Direct => "direct",
+            NatMappingBehavior::EndpointIndependent => "endpoint-independent",
+            NatMappingBehavior::AddressDependent => "address-dependent",
+            NatMappingBehavior::AddressAndPortDependent => "address and port-dependent",
+            NatMappingBehavior::Failed => "failed",
+        }
+    }
+}
+
+/// NAT filtering behavior as defined by the behavior discovery procedure.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum NatFilteringBehavior {
+    #[default]
+    Unknown,
+    UnsupportedServer,
+    EndpointIndependent,
+    AddressDependent,
+    AddressAndPortDependent,
+}
+
+impl NatFilteringBehavior {
+    pub fn label(&self) -> &'static str {
+        match self {
+            NatFilteringBehavior::Unknown => "unknown",
+            NatFilteringBehavior::UnsupportedServer => "unsupported server",
+            NatFilteringBehavior::EndpointIndependent => "endpoint-independent",
+            NatFilteringBehavior::AddressDependent => "address-dependent",
+            NatFilteringBehavior::AddressAndPortDependent => "address and port-dependent",
+        }
+    }
+}
+
+/// Result of the initial binding exchange.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum NatBindingResult {
+    #[default]
+    Unknown,
+    Success,
+    UnsupportedServer,
+    Failed,
+}
+
+impl NatBindingResult {
+    pub fn label(&self) -> &'static str {
+        match self {
+            NatBindingResult::Unknown => "unknown",
+            NatBindingResult::Success => "success",
+            NatBindingResult::UnsupportedServer => "unsupported server",
+            NatBindingResult::Failed => "failed",
+        }
+    }
+}
+
+/// One step of a discovery run.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum NatStepKind {
+    Binding,
+    FilteringTest2,
+    FilteringTest3,
+    MappingTest2,
+    MappingTest3,
+    Rfc3489Test1,
+    Rfc3489Test2,
+    Rfc3489Test1Second,
+    Rfc3489Test3,
+}
+
+/// Observable result of one request or exchange.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NatStep {
+    /// One-based step number within the run.
+    pub index: u32,
+    pub kind: NatStepKind,
+    /// Destination endpoint.
+    pub target: String,
+    pub change_ip: bool,
+    pub change_port: bool,
+    pub responded: bool,
+    /// Source endpoint of the response, when one arrived.
+    pub response_from: Option<String>,
+    /// Reflexive address reported by the response.
+    pub mapped_endpoint: Option<String>,
+    /// Alternate server endpoint reported by the response.
+    pub changed_endpoint: Option<String>,
+    pub rtt_ms: Option<f64>,
+    /// Short machine-readable outcome for the log.
+    pub outcome: String,
+}
+
+/// Final NAT discovery result.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NatResult {
+    pub mode: NatTestMode,
+    pub server: String,
+    pub local_endpoint: String,
+    pub public_endpoint: Option<String>,
+    pub other_endpoint: Option<String>,
+    pub nat_type: NatType,
+    pub binding: NatBindingResult,
+    pub mapping: NatMappingBehavior,
+    pub filtering: NatFilteringBehavior,
+    pub steps: Vec<NatStep>,
+    pub elapsed_ms: u64,
+    /// Optional warning code, especially for unsupported servers. The UI maps
+    /// it to a localized explanation.
+    pub warning: Option<String>,
+}
+
 /// Unified event streamed from a probe task back to the UI.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ProbeEvent {
@@ -1074,6 +1250,10 @@ pub enum ProbeEvent {
     Iperf3ServerResult(Iperf3ServerResult),
     /// Live metrics of a test running on the built-in iperf3 server.
     Iperf3ServerProgress(Iperf3ServerProgress),
+    /// One NAT discovery step.
+    NatStep(NatStep),
+    /// Final NAT discovery result.
+    Nat(NatResult),
     /// The task finished naturally.
     Finished,
 }

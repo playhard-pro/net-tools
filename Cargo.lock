@@ -2806,6 +2806,7 @@ dependencies = [
  "chrono-tz",
  "ct-logs",
  "der",
+ "getrandom 0.3.4",
  "hickory-proto",
  "hickory-resolver",
  "if-addrs",

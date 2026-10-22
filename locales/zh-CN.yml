@@ -28,6 +28,7 @@ tab:
   dns: DNS
   ntp: NTP
   speedtest: 测速
+  nat: NAT
 state:
   idle: 空闲
   running: 运行中
@@ -364,6 +365,108 @@ speedtest:
   phase_connecting: 连接中
   phase_testing: 测试中
   phase_done: 完成
+
+nat:
+  mode: 检测模式
+  server: STUN 服务器
+  retries: 重试次数
+  server_hint: "公共 STUN 服务器可能离线，或不支持 CHANGE-REQUEST 扩展。结果为“服务器不支持”时请更换服务器。"
+  rfc3489_warning: "RFC 3489 已过时，可能无法反映现代路由器或 NAT 的实际行为。"
+  local_bind: 本地绑定地址
+  local_bind_hint: "留空表示在所有网卡上绑定随机端口。"
+  testing: 正在检测…
+  empty: 开始检测以查看 NAT 类型和行为。
+  type: NAT 类型
+  type_open_internet: 公网直连
+  type_full_cone: Full Cone
+  type_restricted: Restricted Cone
+  type_port_restricted: Port Restricted Cone
+  type_firewall: 对称 UDP 防火墙
+  type_symmetric: 对称型 NAT
+  type_udp_blocked: UDP 被阻断
+  type_unsupported: 服务器不支持
+  type_unknown: 无法确定
+  binding: 绑定测试
+  mapping: 映射行为
+  filtering: 过滤行为
+  local_endpoint: 本地端点
+  public_endpoint: 公网端点
+  other_endpoint: 备用端点
+  elapsed: 总耗时
+  steps: 测试步骤
+  no_steps: 暂无测试步骤。
+  step: 步骤
+  target: 目标
+  change: 请求变更
+  response_from: 响应来源
+  mapped: 映射地址
+  outcome: 结果
+  change_ip_port: IP + 端口
+  change_ip: IP
+  change_port: 端口
+  explanation: 这说明什么
+  cgnat_note: "STUN 只能看到最外层映射，无法单独证明是否存在运营商级 NAT 或双重 NAT。若检测正常但入站仍不可达，请检查 CGNAT、端口映射和本地防火墙。"
+  warn_alternate_endpoint: "服务器没有提供可用的备用端点，请更换服务器。"
+  warn_source_change: "服务器没有按请求变更来源端点，本次结果不可靠，请更换服务器。"
+  warn_no_mapped: "服务器没有返回映射地址，请更换服务器。"
+  warn_ignored_source: "服务器忽略了来源变更请求，请更换服务器。"
+  warn_ignored_port: "服务器忽略了端口变更请求，请更换服务器。"
+  binding_success: 成功
+  binding_unsupported: 服务器不支持
+  binding_failed: 失败
+  binding_unknown: 未知
+  mapping_direct: 直连
+  mapping_endpoint_independent: 端点无关
+  mapping_address_dependent: 地址相关
+  mapping_address_port_dependent: 地址和端口相关
+  mapping_unsupported: 服务器不支持
+  mapping_failed: 失败
+  mapping_unknown: 未知
+  filtering_endpoint_independent: 端点无关
+  filtering_address_dependent: 地址相关
+  filtering_address_port_dependent: 地址和端口相关
+  filtering_unsupported: 服务器不支持
+  filtering_unknown: 未知
+  step_binding: 绑定测试
+  step_filtering_2: 过滤测试 II
+  step_filtering_3: 过滤测试 III
+  step_mapping_2: 映射测试 II
+  step_mapping_3: 映射测试 III
+  step_classic_1: 测试 I
+  step_classic_2: 测试 II
+  step_classic_1_second: 测试 I（备用服务器）
+  step_classic_3: 测试 III
+  outcome_no_response: 无响应
+  outcome_mapped: 已获取映射
+  outcome_unsupported: 服务器不支持
+  outcome_responded: 已响应
+  outcome_mapping_changed: 映射已变化
+  outcome_mapping_unchanged: 映射未变化
+  outcome_alternate_endpoint: 备用端点已响应
+  outcome_alternate_port: 备用端口已响应
+  outcome_no_alternate_port: 备用端口无响应
+  outcome_unexpected_source: 响应来源异常
+  outcome_no_mapped: 无映射地址
+  outcome_mapping_changed_again: 映射再次变化
+  explain_open_what: "当前主机无需 NAT 即可在公网直接访问。"
+  explain_open_advice: "P2P 连接很容易建立，但主机直接暴露在入站流量中。请保持防火墙开启，只运行确实需要对外提供的服务。"
+  explain_full_what: "NAT 对所有目标使用同一个映射，并且任何外部主机向该映射发送数据包都能到达内网主机。"
+  explain_full_advice: "P2P 和打洞通常很可靠。由于过滤行为与端点无关，知道映射地址的任何人都可能访问该主机，请检查防火墙规则。"
+  explain_restricted_what: "NAT 对所有目标使用同一个映射，但只接受内网主机曾主动联系过的地址发来的数据包。"
+  explain_restricted_advice: "双方都先向对方发送数据后，大多数 P2P 和打洞场景可以工作；通常通过 STUN 协调握手即可。"
+  explain_port_restricted_what: "NAT 使用同一个映射，但会同时按来源地址和端口过滤入站数据包。"
+  explain_port_restricted_advice: "双方通过 STUN 协调后打洞通常可行；没有协调时入站流量会被丢弃。"
+  explain_firewall_what: "主机看起来拥有公网地址，但入站 UDP 被过滤。"
+  explain_firewall_advice: "这更像防火墙策略而不是 NAT 映射。可以放行所需端口或使用打洞；双方都主动发起流量时 P2P 仍可能工作。"
+  explain_symmetric_what: "当目标地址或端口变化时，NAT 会分配不同的映射，并且只有被联系过的对端才能回包。"
+  explain_symmetric_advice: "直接 P2P 较困难，端口预测也不可靠。建议使用 TURN 等中继、在路由器上启用限制更少的 NAT 模式，或确认是否存在 CGNAT。"
+  explain_blocked_what: "没有收到 STUN 响应，UDP 可能被阻断，或服务器不可达。"
+  explain_blocked_advice: "请检查防火墙、更换 STUN 服务器，或改用基于 TCP/TLS 的服务和中继，而不是依赖 UDP。"
+  explain_unsupported_what: "服务器有响应，但没有提供本检测所需的备用端点或来源变更能力。"
+  explain_unsupported_advice: "请更换 STUN 服务器。部分公共服务器只支持基础绑定，无法用于判定 NAT 行为。"
+  explain_unknown_what: "检测未能完成足够的步骤来判定 NAT 类型。"
+  explain_unknown_advice: "可以重试、增大超时时间或更换服务器，并查看步骤日志确认是哪一步失败。"
+
 
 server:
   refresh_ips: 刷新 IP

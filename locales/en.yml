@@ -29,6 +29,7 @@ tab:
   ntp: NTP
   utils: Utils
   speedtest: Speedtest
+  nat: NAT
 state:
   idle: idle
   running: running
@@ -365,6 +366,108 @@ speedtest:
   phase_connecting: connecting
   phase_testing: testing
   phase_done: done
+
+nat:
+  mode: Mode
+  server: STUN server
+  retries: Retries
+  server_hint: "Public STUN servers may be offline or may not support the CHANGE-REQUEST extension. Try another server when the result is unsupported."
+  rfc3489_warning: "RFC 3489 is obsolete and may not reflect modern routers or NAT behavior."
+  local_bind: Local bind address
+  local_bind_hint: "Leave empty to bind an ephemeral port on all interfaces."
+  testing: Testing…
+  empty: Start a NAT discovery to see the type and behavior.
+  type: NAT type
+  type_open_internet: Open Internet
+  type_full_cone: Full Cone
+  type_restricted: Restricted Cone
+  type_port_restricted: Port Restricted Cone
+  type_firewall: Symmetric UDP Firewall
+  type_symmetric: Symmetric NAT
+  type_udp_blocked: UDP Blocked
+  type_unsupported: Unsupported Server
+  type_unknown: Unknown
+  binding: Binding test
+  mapping: Mapping behavior
+  filtering: Filtering behavior
+  local_endpoint: Local endpoint
+  public_endpoint: Public endpoint
+  other_endpoint: Alternate endpoint
+  elapsed: Elapsed
+  steps: Test steps
+  no_steps: No test steps yet.
+  step: Step
+  target: Target
+  change: Change
+  response_from: Response from
+  mapped: Mapped
+  outcome: Outcome
+  change_ip_port: IP + port
+  change_ip: IP
+  change_port: Port
+  explanation: What this means
+  cgnat_note: "STUN only shows the outermost mapping. It cannot prove whether a carrier-grade NAT or a double NAT is present; if inbound traffic still fails, check CGNAT, port forwarding and the local firewall."
+  warn_alternate_endpoint: "The server did not provide a usable alternate endpoint. Try another server."
+  warn_source_change: "The server did not change its source endpoint, so this result is not reliable. Try another server."
+  warn_no_mapped: "The server did not return a mapped address. Try another server."
+  warn_ignored_source: "The server ignored the requested source change. Try another server."
+  warn_ignored_port: "The server ignored the requested port change. Try another server."
+  binding_success: Success
+  binding_unsupported: Unsupported server
+  binding_failed: Failed
+  binding_unknown: Unknown
+  mapping_direct: Direct
+  mapping_endpoint_independent: Endpoint-independent
+  mapping_address_dependent: Address-dependent
+  mapping_address_port_dependent: Address and port-dependent
+  mapping_unsupported: Unsupported server
+  mapping_failed: Failed
+  mapping_unknown: Unknown
+  filtering_endpoint_independent: Endpoint-independent
+  filtering_address_dependent: Address-dependent
+  filtering_address_port_dependent: Address and port-dependent
+  filtering_unsupported: Unsupported server
+  filtering_unknown: Unknown
+  step_binding: Binding test
+  step_filtering_2: Filtering test II
+  step_filtering_3: Filtering test III
+  step_mapping_2: Mapping test II
+  step_mapping_3: Mapping test III
+  step_classic_1: Test I
+  step_classic_2: Test II
+  step_classic_1_second: Test I (alternate server)
+  step_classic_3: Test III
+  outcome_no_response: No response
+  outcome_mapped: Mapping received
+  outcome_unsupported: Unsupported server
+  outcome_responded: Responded
+  outcome_mapping_changed: Mapping changed
+  outcome_mapping_unchanged: Mapping unchanged
+  outcome_alternate_endpoint: Alternate endpoint responded
+  outcome_alternate_port: Alternate port responded
+  outcome_no_alternate_port: Alternate port did not respond
+  outcome_unexpected_source: Unexpected response source
+  outcome_no_mapped: No mapped address
+  outcome_mapping_changed_again: Mapping changed again
+  explain_open_what: "Your endpoint is directly reachable on the public internet without NAT."
+  explain_open_advice: "Peer-to-peer connections are easy, but the host is exposed to inbound traffic. Keep a firewall enabled and only run services you intend to expose."
+  explain_full_what: "The NAT keeps one mapping for all destinations and accepts inbound packets from any source that sends to that mapping."
+  explain_full_advice: "P2P and hole punching are usually reliable. Because filtering is endpoint-independent, anyone who learns the mapping can reach it; review firewall rules."
+  explain_restricted_what: "The NAT keeps one mapping for all destinations but only accepts packets from addresses the host has contacted."
+  explain_restricted_advice: "Most P2P and hole punching scenarios work once both sides send to each other; a STUN-coordinated handshake is normally enough."
+  explain_port_restricted_what: "The NAT keeps one mapping but filters inbound packets by both source address and port."
+  explain_port_restricted_advice: "Hole punching usually works when both peers coordinate through STUN. Without coordination, inbound traffic is dropped."
+  explain_firewall_what: "The host appears to have a public address, but inbound UDP is filtered."
+  explain_firewall_advice: "This is a firewall policy rather than a NAT mapping. Allow the required port or use hole punching; peer-to-peer may work when both sides initiate traffic."
+  explain_symmetric_what: "The NAT assigns a different mapping when the destination address or port changes, and only the contacted peer can send back."
+  explain_symmetric_advice: "Direct P2P is difficult and port prediction is unreliable. Use a relay such as TURN, enable a less restrictive NAT mode on the router, or verify whether CGNAT is involved."
+  explain_blocked_what: "No STUN response arrived, so UDP appears to be blocked or the server is unreachable."
+  explain_blocked_advice: "Check the firewall, try another STUN server, or use TCP/TLS-based services and relays instead of UDP."
+  explain_unsupported_what: "The server answered but did not provide the alternate endpoint or source-change behavior needed by this procedure."
+  explain_unsupported_advice: "Try another STUN server. Some public servers only support basic binding and cannot classify NAT behavior."
+  explain_unknown_what: "The discovery could not complete enough tests to classify the NAT."
+  explain_unknown_advice: "Retry, increase the timeout, or try another server. Check the step log to see which request failed."
+
 
 server:
   refresh_ips: Refresh IPs

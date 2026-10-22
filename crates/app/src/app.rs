@@ -11,6 +11,7 @@ use crate::tabs::http_ping::HttpPingTab;
 use crate::tabs::ip_insight::IpInsightTab;
 use crate::tabs::lookup::LookupTab;
 use crate::tabs::mtr::MtrTab;
+use crate::tabs::nat::NatTab;
 use crate::tabs::ntp::NtpTab;
 use crate::tabs::overview::OverviewTab;
 use crate::tabs::ping::PingTab;
@@ -53,12 +54,13 @@ pub enum Tab {
     Ntp,
     Utils,
     Speedtest,
+    Nat,
 }
 
 impl Tab {
     /// Built-in order. The overview is pinned first and missing tabs are
     /// appended when a saved order is loaded.
-    pub const ALL: [Tab; 13] = [
+    pub const ALL: [Tab; 14] = [
         Tab::Overview,
         Tab::Ping,
         Tab::Mtr,
@@ -72,6 +74,7 @@ impl Tab {
         Tab::Ntp,
         Tab::Utils,
         Tab::Speedtest,
+        Tab::Nat,
     ];
 
     /// Stable identifier stored in the configuration. Changing this breaks the
@@ -91,6 +94,7 @@ impl Tab {
             Tab::Ntp => "ntp",
             Tab::Utils => "utils",
             Tab::Speedtest => "speedtest",
+            Tab::Nat => "nat",
         }
     }
 
@@ -119,6 +123,7 @@ pub struct App {
     pub ntp: NtpTab,
     pub utils: UtilsTab,
     pub speedtest: SpeedtestTab,
+    pub nat: NatTab,
     pub privilege: PrivilegeStatus,
     /// Manual or system-following theme preference.
     pub theme_preference: egui::ThemePreference,
@@ -155,6 +160,7 @@ impl App {
             ntp: NtpTab::new(),
             utils: UtilsTab::new(),
             speedtest: SpeedtestTab::new(),
+            nat: NatTab::new(),
             privilege: net_tools_core::net::privilege::probe(),
             theme_preference,
             settings_expanded: true,
@@ -193,6 +199,11 @@ impl App {
         // outstanding collection result.
         if self.tab == Tab::Connections && tab != Tab::Connections {
             self.connections.clear_on_hide();
+        }
+        // Leaving the NAT tab cancels an in-flight discovery. A completed
+        // result remains available for the next visit.
+        if self.tab == Tab::Nat && tab != Tab::Nat {
+            self.nat.clear_on_hide();
         }
         self.tab = tab;
     }
@@ -474,6 +485,7 @@ fn tab_label(tab: Tab) -> String {
         Tab::Ntp => t!("tab.ntp"),
         Tab::Utils => t!("tab.utils"),
         Tab::Speedtest => t!("tab.speedtest"),
+        Tab::Nat => t!("tab.nat"),
     }
     .to_string()
 }
@@ -658,6 +670,13 @@ impl eframe::App for App {
                 &self.rt,
                 settings_expanded,
             ),
+            Tab::Nat => self.nat.ui(
+                ui,
+                &mut self.cfg.nat,
+                &mut self.cfg.history,
+                &self.rt,
+                settings_expanded,
+            ),
         });
         self.settings_expanded = expanded.inner;
 
@@ -674,6 +693,7 @@ impl eframe::App for App {
         // Stop a running speed test so its hidden worker does not outlive the
         // application.
         self.speedtest.clear_on_hide();
+        self.nat.clear_on_hide();
         self.tls.clear_on_hide();
         crate::config_store::save(&self.cfg);
     }
@@ -770,6 +790,7 @@ mod tests {
             ntp: NtpTab::new(),
             utils: UtilsTab::new(),
             speedtest: SpeedtestTab::new(),
+            nat: NatTab::new(),
             privilege: net_tools_core::net::privilege::probe(),
             theme_preference: egui::ThemePreference::System,
             settings_expanded: true,

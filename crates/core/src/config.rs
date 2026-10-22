@@ -5,8 +5,8 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 
 use crate::model::{
-    IpVersion, Iperf3Protocol, PortPreset, PortReferenceView, PortTransportFilter, ProbeMode,
-    ScanMode, SpeedtestTool, TimestampUnit, UtilsTool,
+    IpVersion, Iperf3Protocol, NatTestMode, PortPreset, PortReferenceView, PortTransportFilter,
+    ProbeMode, ScanMode, SpeedtestTool, TimestampUnit, UtilsTool,
 };
 
 /// Maximum number of remembered values kept for each input field. Older entries
@@ -463,6 +463,36 @@ impl Default for SpeedtestSettings {
     }
 }
 
+/// Settings for NAT type discovery.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NatSettings {
+    /// Discovery procedure: behavior discovery or the classic procedure.
+    pub mode: NatTestMode,
+    /// STUN server host, optionally followed by a port.
+    pub server: String,
+    pub ip_version: IpVersion,
+    /// Timeout for one request attempt, in milliseconds.
+    pub timeout_ms: u64,
+    /// Additional attempts after a timeout.
+    pub retries: u32,
+    /// Optional local bind address (`IP` or `IP:port`); empty binds a wildcard
+    /// address and an ephemeral port.
+    pub local_bind: String,
+}
+
+impl Default for NatSettings {
+    fn default() -> Self {
+        Self {
+            mode: NatTestMode::Rfc5780,
+            server: "stun.fitauto.ru".into(),
+            ip_version: IpVersion::Auto,
+            timeout_ms: 3000,
+            retries: 1,
+            local_bind: String::new(),
+        }
+    }
+}
+
 /// Settings for the subnet/CIDR calculator.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SubnetSettings {
@@ -699,6 +729,9 @@ pub struct AppConfig {
     /// Added after the first release, so older config files still load.
     #[serde(default)]
     pub utils: UtilsSettings,
+    /// Added after the first release, so older config files still load.
+    #[serde(default)]
+    pub nat: NatSettings,
 }
 
 impl Default for AppConfig {
@@ -720,6 +753,7 @@ impl Default for AppConfig {
             speedtest: SpeedtestSettings::default(),
             tls: TlsSettings::default(),
             utils: UtilsSettings::default(),
+            nat: NatSettings::default(),
         }
     }
 }
@@ -776,6 +810,11 @@ mod tests {
         assert_eq!(back.tls.concurrency, cfg.tls.concurrency);
         assert_eq!(back.tls.probe_alpn, cfg.tls.probe_alpn);
         assert_eq!(back.tls.check_revocation, cfg.tls.check_revocation);
+        assert_eq!(back.nat.mode, cfg.nat.mode);
+        assert_eq!(back.nat.server, cfg.nat.server);
+        assert_eq!(back.nat.timeout_ms, cfg.nat.timeout_ms);
+        assert_eq!(back.nat.retries, cfg.nat.retries);
+        assert_eq!(back.nat.local_bind, cfg.nat.local_bind);
     }
 
     #[test]
@@ -863,6 +902,20 @@ mod tests {
         let text = toml::to_string(&value).unwrap();
         let back: AppConfig = toml::from_str(&text).unwrap();
         assert_eq!(back.speedtest.iperf3_server.port, 5201);
+    }
+
+    #[test]
+    fn old_config_without_nat_still_loads() {
+        let mut value = toml::Value::try_from(AppConfig::default()).unwrap();
+        value
+            .as_table_mut()
+            .expect("config is a table")
+            .remove("nat");
+        let text = toml::to_string(&value).unwrap();
+        let back: AppConfig = toml::from_str(&text).unwrap();
+        assert_eq!(back.nat.mode, NatTestMode::Rfc5780);
+        assert_eq!(back.nat.retries, NatSettings::default().retries);
+        assert_eq!(back.nat.local_bind, "");
     }
 
     #[test]

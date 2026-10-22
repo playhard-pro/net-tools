@@ -7,6 +7,7 @@ pub mod ip_insight;
 pub mod iperf3_server;
 pub mod lookup;
 pub mod mtr;
+pub mod nat;
 pub mod ntp;
 pub mod overview;
 pub mod ping;

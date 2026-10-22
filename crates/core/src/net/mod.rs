@@ -33,6 +33,7 @@ pub mod portscan;
 pub mod privilege;
 pub mod raw_icmp;
 pub mod rdap;
+pub mod stun;
 pub mod tcp;
 pub mod tls;
 pub mod udp;
