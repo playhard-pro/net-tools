@@ -366,6 +366,11 @@ speedtest:
   phase_testing: 测试中
   phase_done: 完成
 
+portscan:
+  scanned: 已扫描
+  remaining: 剩余
+  open: 开放端口
+
 nat:
   mode: 检测模式
   server: STUN 服务器

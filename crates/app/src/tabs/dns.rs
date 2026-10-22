@@ -15,6 +15,27 @@ use crate::ui::history_input;
 const TARGET_HISTORY_KEY: &str = "dns.target";
 const SERVER_HISTORY_KEY: &str = "dns.server";
 
+/// Public recursive resolvers offered as labeled presets. The label names the
+/// provider and the value is what gets stored in the input field.
+const SERVER_PRESETS: &[(&str, &str)] = &[
+    ("Google 8.8.8.8", "8.8.8.8"),
+    ("Google 8.8.4.4", "8.8.4.4"),
+    ("Google 2001:4860:4860::8888", "2001:4860:4860::8888"),
+    ("Google 2001:4860:4860::8844", "2001:4860:4860::8844"),
+    ("Cloudflare 1.1.1.1", "1.1.1.1"),
+    ("Cloudflare 1.0.0.1", "1.0.0.1"),
+    ("Cloudflare 2606:4700:4700::1111", "2606:4700:4700::1111"),
+    ("Cloudflare 2606:4700:4700::1001", "2606:4700:4700::1001"),
+    ("OpenDNS 208.67.222.222", "208.67.222.222"),
+    ("OpenDNS 208.67.220.220", "208.67.220.220"),
+    ("OpenDNS 2620:119:35::35", "2620:119:35::35"),
+    ("OpenDNS 2620:119:53::53", "2620:119:53::53"),
+    ("Quad9 9.9.9.9", "9.9.9.9"),
+    ("Quad9 149.112.112.112", "149.112.112.112"),
+    ("Quad9 2620:fe::fe", "2620:fe::fe"),
+    ("Quad9 2620:fe::9", "2620:fe::9"),
+];
+
 pub struct DnsTab {
     pub ctrl: TaskController<ProbeEvent>,
     /// Text produced by the latest query or trace.
@@ -111,9 +132,10 @@ impl DnsTab {
                     ui.end_row();
 
                     ui.label(t!("dns.server"));
-                    if history_input::singleline(
+                    if history_input::singleline_with_labeled_presets(
                         ui,
                         SERVER_HISTORY_KEY,
+                        SERVER_PRESETS,
                         &mut s.server,
                         history,
                         140.0,

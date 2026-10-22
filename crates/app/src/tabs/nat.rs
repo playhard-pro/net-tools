@@ -40,7 +40,6 @@ pub const PRESET_SERVERS: &[&str] = &[
     "stun.t-online.de",
     "stun.srce.hr",
     "stun.aa.net.uk",
-    "stun.miwifi.com",
     "stun.syncthing.net",
 ];
 

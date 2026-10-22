@@ -67,9 +67,13 @@ impl PortScanTab {
     }
 
     pub fn drain(&mut self) {
+        let mut added = false;
         for ev in self.ctrl.drain() {
             match ev {
-                ProbeEvent::Port(p) => self.results.push(p),
+                ProbeEvent::Port(p) => {
+                    self.results.push(p);
+                    added = true;
+                }
                 ProbeEvent::ScanProgress(p) => self.progress = Some(p),
                 ProbeEvent::Info(msg) => {
                     self.info.push(msg);
@@ -80,6 +84,11 @@ impl PortScanTab {
                 ProbeEvent::Error { message, hint } => self.error = Some((message, hint)),
                 _ => {}
             }
+        }
+        // Workers report completions concurrently, so keep the table in a
+        // stable host/port order without changing the scan itself.
+        if added {
+            sort_results(&mut self.results);
         }
     }
 
@@ -166,10 +175,6 @@ impl PortScanTab {
                 self.control_row(ui, s, history, rt);
                 state_badge(ui, self.ctrl.state);
             });
-            if let Some(p) = &self.progress {
-                ui.label(format!("{} / {} ({})", p.scanned, p.total, p.open));
-            }
-
             if let Some((msg, hint)) = &self.error {
                 error_banner(ui, msg, hint.as_deref());
             }
@@ -192,6 +197,7 @@ impl PortScanTab {
 
         crate::ui::layout::results_panel(ui, |ui| {
             self.toolbar(ui);
+            self.progress_ui(ui);
 
             let palette = Palette::from_ui(ui);
             let headers = [
@@ -236,6 +242,44 @@ impl PortScanTab {
         });
 
         expanded
+    }
+
+    /// Show overall scan progress, remaining probes and the open-port count.
+    fn progress_ui(&self, ui: &mut egui::Ui) {
+        let Some(progress) = &self.progress else {
+            return;
+        };
+        let fraction = if progress.total == 0 {
+            0.0
+        } else {
+            progress.scanned as f32 / progress.total as f32
+        };
+        let remaining = progress.total.saturating_sub(progress.scanned);
+        let palette = Palette::from_ui(ui);
+        egui::Frame::new()
+            .fill(palette.card_bg)
+            .corner_radius(4.0)
+            .inner_margin(egui::Margin::symmetric(8, 6))
+            .show(ui, |ui| {
+                ui.add(
+                    egui::ProgressBar::new(fraction)
+                        .desired_width(ui.available_width())
+                        .show_percentage(),
+                );
+                ui.horizontal_wrapped(|ui| {
+                    ui.monospace(format!(
+                        "{}: {} / {}",
+                        t!("portscan.scanned"),
+                        progress.scanned,
+                        progress.total
+                    ));
+                    ui.separator();
+                    ui.monospace(format!("{}: {}", t!("portscan.remaining"), remaining));
+                    ui.separator();
+                    ui.monospace(format!("{}: {}", t!("portscan.open"), progress.open));
+                });
+            });
+        ui.add_space(8.0);
     }
 
     fn toolbar(&mut self, ui: &mut egui::Ui) {
@@ -323,5 +367,41 @@ impl PortScanTab {
 
     pub fn to_html(&self) -> String {
         crate::ui::export::csv_to_html(&self.to_csv())
+    }
+}
+
+/// Sort scan rows for display. Hosts stay grouped, and ports are ascending
+/// within each host regardless of worker completion order.
+fn sort_results(results: &mut [PortResult]) {
+    results.sort_by(|a, b| a.host.cmp(&b.host).then(a.port.cmp(&b.port)));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use net_tools_core::model::PortProtocol;
+
+    fn result(host: &str, port: u16) -> PortResult {
+        PortResult {
+            host: host.into(),
+            port,
+            protocol: PortProtocol::Tcp,
+            state: PortState::Open,
+            banner: None,
+            service: None,
+        }
+    }
+
+    #[test]
+    fn results_sort_by_host_then_port() {
+        let mut results = vec![
+            result("b", 443),
+            result("a", 80),
+            result("a", 22),
+            result("b", 22),
+        ];
+        sort_results(&mut results);
+        let keys: Vec<(&str, u16)> = results.iter().map(|r| (r.host.as_str(), r.port)).collect();
+        assert_eq!(keys, vec![("a", 22), ("a", 80), ("b", 22), ("b", 443)]);
     }
 }

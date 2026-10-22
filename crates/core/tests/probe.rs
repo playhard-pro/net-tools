@@ -3,7 +3,7 @@
 use std::time::Duration;
 
 use net_tools_core::config::{HttpSettings, MtrSettings, PingSettings, PortScanSettings};
-use net_tools_core::control::TaskController;
+use net_tools_core::control::{TaskController, TaskState};
 use net_tools_core::model::{IpVersion, PortState, ProbeEvent, ScanMode};
 use net_tools_core::net::{http, icmp, mtr, portscan, udp};
 
@@ -441,6 +441,88 @@ async fn udp_scan_closed_port() {
         closed,
         "expected port {port} closed (ICMP unreachable), got {events:?}"
     );
+}
+
+#[tokio::test]
+async fn port_scan_stops_promptly_with_long_timeout() {
+    // A bound but silent UDP socket makes each probe wait for the full
+    // timeout. Cancellation must drop those waits instead of leaving the task
+    // in the stopping state.
+    let socket = tokio::net::UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    let port = socket.local_addr().unwrap().port();
+
+    let s = PortScanSettings {
+        targets: "127.0.0.1".into(),
+        ports: port.to_string(),
+        mode: ScanMode::Udp,
+        timeout_ms: 10_000,
+        concurrency: 4,
+        ..PortScanSettings::default()
+    };
+    let mut ctrl: TaskController<ProbeEvent> = TaskController::new();
+    ctrl.start(&tokio::runtime::Handle::current(), move |h| {
+        portscan::run_scan(h, s)
+    });
+
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    ctrl.stop();
+
+    let started = std::time::Instant::now();
+    loop {
+        let _ = ctrl.drain();
+        if ctrl.state == TaskState::Finished {
+            break;
+        }
+        assert!(
+            started.elapsed() < Duration::from_secs(1),
+            "port scan did not stop promptly, state: {:?}",
+            ctrl.state
+        );
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+}
+
+#[tokio::test]
+async fn port_scan_reports_initial_and_final_progress() {
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let _srv = tokio::spawn(async move {
+        loop {
+            if listener.accept().await.is_err() {
+                break;
+            }
+        }
+    });
+
+    let s = PortScanSettings {
+        targets: "127.0.0.1".into(),
+        ports: port.to_string(),
+        mode: ScanMode::TcpConnect,
+        timeout_ms: 500,
+        ..PortScanSettings::default()
+    };
+    let mut ctrl: TaskController<ProbeEvent> = TaskController::new();
+    ctrl.start(&tokio::runtime::Handle::current(), move |h| {
+        portscan::run_scan(h, s)
+    });
+
+    let mut progress = Vec::new();
+    for _ in 0..100 {
+        for event in ctrl.drain() {
+            if let ProbeEvent::ScanProgress(p) = event {
+                progress.push(p);
+            }
+        }
+        if ctrl.state == TaskState::Finished {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+
+    assert!(!progress.is_empty(), "expected progress events");
+    assert_eq!(progress.first().unwrap().scanned, 0);
+    assert_eq!(progress.last().unwrap().scanned, 1);
+    assert_eq!(progress.last().unwrap().total, 1);
 }
 
 /// On Linux the datagram ICMP engine reports the reply TTL without elevation.

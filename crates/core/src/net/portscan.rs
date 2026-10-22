@@ -4,13 +4,13 @@ use std::collections::BTreeSet;
 #[cfg(target_os = "linux")]
 use std::net::Ipv4Addr;
 use std::net::{IpAddr, SocketAddr};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 use tokio::sync::mpsc;
-use tokio::sync::Mutex as AsyncMutex;
 
 use crate::config::PortScanSettings;
 use crate::control::ProbeHandle;
@@ -94,19 +94,22 @@ pub async fn run_scan(handle: ProbeHandle<ProbeEvent>, settings: PortScanSetting
         }
     }
 
+    // The SYN path reports its own total because it skips IPv6 targets.
+    if !matches!(settings.mode, ScanMode::Syn) {
+        handle.send(ProbeEvent::ScanProgress(ScanProgress {
+            scanned: 0,
+            total,
+            open: 0,
+        }));
+    }
+
+    let jobs = Arc::new(jobs);
     match settings.mode {
         ScanMode::TcpConnect => {
-            scan_pool(
-                &handle,
-                &settings,
-                total,
-                jobs.into_iter(),
-                scan_tcp_connect,
-            )
-            .await;
+            scan_pool(&handle, &settings, total, jobs, scan_tcp_connect).await;
         }
         ScanMode::Udp => {
-            scan_pool(&handle, &settings, total, jobs.into_iter(), scan_udp).await;
+            scan_pool(&handle, &settings, total, jobs, scan_udp).await;
         }
         ScanMode::Syn => {
             syn_scan_all(&handle, &settings, &host_ips, &ports).await;
@@ -116,62 +119,60 @@ pub async fn run_scan(handle: ProbeHandle<ProbeEvent>, settings: PortScanSetting
     handle.send(ProbeEvent::Finished);
 }
 
-/// Generic concurrent worker pool: `concurrency` workers consume jobs and
-/// results are streamed back in completion order.
+/// Generic concurrent worker pool: `concurrency` workers pull jobs from a
+/// shared index and results are streamed back in completion order.
 async fn scan_pool<F, Fut>(
     handle: &ProbeHandle<ProbeEvent>,
     settings: &PortScanSettings,
     total: u64,
-    jobs: impl Iterator<Item = Job>,
+    jobs: Arc<Vec<Job>>,
     worker_fn: F,
 ) where
     F: Fn(Job, PortScanSettings) -> Fut + Send + Sync + Copy + 'static,
     Fut: std::future::Future<Output = PortResult> + Send,
 {
-    let (job_tx, job_rx) = mpsc::channel::<Job>(1024);
     let (res_tx, mut res_rx) = mpsc::channel::<PortResult>(1024);
-    let job_rx = Arc::new(AsyncMutex::new(job_rx));
+    let next = Arc::new(AtomicUsize::new(0));
 
     let concurrency = settings.concurrency.max(1);
     let mut workers = Vec::new();
     for _ in 0..concurrency {
-        let rx = job_rx.clone();
         let tx = res_tx.clone();
         let h = handle.clone();
         let s = settings.clone();
+        let jobs = Arc::clone(&jobs);
+        let next = Arc::clone(&next);
         workers.push(tokio::spawn(async move {
             loop {
                 if h.is_cancelled() {
                     break;
                 }
                 h.wait_if_paused().await;
-                let job = {
-                    let mut g = rx.lock().await;
-                    g.recv().await
+                // Claiming a job is a cheap atomic operation, so cancellation
+                // never has to wait for a channel or a shared lock.
+                let index = next.fetch_add(1, Ordering::Relaxed);
+                let Some(job) = jobs.get(index).cloned() else {
+                    break;
                 };
-                match job {
-                    Some(j) => {
-                        let r = worker_fn(j, s.clone()).await;
-                        if tx.send(r).await.is_err() {
-                            break;
-                        }
-                    }
-                    None => break,
+
+                // A connect or response timeout can be much longer than the
+                // time a user expects the Stop button to take. Cancelling the
+                // in-flight probe keeps stopping responsive.
+                let result = tokio::select! {
+                    _ = h.cancelled() => break,
+                    result = worker_fn(job, s.clone()) => result,
+                };
+                let sent = tokio::select! {
+                    _ = h.cancelled() => break,
+                    sent = tx.send(result) => sent,
+                };
+                if sent.is_err() {
+                    break;
                 }
             }
         }));
     }
-
-    // Producer.
-    for job in jobs {
-        if handle.is_cancelled() {
-            break;
-        }
-        if job_tx.send(job).await.is_err() {
-            break;
-        }
-    }
-    drop(job_tx);
+    drop(res_tx);
 
     // Aggregate results.
     let mut scanned = 0u64;
@@ -182,16 +183,14 @@ async fn scan_pool<F, Fut>(
         }
         scanned += 1;
         handle.send(ProbeEvent::Port(r));
-        if scanned.is_multiple_of(50) || scanned >= total {
-            handle.send(ProbeEvent::ScanProgress(ScanProgress {
-                scanned,
-                total,
-                open,
-            }));
-        }
+        handle.send(ProbeEvent::ScanProgress(ScanProgress {
+            scanned,
+            total,
+            open,
+        }));
     }
-    for w in workers {
-        let _ = w.await;
+    for worker in workers {
+        let _ = worker.await;
     }
 }
 
@@ -374,14 +373,33 @@ async fn syn_scan_all(
         return;
     }
 
+    let total = host_ips
+        .iter()
+        .filter(|(_, ip)| matches!(ip, IpAddr::V4(_)))
+        .count() as u64
+        * ports.len() as u64;
+    handle.send(ProbeEvent::ScanProgress(ScanProgress {
+        scanned: 0,
+        total,
+        open: 0,
+    }));
+
+    let mut progress = SynProgress {
+        scanned: 0,
+        open: 0,
+        total,
+    };
     for (host, ip) in host_ips {
+        if handle.is_cancelled() {
+            break;
+        }
         let IpAddr::V4(target) = ip else {
             handle.send(ProbeEvent::Info(format!(
                 "SYN scan: skip {host} (IPv6 not supported for SYN)"
             )));
             continue;
         };
-        match syn_scan_host(handle, settings, host, *target, ports).await {
+        match syn_scan_host(handle, settings, host, *target, ports, &mut progress).await {
             Ok(()) => {}
             Err(e) => {
                 handle.send(ProbeEvent::Error {
@@ -408,6 +426,14 @@ async fn syn_scan_all(
     });
 }
 
+/// Aggregated counter for the SYN path across all IPv4 targets.
+#[cfg(target_os = "linux")]
+struct SynProgress {
+    scanned: u64,
+    open: u64,
+    total: u64,
+}
+
 #[cfg(target_os = "linux")]
 async fn syn_scan_host(
     handle: &ProbeHandle<ProbeEvent>,
@@ -415,6 +441,7 @@ async fn syn_scan_host(
     host: &str,
     target: Ipv4Addr,
     ports: &[u16],
+    progress: &mut SynProgress,
 ) -> Result<(), String> {
     use socket2::{Domain, Protocol, SockAddr, Socket, Type};
 
@@ -423,8 +450,6 @@ async fn syn_scan_host(
     let raw =
         Socket::new(Domain::IPV4, Type::RAW, Some(Protocol::TCP)).map_err(|e| e.to_string())?;
     let timeout = Duration::from_millis(settings.timeout_ms);
-    raw.set_read_timeout(Some(timeout))
-        .map_err(|e| e.to_string())?;
 
     let src_port: u16 = 40000 + ((std::process::id() as u16) % 20000);
     let seq: u32 = (std::time::SystemTime::now()
@@ -432,10 +457,6 @@ async fn syn_scan_host(
         .unwrap()
         .as_nanos() as u32)
         ^ 0x5a5a5a5a;
-
-    let total = ports.len() as u64;
-    let mut scanned = 0u64;
-    let mut open = 0u64;
 
     for &port in ports {
         if handle.is_cancelled() {
@@ -453,7 +474,9 @@ async fn syn_scan_host(
         let dst = SockAddr::from(SocketAddr::new(IpAddr::V4(target), port));
         raw.send_to(&syn, &dst).map_err(|e| e.to_string())?;
 
-        let state = recv_syn_ack(&raw, src_port, port);
+        let Some(state) = recv_syn_ack(&raw, src_port, port, timeout, handle) else {
+            return Ok(());
+        };
         let r = PortResult {
             host: host.to_string(),
             port,
@@ -463,17 +486,15 @@ async fn syn_scan_host(
             service: port_to_service(port),
         };
         if state == PortState::Open {
-            open += 1;
+            progress.open += 1;
         }
-        scanned += 1;
+        progress.scanned += 1;
         handle.send(ProbeEvent::Port(r));
-        if scanned.is_multiple_of(50) || scanned >= total {
-            handle.send(ProbeEvent::ScanProgress(ScanProgress {
-                scanned,
-                total,
-                open,
-            }));
-        }
+        handle.send(ProbeEvent::ScanProgress(ScanProgress {
+            scanned: progress.scanned,
+            total: progress.total,
+            open: progress.open,
+        }));
     }
     Ok(())
 }
@@ -531,12 +552,38 @@ fn tcp_checksum(tcp: &[u8], src: Ipv4Addr, dst: Ipv4Addr) -> u16 {
 }
 
 #[cfg(target_os = "linux")]
-fn recv_syn_ack(raw: &socket2::Socket, src_port: u16, dst_port: u16) -> PortState {
+fn recv_syn_ack(
+    raw: &socket2::Socket,
+    src_port: u16,
+    dst_port: u16,
+    timeout: Duration,
+    handle: &ProbeHandle<ProbeEvent>,
+) -> Option<PortState> {
     let mut buf = [std::mem::MaybeUninit::<u8>::uninit(); 256];
+    let deadline = std::time::Instant::now() + timeout;
     loop {
+        if handle.is_cancelled() {
+            return None;
+        }
+        let now = std::time::Instant::now();
+        if now >= deadline {
+            return Some(PortState::Filtered);
+        }
+        // The raw socket read is blocking. Use short slices so cancellation
+        // remains responsive even when the configured timeout is long.
+        let slice = (deadline - now).min(Duration::from_millis(50));
+        if raw.set_read_timeout(Some(slice)).is_err() {
+            return Some(PortState::Filtered);
+        }
         let n = match raw.recv(&mut buf) {
             Ok(n) => n,
-            Err(_) => return PortState::Filtered, // Timeout
+            Err(e)
+                if e.kind() == std::io::ErrorKind::WouldBlock
+                    || e.kind() == std::io::ErrorKind::TimedOut =>
+            {
+                continue;
+            }
+            Err(_) => return Some(PortState::Filtered),
         };
         let buf = unsafe { std::slice::from_raw_parts(buf.as_ptr() as *const u8, n) };
         if n < 20 {
@@ -549,10 +596,10 @@ fn recv_syn_ack(raw: &socket2::Socket, src_port: u16, dst_port: u16) -> PortStat
         }
         let flags = buf[13];
         if flags & 0x04 != 0 {
-            return PortState::Closed; // RST
+            return Some(PortState::Closed); // RST
         }
         if flags & 0x12 == 0x12 {
-            return PortState::Open; // SYN|ACK
+            return Some(PortState::Open); // SYN|ACK
         }
     }
 }

@@ -23,11 +23,11 @@ it.
 | MTR | Parallel hop-by-hop probing over ICMP, UDP or TCP with continuous refresh and multiple responders per hop. |
 | HTTP Ping | Multi-method requests with DNS, connect, TLS, TTFB and total timings, plus total-time percentiles and histogram. |
 | TLS | Batch certificate and chain inspection, SAN, key details, expiry warnings, TLS/ALPN support, revocation (OCSP/CRL), HSTS, CT and CAA checks. |
-| Port Scan | TCP connect, SYN half-open and UDP scans, with banner grabbing. |
+| Port Scan | TCP connect, SYN half-open and UDP scans, with banner grabbing, live progress and immediate cancellation. |
 | Connections | Local TCP/UDP socket inventory with process/PID, state and remote endpoint, filters, process termination and best-effort connection close. |
 | IP Insight | Parallel IP geolocation queries across multiple providers. |
 | Lookup | RDAP domain/IP lookup with JSON tree, parsed contacts and parent-domain fallback. |
-| DNS | dig-like queries, custom server, UDP with TCP fallback, and iterative trace from the root servers. |
+| DNS | dig-like queries, custom server with Google/Cloudflare/OpenDNS/Quad9 IPv4 and IPv6 presets, UDP with TCP fallback, and iterative trace from the root servers. |
 | NTP | SNTP query, live analog clock, local/UTC time in milliseconds, server metrics, presets and optional system clock update. |
 | Utils | Subnet/CIDR calculator, Wake-on-LAN, IANA port/protocol reference, MAC vendor lookup and timestamp/timezone conversion. |
 | Speedtest | LibreSpeed, iperf3 client and built-in iperf3 server; live throughput, RTT/jitter and TCP/UDP metrics. |

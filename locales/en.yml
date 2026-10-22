@@ -367,6 +367,11 @@ speedtest:
   phase_testing: testing
   phase_done: done
 
+portscan:
+  scanned: Scanned
+  remaining: Remaining
+  open: Open ports
+
 nat:
   mode: Mode
   server: STUN server
