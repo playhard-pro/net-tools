@@ -5,7 +5,7 @@
 # in-app update check keeps reporting the previous stable version.
 #
 # `stable`: publish a normal GitHub release. Only use this after the pre-release
-# has been tested. The promote workflow can then make the same build the latest
-# release without rebuilding it.
+# has been tested. Pushing this file with the stable channel also refreshes the
+# repository's latest-release pointer without rebuilding anything.
 [release]
 channel = "stable"
