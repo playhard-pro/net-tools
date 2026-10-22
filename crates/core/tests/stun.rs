@@ -86,21 +86,27 @@ async fn start_mock(
     respond_change_both: bool,
     respond_change_port: bool,
     classic: bool,
-) -> MockServer {
+) -> Option<MockServer> {
     let primary = Arc::new(UdpSocket::bind("127.0.0.1:0").await.unwrap());
     let primary_addr = primary.local_addr().unwrap();
     let same_ip_alt_port = Arc::new(UdpSocket::bind("127.0.0.1:0").await.unwrap());
     let same_ip_alt_port_addr = same_ip_alt_port.local_addr().unwrap();
-    let alt_ip_primary = Arc::new(
-        UdpSocket::bind((Ipv4Addr::new(127, 0, 0, 2), primary_addr.port()))
-            .await
-            .unwrap(),
-    );
-    let alt_ip_alt_port = Arc::new(
-        UdpSocket::bind((Ipv4Addr::new(127, 0, 0, 2), same_ip_alt_port_addr.port()))
-            .await
-            .unwrap(),
-    );
+
+    // Linux and Windows accept any address in 127/8, but macOS only assigns
+    // 127.0.0.1. The alternate-address tests cannot simulate CHANGE-REQUEST
+    // from a second IP there, so report that the scenario is unavailable
+    // instead of failing with an environment-specific bind error.
+    let alt_ip = Ipv4Addr::new(127, 0, 0, 2);
+    let alt_ip_primary = match UdpSocket::bind((alt_ip, primary_addr.port())).await {
+        Ok(socket) => Arc::new(socket),
+        Err(error) if error.kind() == std::io::ErrorKind::AddrNotAvailable => return None,
+        Err(error) => panic!("failed to bind alternate loopback address: {error}"),
+    };
+    let alt_ip_alt_port = match UdpSocket::bind((alt_ip, same_ip_alt_port_addr.port())).await {
+        Ok(socket) => Arc::new(socket),
+        Err(error) if error.kind() == std::io::ErrorKind::AddrNotAvailable => return None,
+        Err(error) => panic!("failed to bind alternate loopback address: {error}"),
+    };
 
     let sockets = Arc::new(MockSockets {
         primary,
@@ -140,7 +146,7 @@ async fn start_mock(
         }));
     }
 
-    MockServer { sockets, tasks }
+    Some(MockServer { sockets, tasks })
 }
 
 impl MockServer {
@@ -243,7 +249,10 @@ fn settings(server: SocketAddr, mode: NatTestMode) -> NatSettings {
 
 #[tokio::test]
 async fn behavior_full_cone() {
-    let mock = start_mock(MappingMode::EndpointIndependent, true, true, false).await;
+    let Some(mock) = start_mock(MappingMode::EndpointIndependent, true, true, false).await else {
+        eprintln!("skipping: alternate loopback address is unavailable");
+        return;
+    };
     let result = run(settings(mock.primary_addr(), NatTestMode::Rfc5780))
         .await
         .expect("result");
@@ -260,7 +269,10 @@ async fn behavior_full_cone() {
 
 #[tokio::test]
 async fn behavior_open_internet() {
-    let mock = start_mock(MappingMode::Echo, true, true, false).await;
+    let Some(mock) = start_mock(MappingMode::Echo, true, true, false).await else {
+        eprintln!("skipping: alternate loopback address is unavailable");
+        return;
+    };
     let result = run(settings(mock.primary_addr(), NatTestMode::Rfc5780))
         .await
         .expect("result");
@@ -273,14 +285,20 @@ async fn behavior_open_internet() {
 
 #[tokio::test]
 async fn behavior_restricted_and_port_restricted_cone() {
-    let mock = start_mock(MappingMode::EndpointIndependent, false, true, false).await;
+    let Some(mock) = start_mock(MappingMode::EndpointIndependent, false, true, false).await else {
+        eprintln!("skipping: alternate loopback address is unavailable");
+        return;
+    };
     let result = run(settings(mock.primary_addr(), NatTestMode::Rfc5780))
         .await
         .expect("result");
     assert_eq!(result.nat_type, NatType::RestrictedCone);
     drop(mock);
 
-    let mock = start_mock(MappingMode::EndpointIndependent, false, false, false).await;
+    let Some(mock) = start_mock(MappingMode::EndpointIndependent, false, false, false).await else {
+        eprintln!("skipping: alternate loopback address is unavailable");
+        return;
+    };
     let result = run(settings(mock.primary_addr(), NatTestMode::Rfc5780))
         .await
         .expect("result");
@@ -289,7 +307,11 @@ async fn behavior_restricted_and_port_restricted_cone() {
 
 #[tokio::test]
 async fn behavior_symmetric() {
-    let mock = start_mock(MappingMode::AddressAndPortDependent, false, false, false).await;
+    let Some(mock) = start_mock(MappingMode::AddressAndPortDependent, false, false, false).await
+    else {
+        eprintln!("skipping: alternate loopback address is unavailable");
+        return;
+    };
     let result = run(settings(mock.primary_addr(), NatTestMode::Rfc5780))
         .await
         .expect("result");
@@ -327,14 +349,21 @@ async fn behavior_udp_blocked() {
 
 #[tokio::test]
 async fn classic_full_cone_and_symmetric() {
-    let mock = start_mock(MappingMode::EndpointIndependent, true, true, true).await;
+    let Some(mock) = start_mock(MappingMode::EndpointIndependent, true, true, true).await else {
+        eprintln!("skipping: alternate loopback address is unavailable");
+        return;
+    };
     let result = run(settings(mock.primary_addr(), NatTestMode::Rfc3489))
         .await
         .expect("result");
     assert_eq!(result.nat_type, NatType::FullCone);
     drop(mock);
 
-    let mock = start_mock(MappingMode::AddressAndPortDependent, false, false, true).await;
+    let Some(mock) = start_mock(MappingMode::AddressAndPortDependent, false, false, true).await
+    else {
+        eprintln!("skipping: alternate loopback address is unavailable");
+        return;
+    };
     let result = run(settings(mock.primary_addr(), NatTestMode::Rfc3489))
         .await
         .expect("result");
