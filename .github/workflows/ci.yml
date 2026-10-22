@@ -33,7 +33,20 @@ jobs:
         run: cargo build --workspace
 
       - name: Run tests (core)
-        run: cargo test -p net-tools-core
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo test -p net-tools-core 2>&1 | tee core-tests.log
+
+      # Keep the test output as an artifact so platform-specific failures can
+      # be diagnosed without re-running the job.
+      - name: Upload core test log
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: core-tests-${{ matrix.os }}
+          path: core-tests.log
+          if-no-files-found: ignore
 
       - name: Clippy
         shell: bash
