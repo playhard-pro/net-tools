@@ -12,6 +12,13 @@ on:
         description: 'Tested release tag to promote (for example v0.3.7)'
         required: true
         type: string
+  # Pushing release.toml with `channel = "stable"` promotes the version in the
+  # workspace manifest. Pushes that keep the testing channel are skipped by the
+  # channel check below, so resetting the file never touches a release.
+  push:
+    branches: [main]
+    paths:
+      - release.toml
 
 permissions:
   contents: write
@@ -26,30 +33,38 @@ jobs:
         id: channel
         run: |
           channel="$(bash scripts/release_channel.sh)"
+          echo "channel=${channel}" >> "$GITHUB_OUTPUT"
           if [[ "$channel" != "stable" ]]; then
-              echo "::error::release.toml channel is '${channel}'. Set it to 'stable' before promoting."
-              exit 1
+              echo "::notice::release.toml channel is '${channel}', no release to promote."
           fi
 
       - name: Promote GitHub Release
+        if: steps.channel.outputs.channel == 'stable'
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ inputs.tag }}
+          REQUESTED_TAG: ${{ inputs.tag }}
         run: |
-          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
-              echo "::error::invalid release tag: ${TAG}"
+          tag="$REQUESTED_TAG"
+          if [[ -z "$tag" ]]; then
+              version="$(grep -m1 -E '^version[[:space:]]*=[[:space:]]*"[^"]+"' Cargo.toml \
+                  | sed -E 's/^[^"]*"([^"]+)".*/\1/')"
+              tag="v${version}"
+          fi
+
+          if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+              echo "::error::invalid release tag: ${tag}"
               exit 1
           fi
 
-          assets="$(gh release view "$TAG" --json assets --jq '.assets[].name')"
+          assets="$(gh release view "$tag" --json assets --jq '.assets[].name')"
           if ! grep -qx 'update.json' <<<"$assets"; then
-              echo "::error::release ${TAG} does not contain update.json"
+              echo "::error::release ${tag} does not contain update.json"
               exit 1
           fi
 
           # This is the only state change: the same build becomes the latest
           # normal release, so `/releases/latest/download/update.json` starts
           # pointing at it.
-          gh release edit "$TAG" --prerelease=false --latest
+          gh release edit "$tag" --prerelease=false --latest
 
-          echo "promoted ${TAG} to the latest stable release"
+          echo "promoted ${tag} to the latest stable release"

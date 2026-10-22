@@ -8,4 +8,4 @@
 # has been tested. The promote workflow can then make the same build the latest
 # release without rebuilding it.
 [release]
-channel = "testing"
+channel = "stable"

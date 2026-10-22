@@ -379,13 +379,16 @@ After the packages have been tested, promote the same build:
 
 ```bash
 # Set channel = "stable" in release.toml, then commit and push it.
-# Run the Promote Release workflow with the tested tag, for example v0.2.6.
 ```
 
-Promotion only clears the pre-release flag and makes that release the latest, so
-users receive exactly the build that was tested. The release workflow rejects a
-tag that does not match the workspace version. Remember to set `release.toml`
-back to `channel = "testing"` before starting the next release cycle.
+Pushing the stable configuration to `main` runs the Promote Release workflow,
+which promotes the tag matching the workspace version. The workflow can also be
+run manually with a specific tag (for example `v0.2.6`). Promotion only clears
+the pre-release flag and makes that release the latest, so users receive exactly
+the build that was tested. The release workflow rejects a tag that does not
+match the workspace version. Remember to set `release.toml` back to
+`channel = "testing"` before starting the next release cycle. Pushes that keep
+the testing channel are ignored by the promotion workflow.
 
 The workspace `Cargo.toml` is the version source; member crates inherit it.
 
