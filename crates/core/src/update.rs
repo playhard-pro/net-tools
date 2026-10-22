@@ -275,6 +275,15 @@ mod tests {
     }
 
     #[test]
+    fn manifest_and_release_urls_are_absolute() {
+        // `CARGO_PKG_REPOSITORY` comes from the package manifest. A missing
+        // repository field would turn these into relative paths and break the
+        // update check at runtime.
+        assert!(UPDATE_MANIFEST_URL.starts_with("https://github.com/"));
+        assert!(RELEASE_URL_PREFIX.starts_with("https://github.com/"));
+    }
+
+    #[test]
     fn versions_compare_numerically() {
         assert!(parse_version("0.3.10").unwrap() > parse_version("0.3.9").unwrap());
         assert_eq!(
