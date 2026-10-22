@@ -1,0 +1,11 @@
+# Release publication control.
+#
+# `testing`: build artifacts and publish a GitHub pre-release. The release is
+# visible by direct link but is not what `/releases/latest` points at, so the
+# in-app update check keeps reporting the previous stable version.
+#
+# `stable`: publish a normal GitHub release. Only use this after the pre-release
+# has been tested. The promote workflow can then make the same build the latest
+# release without rebuilding it.
+[release]
+channel = "testing"

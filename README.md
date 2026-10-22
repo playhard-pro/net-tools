@@ -37,6 +37,11 @@ Continuous probes support **Start / Pause / Stop**; one-shot tools and servers
 use **Start / Stop**. Pressing **Enter** in a target field restarts the task with
 the new target.
 
+The bottom bar provides **Check update** and **Auto check**. Update checks read a
+small manifest from the latest GitHub Release and open the release page for the
+user to choose the right package. Automatic checks run at most once per day and
+can be disabled; a specific version can be skipped.
+
 ### Connections viewer
 
 The Connections tab provides a local, netstat/ss-style view of the host:
@@ -327,7 +332,10 @@ cargo build --release --target x86_64-apple-darwin -p net-tools
   formatting checks on Linux, Windows, macOS Intel and macOS Apple Silicon.
 - `.github/workflows/release.yml`: on a `v*` tag, build and package Linux
   (.deb/.AppImage), Windows (.zip) and macOS (.dmg for Apple Silicon and Intel)
-  artifacts, then publish one GitHub Release.
+  artifacts, then publish one GitHub Release. `release.toml` controls whether
+  that release is a testing pre-release or a normal stable release.
+- `.github/workflows/promote-release.yml`: manually promote a tested pre-release
+  to the latest stable release without rebuilding it.
 
 ### macOS signing and notarization
 
@@ -353,12 +361,31 @@ APPLE_SIGNING_IDENTITY="Developer ID Application: ..." \
 
 ### Cutting a release
 
+Every release is first published as a pre-release for local testing:
+
 ```bash
+# release.toml must contain: channel = "testing"
 scripts/bump_version.sh 0.2.6   # Cargo.toml, packager.toml, Cargo.lock
 git commit -am "Bump version to 0.2.6"
 git tag v0.2.6
 git push origin main v0.2.6
 ```
+
+The release workflow builds every platform, creates a GitHub pre-release and
+attaches `update.json`. The in-app updater keeps pointing at the previous stable
+release during this phase.
+
+After the packages have been tested, promote the same build:
+
+```bash
+# Set channel = "stable" in release.toml, then commit and push it.
+# Run the Promote Release workflow with the tested tag, for example v0.2.6.
+```
+
+Promotion only clears the pre-release flag and makes that release the latest, so
+users receive exactly the build that was tested. The release workflow rejects a
+tag that does not match the workspace version. Remember to set `release.toml`
+back to `channel = "testing"` before starting the next release cycle.
 
 The workspace `Cargo.toml` is the version source; member crates inherit it.
 

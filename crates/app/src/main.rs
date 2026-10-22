@@ -12,6 +12,7 @@ mod latency_stats;
 mod speedtest_worker;
 mod tabs;
 mod ui;
+mod update;
 
 use eframe::egui;
 

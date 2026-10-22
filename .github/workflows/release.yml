@@ -116,6 +116,8 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v7
+
       - name: Download all packages
         uses: actions/download-artifact@v8
         with:
@@ -123,8 +125,36 @@ jobs:
           merge-multiple: true
           path: artifacts
 
+      # The tag must match the workspace version. Otherwise the manifest and
+      # the binaries would advertise different versions.
+      - name: Read release channel
+        id: channel
+        run: |
+          channel="$(bash scripts/release_channel.sh)"
+          version="$(grep -m1 -E '^version[[:space:]]*=[[:space:]]*"[^"]+"' Cargo.toml \
+              | sed -E 's/^[^"]*"([^"]+)".*/\1/')"
+          if [[ "${GITHUB_REF_NAME}" != "v${version}" ]]; then
+              echo "::error::tag ${GITHUB_REF_NAME} does not match workspace version ${version}"
+              exit 1
+          fi
+          echo "channel=${channel}" >> "$GITHUB_OUTPUT"
+          if [[ "$channel" == "testing" ]]; then
+              echo "prerelease=true" >> "$GITHUB_OUTPUT"
+              echo "make_latest=false" >> "$GITHUB_OUTPUT"
+          else
+              echo "prerelease=false" >> "$GITHUB_OUTPUT"
+              echo "make_latest=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # The manifest is attached under the fixed name `update.json`, which is
+      # what the in-app updater fetches from `/releases/latest/download/`.
+      - name: Generate update manifest
+        run: bash scripts/generate_update_manifest.sh "$GITHUB_REF_NAME" artifacts/update.json
+
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v3
         with:
           files: artifacts/*
           generate_release_notes: true
+          prerelease: ${{ steps.channel.outputs.prerelease }}
+          make_latest: ${{ steps.channel.outputs.make_latest }}

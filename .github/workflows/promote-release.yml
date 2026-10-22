@@ -1,0 +1,55 @@
+name: Promote Release
+
+# Promote a tested pre-release created by the Release workflow. The existing
+# release and its assets are reused, so what the maintainer tested is exactly
+# what users receive. Only the pre-release flag and the latest-release pointer
+# are changed.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tested release tag to promote (for example v0.3.7)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Verify release channel
+        id: channel
+        run: |
+          channel="$(bash scripts/release_channel.sh)"
+          if [[ "$channel" != "stable" ]]; then
+              echo "::error::release.toml channel is '${channel}'. Set it to 'stable' before promoting."
+              exit 1
+          fi
+
+      - name: Promote GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+              echo "::error::invalid release tag: ${TAG}"
+              exit 1
+          fi
+
+          assets="$(gh release view "$TAG" --json assets --jq '.assets[].name')"
+          if ! grep -qx 'update.json' <<<"$assets"; then
+              echo "::error::release ${TAG} does not contain update.json"
+              exit 1
+          fi
+
+          # This is the only state change: the same build becomes the latest
+          # normal release, so `/releases/latest/download/update.json` starts
+          # pointing at it.
+          gh release edit "$TAG" --prerelease=false --latest
+
+          echo "promoted ${TAG} to the latest stable release"

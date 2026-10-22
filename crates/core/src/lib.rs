@@ -8,4 +8,5 @@ pub mod elevation;
 pub mod model;
 pub mod net;
 pub mod system_time;
+pub mod update;
 pub mod utils;

@@ -685,6 +685,27 @@ impl InputHistory {
     }
 }
 
+/// Update check preferences.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateSettings {
+    /// Whether the application checks for updates automatically.
+    pub auto_check: bool,
+    /// Unix timestamp of the last completed check, used for throttling.
+    pub last_checked: i64,
+    /// Version the user chose not to be notified about again.
+    pub skipped_version: String,
+}
+
+impl Default for UpdateSettings {
+    fn default() -> Self {
+        Self {
+            auto_check: true,
+            last_checked: 0,
+            skipped_version: String::new(),
+        }
+    }
+}
+
 /// Global application configuration (persisted to disk).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
@@ -732,6 +753,10 @@ pub struct AppConfig {
     /// Added after the first release, so older config files still load.
     #[serde(default)]
     pub nat: NatSettings,
+    /// Update check preferences. Added after the first release, so older
+    /// config files still load with the defaults.
+    #[serde(default)]
+    pub update: UpdateSettings,
 }
 
 impl Default for AppConfig {
@@ -754,6 +779,7 @@ impl Default for AppConfig {
             tls: TlsSettings::default(),
             utils: UtilsSettings::default(),
             nat: NatSettings::default(),
+            update: UpdateSettings::default(),
         }
     }
 }
@@ -815,6 +841,23 @@ mod tests {
         assert_eq!(back.nat.timeout_ms, cfg.nat.timeout_ms);
         assert_eq!(back.nat.retries, cfg.nat.retries);
         assert_eq!(back.nat.local_bind, cfg.nat.local_bind);
+        assert_eq!(back.update.auto_check, cfg.update.auto_check);
+        assert_eq!(back.update.last_checked, cfg.update.last_checked);
+        assert_eq!(back.update.skipped_version, cfg.update.skipped_version);
+    }
+
+    #[test]
+    fn old_config_without_update_settings_still_loads() {
+        let mut value = toml::Value::try_from(AppConfig::default()).unwrap();
+        value
+            .as_table_mut()
+            .expect("config is a table")
+            .remove("update");
+        let text = toml::to_string(&value).unwrap();
+        let back: AppConfig = toml::from_str(&text).unwrap();
+        assert!(back.update.auto_check);
+        assert_eq!(back.update.last_checked, 0);
+        assert!(back.update.skipped_version.is_empty());
     }
 
     #[test]

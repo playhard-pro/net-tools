@@ -20,6 +20,7 @@ use crate::tabs::speedtest::SpeedtestTab;
 use crate::tabs::tls::TlsTab;
 use crate::tabs::utils::UtilsTab;
 use crate::ui::theme::Palette;
+use crate::update::{UpdateChecker, UpdateDialog};
 
 /// Project homepage, shown as the title link. Taken from the manifest so the
 /// link and the published package metadata cannot drift apart.
@@ -132,6 +133,8 @@ pub struct App {
     pub settings_expanded: bool,
     /// Whether the About dialog is currently open.
     pub show_about: bool,
+    /// Background update check state and the result dialog.
+    pub update: UpdateChecker,
 }
 
 impl App {
@@ -165,6 +168,7 @@ impl App {
             theme_preference,
             settings_expanded: true,
             show_about: false,
+            update: UpdateChecker::new(),
         }
     }
 
@@ -292,7 +296,7 @@ impl App {
 
     /// Global controls shown at the bottom-right of the window. In a
     /// right-to-left layout this produces the visual order
-    /// `Theme, Language, About, privileges`.
+    /// `Theme, Language, Auto check, Check update, About, privileges`.
     fn app_controls(&mut self, ui: &mut egui::Ui) {
         self.privilege_badge(ui);
         ui.separator();
@@ -300,10 +304,54 @@ impl App {
             self.show_about = true;
         }
         ui.separator();
+
+        // The bottom bar uses a right-to-left layout, so items added after the
+        // About button appear to its left.
+        let checking = self.update.is_checking();
+        let label = if checking {
+            t!("update.checking").to_string()
+        } else if let Some(update) = self.update.available() {
+            t!("update.available_short", version = &update.version).to_string()
+        } else {
+            t!("update.check").to_string()
+        };
+        let clicked = ui
+            .add_enabled_ui(!checking, |ui| ui.small_button(label))
+            .inner
+            .clicked();
+        if clicked {
+            self.update.start(&self.rt, PROJECT_VERSION, true, ui.ctx());
+        }
+        let mut auto_check = self.cfg.update.auto_check;
+        if ui
+            .checkbox(&mut auto_check, t!("update.auto_check"))
+            .changed()
+        {
+            self.cfg.update.auto_check = auto_check;
+            crate::config_store::save(&self.cfg);
+        }
+        ui.separator();
         self.language_selector(ui);
         ui.label(t!("common.language"));
         self.theme_selector(ui);
         ui.label(t!("common.theme"));
+    }
+
+    /// Drain background update results and start an automatic check when due.
+    fn poll_update(&mut self, ctx: &egui::Context) {
+        if self.update.poll(&mut self.cfg.update) {
+            crate::config_store::save(&self.cfg);
+        }
+        if self.update.auto_check_due(&self.cfg.update) {
+            self.update.start(&self.rt, PROJECT_VERSION, false, ctx);
+        }
+        if let Some(delay) = UpdateChecker::next_auto_check_delay(&self.cfg.update) {
+            // Wake the UI at the next scheduled check even when the window is
+            // otherwise idle. A running check repaints itself when it finishes.
+            if !self.update.is_checking() {
+                ctx.request_repaint_after(delay);
+            }
+        }
     }
 
     fn language_selector(&mut self, ui: &mut egui::Ui) {
@@ -578,6 +626,7 @@ impl eframe::App for App {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         self.top_bar(ui);
         self.bottom_bar(ui);
+        self.poll_update(ui.ctx());
 
         // Capture the history revision before rendering so edits made by the
         // input widgets can be written to disk immediately afterwards.
@@ -687,6 +736,9 @@ impl eframe::App for App {
         if self.show_about {
             self.about_dialog(ui.ctx());
         }
+        if self.update.dialog().is_some() {
+            self.update_dialog(ui.ctx());
+        }
     }
 
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
@@ -696,6 +748,82 @@ impl eframe::App for App {
         self.nat.clear_on_hide();
         self.tls.clear_on_hide();
         crate::config_store::save(&self.cfg);
+    }
+}
+
+impl App {
+    /// Update result dialog. Manual checks always show a result; automatic
+    /// checks only open this dialog when a newer, non-skipped version exists.
+    fn update_dialog(&mut self, ctx: &egui::Context) {
+        let Some(dialog) = self.update.dialog() else {
+            return;
+        };
+        let mut close = false;
+        let mut skip = false;
+        let modal = egui::Modal::new(egui::Id::new("update_dialog")).show(ctx, |ui| {
+            ui.set_width(400.0);
+            match &dialog {
+                UpdateDialog::Available(update) => {
+                    ui.heading(t!("update.available_title"));
+                    ui.add_space(4.0);
+                    ui.label(format!(
+                        "{} {}",
+                        t!("update.current_version"),
+                        PROJECT_VERSION
+                    ));
+                    ui.label(format!(
+                        "{} {}",
+                        t!("update.latest_version"),
+                        update.version
+                    ));
+                    ui.add_space(8.0);
+                    ui.hyperlink_to(t!("update.open_release"), &update.release_url);
+                    ui.add_space(8.0);
+                    ui.separator();
+                    ui.horizontal(|ui| {
+                        if ui.button(t!("update.skip_version")).clicked() {
+                            skip = true;
+                        }
+                        if ui.button(t!("about.close")).clicked() {
+                            close = true;
+                        }
+                    });
+                }
+                UpdateDialog::UpToDate => {
+                    ui.heading(t!("update.up_to_date_title"));
+                    ui.add_space(4.0);
+                    ui.label(format!(
+                        "{} {}",
+                        t!("update.current_version"),
+                        PROJECT_VERSION
+                    ));
+                    ui.label(t!("update.up_to_date"));
+                    ui.add_space(8.0);
+                    ui.separator();
+                    if ui.button(t!("about.close")).clicked() {
+                        close = true;
+                    }
+                }
+                UpdateDialog::Error(error) => {
+                    ui.heading(t!("update.error_title"));
+                    ui.add_space(4.0);
+                    ui.label(t!("update.error", error = error));
+                    ui.add_space(8.0);
+                    ui.separator();
+                    if ui.button(t!("about.close")).clicked() {
+                        close = true;
+                    }
+                }
+            }
+        });
+
+        if skip {
+            if self.update.skip_available(&mut self.cfg.update) {
+                crate::config_store::save(&self.cfg);
+            }
+        } else if close || modal.should_close() {
+            self.update.close_dialog();
+        }
     }
 }
 
@@ -795,6 +923,7 @@ mod tests {
             theme_preference: egui::ThemePreference::System,
             settings_expanded: true,
             show_about: false,
+            update: UpdateChecker::new(),
         };
 
         for width in [960.0, 1100.0, 1400.0] {
