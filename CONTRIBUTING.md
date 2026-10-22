@@ -31,6 +31,12 @@ cargo run -p net-tools      # run the app
 cargo build --release       # optimized build
 ```
 
+For quick type-checking loops use `cargo check -p net-tools`; it runs the same
+front-end checks without code generation or linking. The `dev` profile keeps
+only line tables to make debug builds small and fast. If a debugger needs
+variable inspection, build with `--config 'profile.dev.debug="full"'` for that
+session.
+
 ## Project layout
 
 ```

@@ -24,12 +24,21 @@ time = "0.3"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
+# Keep only line tables in debug builds. Full debug information makes the
+# executables and incremental artifacts much larger and slows down linking,
+# while line tables still give readable backtraces and breakpoint locations.
+# Override temporarily with `--config 'profile.dev.debug="full"'` when a
+# debugger needs to inspect variables.
+[profile.dev]
+debug = 1
+
 [profile.release]
 opt-level = 3
-# Whole-program optimization and a single codegen unit trade compile time for
-# a noticeably smaller binary. Keeping the regular optimization level avoids
-# slowing down the data paths that high-throughput probes depend on.
-lto = "fat"
-codegen-units = 1
+# Thin LTO with multiple codegen units lets the optimizer work in parallel, so
+# local release builds finish quickly. The release workflow overrides these
+# settings with fat LTO and a single codegen unit to keep the shipped binaries
+# as small and fast as possible.
+lto = "thin"
+codegen-units = 16
 panic = "abort"
 strip = true

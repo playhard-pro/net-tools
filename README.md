@@ -296,6 +296,29 @@ cargo xwin build --release --target x86_64-pc-windows-msvc -p net-tools
 `cargo xwin` downloads the MSVC CRT and Windows SDK automatically. Use
 `--xwin-version`, `--xwin-sdk-version` or `--xwin-crt-version` to pin versions.
 
+The workspace uses thin LTO for fast local release builds. The executables
+published by CI are built with fat LTO instead, so reproduce that profile when
+the local binary itself is going to be shipped:
+
+```bash
+CARGO_PROFILE_RELEASE_LTO=fat CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1 \
+  cargo xwin build --release --target x86_64-pc-windows-msvc -p net-tools
+```
+
+Fat LTO optimizes the whole program in a single stage, so that build stays
+mostly on one core no matter how many CPUs are available. Give it its own target
+directory when alternating with the fast profile, otherwise Cargo recompiles
+every dependency whenever the profile changes:
+
+```bash
+CARGO_TARGET_DIR=target/xwin-dist \
+  CARGO_PROFILE_RELEASE_LTO=fat CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1 \
+  cargo xwin build --release --target x86_64-pc-windows-msvc -p net-tools
+```
+
+For a quick Windows-target type check, `cargo xwin check --release --target
+x86_64-pc-windows-msvc -p net-tools` skips code generation and linking.
+
 ### Windows (GNU)
 
 ```bash

@@ -65,6 +65,12 @@ jobs:
         run: cargo install cargo-packager --locked
 
       - name: Build release binary
+        # Restore whole-program optimization for the artifacts users download.
+        # Local builds use the faster thin LTO profile from the workspace
+        # manifest, which is overridden here through Cargo's profile variables.
+        env:
+          CARGO_PROFILE_RELEASE_LTO: fat
+          CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "1"
         run: cargo build --release --workspace
 
       - name: Package Linux installers
