@@ -13,7 +13,7 @@ about:
 update:
   check: Check update
   checking: Checking…
-  available_short: "v{version} available"
+  available_short: "v%{version} available"
   auto_check: Auto check
   available_title: Update available
   current_version: "Current version:"
@@ -23,7 +23,7 @@ update:
   up_to_date_title: You're up to date
   up_to_date: net-tools is already the latest version.
   error_title: Update check failed
-  error: "Could not check for updates: {error}"
+  error: "Could not check for updates: %{error}"
 theme:
   system: System
   light: Light
