@@ -44,7 +44,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REQUESTED_TAG: ${{ inputs.tag }}
         run: |
-          set -o pipefail
+          set -euo pipefail
           exec > >(tee promote.log) 2>&1
 
           tag="$REQUESTED_TAG"
@@ -59,18 +59,24 @@ jobs:
               exit 1
           fi
 
-          assets="$(gh release view "$tag" --json assets --jq '.assets[].name')"
-          if ! grep -qx 'update.json' <<<"$assets"; then
+          api_path="repos/${GITHUB_REPOSITORY}/releases/tags/${tag}"
+          echo "promoting ${tag}"
+          release_id="$(gh api "$api_path" --jq '.id')"
+          has_manifest="$(gh api "$api_path" \
+              --jq '[.assets[].name] | index("update.json") != null')"
+          if [[ "$has_manifest" != "true" ]]; then
               echo "::error::release ${tag} does not contain update.json"
               exit 1
           fi
 
-          # This is the only state change: the same build becomes the latest
-          # normal release, so `/releases/latest/download/update.json` starts
-          # pointing at it. Keep the two updates separate: some gh versions
-          # reject combining the prerelease and latest flags.
-          gh release edit "$tag" --prerelease=false
-          gh release edit "$tag" --latest
+          # Editing a draft release through the API both publishes it and sets
+          # the latest pointer in one request. This avoids relying on separate
+          # `gh release edit` operations, which can race with GitHub's release
+          # publication state.
+          gh api --method PATCH "repos/${GITHUB_REPOSITORY}/releases/${release_id}" \
+              -F draft=false \
+              -F prerelease=false \
+              -F make_latest=true > /dev/null
 
           echo "promoted ${tag} to the latest stable release"
 
