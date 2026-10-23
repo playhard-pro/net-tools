@@ -24,6 +24,7 @@ it.
 | HTTP Ping | Multi-method requests with DNS, connect, TLS, TTFB and total timings, plus total-time percentiles and histogram. |
 | TLS | Batch certificate and chain inspection, SAN, key details, expiry warnings, TLS/ALPN support, revocation (OCSP/CRL), HSTS, CT and CAA checks. |
 | Port Scan | TCP connect, SYN half-open and UDP scans, with banner grabbing, live progress and immediate cancellation. |
+| LAN Discovery | Neighbor table and ICMP sweep for private IPv4 LANs, with MAC vendor, PTR, mDNS, SSDP/UPnP and NetBIOS enrichment. |
 | Connections | Local TCP/UDP socket inventory with process/PID, state and remote endpoint, filters, process termination and best-effort connection close. |
 | IP Insight | Parallel IP geolocation queries across multiple providers. |
 | Lookup | RDAP domain/IP lookup with JSON tree, parsed contacts and parent-domain fallback. |
@@ -41,6 +42,28 @@ The bottom bar provides **Check update** and **Auto check**. Update checks read 
 small manifest from the latest GitHub Release and open the release page for the
 user to choose the right package. Automatic checks run at most once per day and
 can be disabled; a specific version can be skipped.
+
+### LAN discovery
+
+The LAN Discovery tab finds devices on the local network without sending raw
+ARP frames. It first reads the system neighbor table, then optionally sweeps the
+configured private IPv4 subnets with ICMP. Because the operating system resolves
+ARP as part of that sweep, the neighbor table is read again afterwards to add
+MAC addresses for hosts that do not answer ICMP.
+
+- Targets are limited to IPv4 private/link-local ranges (`10/8`, `172.16/12`,
+  `192.168/16`, `169.254/16`). Public targets and IPv6 active scanning are
+  rejected; IPv6 rows from the neighbor table are shown only when they belong to
+  a ULA or link-local range.
+- The target field has a local-subnet preset drop-down and an automatic mode
+  that uses the host's non-loopback private IPv4 interfaces. Local ULA and
+  link-local IPv6 prefixes are offered as passive presets; selecting one reads
+  matching neighbor-table entries without active IPv6 scanning.
+- Discovered devices are enriched with the bundled OUI vendor table, PTR
+  lookups, mDNS service records, SSDP/UPnP descriptions and NetBIOS names.
+  Optional online MAC vendor lookup sends only the OUI prefix.
+- Results can be copied or exported as CSV, JSON or HTML. Discovery is manual;
+  there is no automatic rescan.
 
 ### Connections viewer
 

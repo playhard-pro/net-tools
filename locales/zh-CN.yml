@@ -44,6 +44,7 @@ tab:
   http: HTTP Ping
   tls: TLS
   portscan: 端口扫描
+  lan_discovery: 局域网发现
   connections: 连接
   ip_insight: IP 洞察
   lookup: 注册查询
@@ -392,6 +393,33 @@ portscan:
   scanned: 已扫描
   remaining: 剩余
   open: 开放端口
+
+lan_discovery:
+  info_ssdp: "SSDP/UPnP：%{count} 个设备"
+  info_mdns: "mDNS：%{count} 个设备"
+  info_neighbor_table: "邻居表：%{count} 个设备"
+  info_icmp_scan: "正在 ICMP 扫描 %{count} 个主机"
+  info_neighbor_added: "扫描后邻居表新增 %{count} 个设备"
+  info_targets: "目标：%{targets}"
+  info_ipv6_passive: "IPv6 目标仅使用邻居表被动发现。"
+  info_ipv6_fallback: "邻居表中没有匹配该 IPv6 目标的条目，改为显示全部私域邻居设备。"
+  target_hint: 仅支持私域和链路本地网段。IPv6 目标使用邻居表被动发现。
+  ipv6_passive: IPv6 被动
+  target_auto: 自动（留空）
+  icmp_scan: ICMP 扫描
+  mdns: mDNS
+  ssdp: SSDP/UPnP
+  netbios: NetBIOS
+  online_mac: 在线 MAC 厂商补全
+  empty: 开始扫描以发现局域网设备。
+  ip: IP
+  mac: MAC
+  vendor: 厂商
+  hostname: 主机名
+  name_source: 名称来源
+  services: 服务/设备
+  scanned: 已扫描
+  found: 已发现
 
 nat:
   mode: 检测模式

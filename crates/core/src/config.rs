@@ -191,6 +191,46 @@ impl Default for PortScanSettings {
     }
 }
 
+/// Settings for the LAN discovery tab.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LanDiscoverySettings {
+    /// Targets separated by commas or newlines. Empty means auto-detect local
+    /// private IPv4 subnets.
+    pub targets: String,
+    /// Timeout for one ICMP or name/service probe, in milliseconds.
+    pub timeout_ms: u64,
+    /// Maximum number of concurrent probes.
+    pub concurrency: usize,
+    /// Whether to actively probe hosts with ICMP.
+    pub icmp_scan: bool,
+    /// Whether to perform PTR reverse lookups.
+    pub reverse_dns: bool,
+    /// Whether to query mDNS.
+    pub mdns: bool,
+    /// Whether to query SSDP/UPnP.
+    pub ssdp: bool,
+    /// Whether to query NetBIOS name service.
+    pub netbios: bool,
+    /// Whether unknown OUI prefixes may be looked up online.
+    pub allow_online_mac: bool,
+}
+
+impl Default for LanDiscoverySettings {
+    fn default() -> Self {
+        Self {
+            targets: String::new(),
+            timeout_ms: 1000,
+            concurrency: 64,
+            icmp_scan: true,
+            reverse_dns: true,
+            mdns: true,
+            ssdp: true,
+            netbios: true,
+            allow_online_mac: false,
+        }
+    }
+}
+
 /// Settings for the Connections tab: local socket inventory refresh behavior.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConnectionSettings {
@@ -725,6 +765,9 @@ pub struct AppConfig {
     pub port_scan: PortScanSettings,
     /// Added after the first release, so older config files still load.
     #[serde(default)]
+    pub lan_discovery: LanDiscoverySettings,
+    /// Added after the first release, so older config files still load.
+    #[serde(default)]
     pub connections: ConnectionSettings,
     /// Added after the first release, so older config files still load.
     #[serde(default)]
@@ -769,6 +812,7 @@ impl Default for AppConfig {
             mtr: MtrSettings::default(),
             http: HttpSettings::default(),
             port_scan: PortScanSettings::default(),
+            lan_discovery: LanDiscoverySettings::default(),
             connections: ConnectionSettings::default(),
             ip_insight: IpInsightSettings::default(),
             lookup: LookupSettings::default(),
@@ -803,6 +847,14 @@ mod tests {
         assert_eq!(back.mtr.tcp_port, cfg.mtr.tcp_port);
         assert_eq!(back.http.method, cfg.http.method);
         assert_eq!(back.port_scan.concurrency, cfg.port_scan.concurrency);
+        assert_eq!(back.lan_discovery.targets, cfg.lan_discovery.targets);
+        assert_eq!(back.lan_discovery.mdns, cfg.lan_discovery.mdns);
+        assert_eq!(back.lan_discovery.ssdp, cfg.lan_discovery.ssdp);
+        assert_eq!(back.lan_discovery.netbios, cfg.lan_discovery.netbios);
+        assert_eq!(
+            back.lan_discovery.allow_online_mac,
+            cfg.lan_discovery.allow_online_mac
+        );
         assert_eq!(back.connections.auto_refresh, cfg.connections.auto_refresh);
         assert_eq!(back.connections.interval_ms, cfg.connections.interval_ms);
         assert_eq!(back.ip_insight.target, cfg.ip_insight.target);
@@ -962,6 +1014,20 @@ mod tests {
     }
 
     #[test]
+    fn old_config_without_lan_discovery_still_loads() {
+        let mut value = toml::Value::try_from(AppConfig::default()).unwrap();
+        value
+            .as_table_mut()
+            .expect("config is a table")
+            .remove("lan_discovery");
+        let text = toml::to_string(&value).unwrap();
+        let back: AppConfig = toml::from_str(&text).unwrap();
+        assert!(back.lan_discovery.targets.is_empty());
+        assert!(back.lan_discovery.icmp_scan);
+        assert!(!back.lan_discovery.allow_online_mac);
+    }
+
+    #[test]
     fn old_config_without_tls_still_loads() {
         let mut value = toml::Value::try_from(AppConfig::default()).unwrap();
         value
@@ -1017,6 +1083,12 @@ mod tests {
         assert!(m.tcp_port > 0);
         let ps = PortScanSettings::default();
         assert!(ps.concurrency > 0);
+        let lan = LanDiscoverySettings::default();
+        assert!(lan.targets.is_empty());
+        assert!(lan.concurrency > 0);
+        assert!(lan.timeout_ms > 0);
+        assert!(lan.icmp_scan);
+        assert!(!lan.allow_online_mac);
         let connections = ConnectionSettings::default();
         assert!(connections.auto_refresh);
         assert!(connections.interval_ms > 0);

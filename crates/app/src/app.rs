@@ -9,6 +9,7 @@ use crate::tabs::connections::ConnectionsTab;
 use crate::tabs::dns::DnsTab;
 use crate::tabs::http_ping::HttpPingTab;
 use crate::tabs::ip_insight::IpInsightTab;
+use crate::tabs::lan_discovery::LanDiscoveryTab;
 use crate::tabs::lookup::LookupTab;
 use crate::tabs::mtr::MtrTab;
 use crate::tabs::nat::NatTab;
@@ -48,6 +49,7 @@ pub enum Tab {
     Http,
     Tls,
     PortScan,
+    LanDiscovery,
     Connections,
     IpInsight,
     Lookup,
@@ -61,13 +63,14 @@ pub enum Tab {
 impl Tab {
     /// Built-in order. The overview is pinned first and missing tabs are
     /// appended when a saved order is loaded.
-    pub const ALL: [Tab; 14] = [
+    pub const ALL: [Tab; 15] = [
         Tab::Overview,
         Tab::Ping,
         Tab::Mtr,
         Tab::Http,
         Tab::Tls,
         Tab::PortScan,
+        Tab::LanDiscovery,
         Tab::Connections,
         Tab::IpInsight,
         Tab::Lookup,
@@ -88,6 +91,7 @@ impl Tab {
             Tab::Http => "http",
             Tab::Tls => "tls",
             Tab::PortScan => "port_scan",
+            Tab::LanDiscovery => "lan_discovery",
             Tab::Connections => "connections",
             Tab::IpInsight => "ip_insight",
             Tab::Lookup => "lookup",
@@ -117,6 +121,7 @@ pub struct App {
     pub http: HttpPingTab,
     pub tls: TlsTab,
     pub portscan: PortScanTab,
+    pub lan_discovery: LanDiscoveryTab,
     pub connections: ConnectionsTab,
     pub ip_insight: IpInsightTab,
     pub lookup: LookupTab,
@@ -160,6 +165,7 @@ impl App {
             http: HttpPingTab::new(),
             tls: TlsTab::new(),
             portscan: PortScanTab::new(),
+            lan_discovery: LanDiscoveryTab::new(),
             connections: ConnectionsTab::new(),
             ip_insight: IpInsightTab::new(),
             lookup: LookupTab::new(),
@@ -204,6 +210,11 @@ impl App {
         // OCSP/CRL download or target connection continues in the background.
         if self.tab == Tab::Tls && tab != Tab::Tls {
             self.tls.clear_on_hide();
+        }
+        // Leaving the LAN discovery tab cancels an in-flight scan. Completed
+        // results stay available for the next visit.
+        if self.tab == Tab::LanDiscovery && tab != Tab::LanDiscovery {
+            self.lan_discovery.clear_on_hide();
         }
         // Leaving the Connections tab stops automatic polling and drops any
         // outstanding collection result.
@@ -617,6 +628,7 @@ fn tab_label(tab: Tab) -> String {
         Tab::Http => t!("tab.http"),
         Tab::Tls => t!("tab.tls"),
         Tab::PortScan => t!("tab.portscan"),
+        Tab::LanDiscovery => t!("tab.lan_discovery"),
         Tab::Connections => t!("tab.connections"),
         Tab::IpInsight => t!("tab.ip_insight"),
         Tab::Lookup => t!("tab.lookup"),
@@ -762,6 +774,13 @@ impl eframe::App for App {
                 &mut self.cfg.history,
                 &self.rt,
                 &self.privilege,
+                settings_expanded,
+            ),
+            Tab::LanDiscovery => self.lan_discovery.ui(
+                ui,
+                &mut self.cfg.lan_discovery,
+                &mut self.cfg.history,
+                &self.rt,
                 settings_expanded,
             ),
             Tab::Connections => {
@@ -1005,6 +1024,7 @@ mod tests {
             http: HttpPingTab::new(),
             tls: TlsTab::new(),
             portscan: PortScanTab::new(),
+            lan_discovery: LanDiscoveryTab::new(),
             connections: ConnectionsTab::new(),
             ip_insight: IpInsightTab::new(),
             lookup: LookupTab::new(),

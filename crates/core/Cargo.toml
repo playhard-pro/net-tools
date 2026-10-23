@@ -21,7 +21,7 @@ surge-ping = "0.9.1"
 pnet_packet = "0.35.0"
 if-addrs = "0.15.0"
 hickory-resolver = "0.26.3"
-hickory-proto = "0.26.3"
+hickory-proto = { version = "0.26.3", features = ["mdns"] }
 libc = "0.2"
 getrandom = "0.3"
 reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider", "http2", "charset"] }
@@ -44,6 +44,7 @@ sct = "0.7"
 ct-logs = "0.9"
 base64 = "0.22"
 percent-encoding = "2"
+quick-xml = "0.41"
 
 # Timestamp and IANA timezone conversion for the Utils tab.
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }

@@ -20,6 +20,7 @@ pub mod http;
 pub mod icmp;
 pub mod ip_insight;
 pub mod iperf3;
+pub mod lan_discovery;
 pub mod librespeed;
 #[cfg(target_os = "linux")]
 pub(crate) mod linux_icmp;

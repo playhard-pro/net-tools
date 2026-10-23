@@ -44,6 +44,7 @@ tab:
   http: HTTP Ping
   tls: TLS
   portscan: Port Scan
+  lan_discovery: LAN Discovery
   connections: Connections
   ip_insight: IP Insight
   lookup: Lookup
@@ -393,6 +394,33 @@ portscan:
   scanned: Scanned
   remaining: Remaining
   open: Open ports
+
+lan_discovery:
+  info_ssdp: "SSDP/UPnP: %{count} device(s)"
+  info_mdns: "mDNS: %{count} device(s)"
+  info_neighbor_table: "Neighbor table: %{count} device(s)"
+  info_icmp_scan: "ICMP scanning %{count} host(s)"
+  info_neighbor_added: "Neighbor table added %{count} device(s) after the sweep"
+  info_targets: "Targets: %{targets}"
+  info_ipv6_passive: "IPv6 targets use passive neighbor discovery only."
+  info_ipv6_fallback: "No neighbor entries matched the IPv6 target; showing all private neighbor entries."
+  target_hint: Only private and link-local subnets are allowed. IPv6 targets use passive neighbor discovery.
+  ipv6_passive: IPv6 passive
+  target_auto: Auto (leave empty)
+  icmp_scan: ICMP scan
+  mdns: mDNS
+  ssdp: SSDP/UPnP
+  netbios: NetBIOS
+  online_mac: Online MAC vendor lookup
+  empty: Start a scan to discover devices on the local network.
+  ip: IP
+  mac: MAC
+  vendor: Vendor
+  hostname: Hostname
+  name_source: Name source
+  services: Services / device
+  scanned: Scanned
+  found: Found
 
 nat:
   mode: Mode

@@ -1,5 +1,7 @@
 //! Shared types: probe results, events, and enums.
 
+use std::net::IpAddr;
+
 use serde::{Deserialize, Serialize};
 
 /// IP version selection.
@@ -807,6 +809,132 @@ pub struct MacVendorResult {
     pub source: MacVendorSource,
 }
 
+/// Where a LAN device name was obtained.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum LanNameSource {
+    Ptr,
+    Mdns,
+    Netbios,
+    Upnp,
+}
+
+impl LanNameSource {
+    pub fn label(self) -> &'static str {
+        match self {
+            LanNameSource::Ptr => "PTR",
+            LanNameSource::Mdns => "mDNS",
+            LanNameSource::Netbios => "NetBIOS",
+            LanNameSource::Upnp => "UPnP",
+        }
+    }
+}
+
+/// Discovery method that contributed to a LAN device entry.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum LanDiscoverySource {
+    Neighbor,
+    Icmp,
+    Mdns,
+    Ssdp,
+    Netbios,
+}
+
+impl LanDiscoverySource {
+    pub fn label(self) -> &'static str {
+        match self {
+            LanDiscoverySource::Neighbor => "neighbor",
+            LanDiscoverySource::Icmp => "ICMP",
+            LanDiscoverySource::Mdns => "mDNS",
+            LanDiscoverySource::Ssdp => "SSDP",
+            LanDiscoverySource::Netbios => "NetBIOS",
+        }
+    }
+}
+
+/// One device found on the local network.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LanDevice {
+    pub ip: IpAddr,
+    pub mac: Option<String>,
+    pub vendor: Option<String>,
+    pub vendor_source: Option<MacVendorSource>,
+    pub hostname: Option<String>,
+    pub hostname_source: Option<LanNameSource>,
+    pub netbios_name: Option<String>,
+    pub netbios_workgroup: Option<String>,
+    pub mdns_services: Vec<String>,
+    pub upnp_name: Option<String>,
+    pub upnp_manufacturer: Option<String>,
+    pub upnp_model: Option<String>,
+    pub upnp_device_type: Option<String>,
+    pub rtt_ms: Option<f64>,
+    pub sources: Vec<LanDiscoverySource>,
+}
+
+impl LanDevice {
+    /// Create an empty device row for one address.
+    pub fn new(ip: IpAddr) -> Self {
+        Self {
+            ip,
+            mac: None,
+            vendor: None,
+            vendor_source: None,
+            hostname: None,
+            hostname_source: None,
+            netbios_name: None,
+            netbios_workgroup: None,
+            mdns_services: Vec::new(),
+            upnp_name: None,
+            upnp_manufacturer: None,
+            upnp_model: None,
+            upnp_device_type: None,
+            rtt_ms: None,
+            sources: Vec::new(),
+        }
+    }
+
+    /// Record a discovery source once.
+    pub fn add_source(&mut self, source: LanDiscoverySource) {
+        if !self.sources.contains(&source) {
+            self.sources.push(source);
+        }
+    }
+
+    /// Short, human-readable description for the services column.
+    pub fn service_summary(&self) -> String {
+        let mut parts = Vec::new();
+        if !self.mdns_services.is_empty() {
+            parts.push(self.mdns_services.join(", "));
+        }
+        if let Some(name) = &self.upnp_name {
+            parts.push(format!("UPnP: {name}"));
+        } else if let Some(model) = &self.upnp_model {
+            parts.push(format!("UPnP: {model}"));
+        }
+        if let Some(workgroup) = &self.netbios_workgroup {
+            parts.push(format!("Workgroup: {workgroup}"));
+        }
+        parts.join(" · ")
+    }
+}
+
+/// Progress of one LAN discovery scan.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct LanScanProgress {
+    pub scanned: u64,
+    pub total: u64,
+    pub found: u64,
+}
+
+/// One local IPv4 interface that can be used as a scan target.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LocalSubnet {
+    pub interface: String,
+    pub address: String,
+    pub prefix: u8,
+    pub cidr: String,
+}
+
 /// Speed test tool shown inside the Speedtest tab.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum SpeedtestTool {
@@ -1254,6 +1382,34 @@ pub enum ProbeEvent {
     NatStep(NatStep),
     /// Final NAT discovery result.
     Nat(NatResult),
+    /// One LAN device was found or updated.
+    LanDevice(LanDevice),
+    /// Progress of a LAN discovery scan.
+    LanProgress(LanScanProgress),
     /// The task finished naturally.
     Finished,
+}
+
+#[cfg(test)]
+mod lan_tests {
+    use super::*;
+
+    #[test]
+    fn lan_device_merges_sources_without_duplicates() {
+        let mut device = LanDevice::new("192.168.1.10".parse().unwrap());
+        device.add_source(LanDiscoverySource::Neighbor);
+        device.add_source(LanDiscoverySource::Neighbor);
+        device.add_source(LanDiscoverySource::Icmp);
+        assert_eq!(
+            device.sources,
+            vec![LanDiscoverySource::Neighbor, LanDiscoverySource::Icmp]
+        );
+    }
+
+    #[test]
+    fn lan_labels_are_stable() {
+        assert_eq!(LanNameSource::Mdns.label(), "mDNS");
+        assert_eq!(LanDiscoverySource::Ssdp.label(), "SSDP");
+        assert_eq!(LanDiscoverySource::Netbios.label(), "NetBIOS");
+    }
 }

@@ -5,6 +5,7 @@ pub mod dns;
 pub mod http_ping;
 pub mod ip_insight;
 pub mod iperf3_server;
+pub mod lan_discovery;
 pub mod lookup;
 pub mod mtr;
 pub mod nat;
