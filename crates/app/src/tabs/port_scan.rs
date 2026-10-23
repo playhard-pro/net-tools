@@ -71,8 +71,12 @@ impl PortScanTab {
         for ev in self.ctrl.drain() {
             match ev {
                 ProbeEvent::Port(p) => {
-                    self.results.push(p);
-                    added = true;
+                    // The table is meant to surface actionable ports, so keep
+                    // only ports that responded or may be open.
+                    if is_valid_result(&p) {
+                        self.results.push(p);
+                        added = true;
+                    }
                 }
                 ProbeEvent::ScanProgress(p) => self.progress = Some(p),
                 ProbeEvent::Info(msg) => {
@@ -370,6 +374,12 @@ impl PortScanTab {
     }
 }
 
+/// Whether a scan result is worth showing in the table. Closed and filtered
+/// ports carry no actionable information for this view.
+fn is_valid_result(result: &PortResult) -> bool {
+    matches!(result.state, PortState::Open | PortState::OpenOrFiltered)
+}
+
 /// Sort scan rows for display. Hosts stay grouped, and ports are ascending
 /// within each host regardless of worker completion order.
 fn sort_results(results: &mut [PortResult]) {
@@ -389,6 +399,21 @@ mod tests {
             state: PortState::Open,
             banner: None,
             service: None,
+        }
+    }
+
+    /// Closed and filtered probes must not reach the visible result list.
+    #[test]
+    fn only_valid_states_are_kept() {
+        for (state, expected) in [
+            (PortState::Open, true),
+            (PortState::OpenOrFiltered, true),
+            (PortState::Closed, false),
+            (PortState::Filtered, false),
+        ] {
+            let mut r = result("host", 80);
+            r.state = state;
+            assert_eq!(is_valid_result(&r), expected);
         }
     }
 

@@ -197,7 +197,7 @@ impl MtrTab {
                     ui.label(format!("{:.1}%", h.loss_ratio() * 100.0));
                 });
                 row.col(|ui| {
-                    ui.label(format!("{}/{}/{}", h.sent, h.success_count(), h.lost));
+                    ui.label(format!("{}/{}", h.sent, h.lost));
                 });
                 row.col(|ui| {
                     ui.label(h.last_ms.map_or("-".into(), |v| format!("{:.2}", v)));
@@ -339,17 +339,15 @@ impl MtrTab {
     }
 
     pub fn to_csv(&self) -> String {
-        let mut out =
-            String::from("hop,addr,reverse,loss,sent,success,lost,last,avg,best,worst,stdev\n");
+        let mut out = String::from("hop,addr,reverse,loss,sent,lost,last,avg,best,worst,stdev\n");
         for h in &self.hops {
             out.push_str(&format!(
-                "{},{},{},{:.1}%,{},{},{},{},{},{},{},{}\n",
+                "{},{},{},{:.1}%,{},{},{},{},{},{},{}\n",
                 h.hop,
                 crate::ui::export::csv_field(&h.addr_text()),
                 crate::ui::export::csv_field(&h.reverse_text()),
                 h.loss_ratio() * 100.0,
                 h.sent,
-                h.success_count(),
                 h.lost,
                 h.last_ms.map_or("-".into(), |v| format!("{:.2}", v)),
                 h.avg_ms.map_or("-".into(), |v| format!("{:.2}", v)),
@@ -406,10 +404,20 @@ fn hop_column_widths<H: AsRef<str>>(ui: &egui::Ui, headers: &[H]) -> Vec<f32> {
     };
 
     // Hop and the numeric columns only need room for their headers and values.
+    // The loss column also reserves room for a full percentage value, which can
+    // be wider than its localized header.
+    let loss_value_width = measure("100.0%");
     let numeric_headers = [0usize, 3, 4, 5, 6, 7, 8, 9];
     let fixed_widths: Vec<f32> = numeric_headers
         .iter()
-        .map(|&index| measure(headers[index].as_ref()) + COLUMN_PADDING)
+        .map(|&index| {
+            let header_width = measure(headers[index].as_ref());
+            if index == 3 {
+                header_width.max(loss_value_width) + COLUMN_PADDING
+            } else {
+                header_width + COLUMN_PADDING
+            }
+        })
         .collect();
     let fixed_sum: f32 = fixed_widths.iter().sum();
     let remaining = (table_width - fixed_sum).max(2.0);

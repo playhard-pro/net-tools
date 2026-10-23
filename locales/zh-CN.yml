@@ -184,7 +184,7 @@ mtr:
   addr: 地址
   reverse: 反查域名
   loss: 丢包
-  count: 总次数/成功/失败
+  count: 发送/丢失
   last_ms: 最新(ms)
   avg_ms: 平均(ms)
   best_ms: 最优(ms)
