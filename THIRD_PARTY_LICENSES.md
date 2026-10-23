@@ -2266,7 +2266,7 @@ DEALINGS IN THE SOFTWARE.
 
 Used by:
 
-- clipboard-win 5.4.1 — https://github.com/DoumanAsh/clipboard-win
+- clipboard-win 5.4.3 — https://github.com/DoumanAsh/clipboard-win
 
 ```text
 Boost Software License - Version 1.0 - August 17th, 2003
@@ -8413,7 +8413,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 Used by:
 
 - tokio-util 0.7.19 — https://github.com/tokio-rs/tokio
-- tokio 1.53.2 — https://github.com/tokio-rs/tokio
+- tokio 1.54.1 — https://github.com/tokio-rs/tokio
 
 ```text
 MIT License
