@@ -959,100 +959,6 @@ fn check_ct(leaf_der: &[u8]) -> crate::model::CtCheck {
     check
 }
 
-/// Look up the effective CAA policy for a domain, walking up parent labels.
-async fn check_caa(
-    handle: &ProbeHandle<ProbeEvent>,
-    host: &str,
-    timeout: Duration,
-) -> crate::model::CaaCheck {
-    use hickory_resolver::proto::rr::domain::Name;
-    use hickory_resolver::proto::rr::{RData, RecordType};
-    use hickory_resolver::TokioResolver;
-
-    if host.parse::<std::net::IpAddr>().is_ok() {
-        return crate::model::CaaCheck {
-            error: Some("CAA applies to domain names only".into()),
-            ..Default::default()
-        };
-    }
-
-    let resolver = match TokioResolver::builder_tokio().and_then(|builder| builder.build()) {
-        Ok(value) => value,
-        Err(error) => {
-            return crate::model::CaaCheck {
-                error: Some(format!("resolver build failed: {error}")),
-                ..Default::default()
-            }
-        }
-    };
-    let mut name = match Name::from_utf8(format!("{host}.")) {
-        Ok(value) => value,
-        Err(error) => {
-            return crate::model::CaaCheck {
-                error: Some(format!("invalid DNS name: {error}")),
-                ..Default::default()
-            }
-        }
-    };
-
-    loop {
-        let source = name.to_string();
-        let lookup = tokio::select! {
-            _ = handle.cancelled() => {
-                return crate::model::CaaCheck {
-                    error: Some("cancelled".into()),
-                    ..Default::default()
-                }
-            }
-            result = tokio::time::timeout(
-                timeout,
-                resolver.lookup(name.clone(), RecordType::CAA),
-            ) => match result {
-                Ok(Ok(value)) => Some(value),
-                // A missing RRset is expected while walking to the parent.
-                Ok(Err(error)) if error.is_no_records_found() => None,
-                Ok(Err(error)) => {
-                    return crate::model::CaaCheck {
-                        error: Some(format!("CAA lookup failed for {source}: {error}")),
-                        ..Default::default()
-                    }
-                }
-                Err(_) => {
-                    return crate::model::CaaCheck {
-                        error: Some(format!("CAA lookup timed out for {source}")),
-                        ..Default::default()
-                    }
-                }
-            }
-        };
-        if let Some(lookup) = lookup {
-            let mut records = Vec::new();
-            for record in lookup.answers() {
-                if let RData::CAA(caa) = &record.data {
-                    records.push(crate::model::CaaRecordInfo {
-                        flags: caa.reserved_flags | if caa.issuer_critical { 0x80 } else { 0 },
-                        tag: caa.tag.clone(),
-                        value: String::from_utf8_lossy(&caa.value).into_owned(),
-                        critical: caa.issuer_critical,
-                    });
-                }
-            }
-            if !records.is_empty() {
-                return crate::model::CaaCheck {
-                    source: Some(source.trim_end_matches('.').to_string()),
-                    records,
-                    error: None,
-                };
-            }
-        }
-        if name.is_root() {
-            break;
-        }
-        name = name.base_name();
-    }
-    crate::model::CaaCheck::default()
-}
-
 /// Hard upper bound for concurrent target checks.
 pub const MAX_CONCURRENCY: usize = 10;
 
@@ -1231,7 +1137,7 @@ async fn check_target(
         }
     }
     if settings.check_caa {
-        security.caa = check_caa(handle, &target.host, timeout).await;
+        security.caa = crate::net::dns_tool::check_caa(handle, &target.host, timeout).await;
     }
 
     let revoked = security.revocation.status == crate::model::RevocationStatus::Revoked;

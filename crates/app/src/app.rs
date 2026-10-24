@@ -226,6 +226,11 @@ impl App {
         if self.tab == Tab::Nat && tab != Tab::Nat {
             self.nat.clear_on_hide();
         }
+        // Leaving the DNS tab stops any running query, propagation,
+        // benchmark or health task and drops live progress.
+        if self.tab == Tab::Dns && tab != Tab::Dns {
+            self.dns.clear_on_hide();
+        }
         self.tab = tab;
     }
 

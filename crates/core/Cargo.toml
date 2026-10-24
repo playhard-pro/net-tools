@@ -20,7 +20,8 @@ tracing.workspace = true
 surge-ping = "0.9.1"
 pnet_packet = "0.35.0"
 if-addrs = "0.15.0"
-hickory-resolver = "0.26.3"
+hickory-resolver = { version = "0.26.3", features = ["dnssec-ring", "tls-ring", "https-ring", "quic-ring", "webpki-roots"] }
+quinn = { version = "0.11", default-features = false, features = ["runtime-tokio", "rustls-ring"] }
 hickory-proto = { version = "0.26.3", features = ["mdns"] }
 libc = "0.2"
 getrandom = "0.3"

@@ -226,6 +226,40 @@ pub fn network_rate_chart(
         });
 }
 
+/// Render one bar per resolver, using the average latency as the value.
+///
+/// The table next to the chart carries the resolver names; the bar names are
+/// still set so hovering a bar reveals the full label.
+pub fn resolver_latency_chart(ui: &mut egui::Ui, id: &str, values: &[(String, f64)], height: f32) {
+    if values.is_empty() {
+        return;
+    }
+    let color = Palette::from_ui(ui).chart_primary;
+    let bars: Vec<Bar> = values
+        .iter()
+        .enumerate()
+        .map(|(index, (label, value))| {
+            Bar::new(index as f64, *value)
+                .width(0.7)
+                .name(format!("{label}: {value:.1} ms"))
+        })
+        .collect();
+    let max = values
+        .iter()
+        .map(|(_, value)| *value)
+        .fold(1.0_f64, f64::max);
+    Plot::new(id)
+        .height(height)
+        .show_x(false)
+        .show_y(true)
+        .include_y(0.0)
+        .include_y(max)
+        .y_axis_label(t!("common.rtt_ms"))
+        .show(ui, |plot_ui| {
+            plot_ui.bar_chart(BarChart::new("resolvers", bars).color(color));
+        });
+}
+
 #[cfg(test)]
 mod tests {
     use super::histogram_bins;

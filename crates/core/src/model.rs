@@ -1324,6 +1324,316 @@ pub struct NatResult {
     pub warning: Option<String>,
 }
 
+/// DNS sub-tool selected inside the DNS tab.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum DnsTool {
+    #[default]
+    Query,
+    Propagation,
+    Benchmark,
+    Health,
+}
+
+impl DnsTool {
+    /// Stable identifier used by the configuration.
+    pub fn id(self) -> &'static str {
+        match self {
+            DnsTool::Query => "query",
+            DnsTool::Propagation => "propagation",
+            DnsTool::Benchmark => "benchmark",
+            DnsTool::Health => "health",
+        }
+    }
+
+    /// Resolve a stored identifier, ignoring unknown values.
+    pub fn from_id(id: &str) -> Option<Self> {
+        [
+            DnsTool::Query,
+            DnsTool::Propagation,
+            DnsTool::Benchmark,
+            DnsTool::Health,
+        ]
+        .into_iter()
+        .find(|tool| tool.id() == id)
+    }
+}
+
+/// Transport used for a DNS query.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum DnsProtocol {
+    #[default]
+    Udp,
+    Tcp,
+    Dot,
+    Doh,
+    Quic,
+}
+
+impl DnsProtocol {
+    pub fn id(self) -> &'static str {
+        match self {
+            DnsProtocol::Udp => "udp",
+            DnsProtocol::Tcp => "tcp",
+            DnsProtocol::Dot => "dot",
+            DnsProtocol::Doh => "doh",
+            DnsProtocol::Quic => "quic",
+        }
+    }
+
+    pub fn from_id(id: &str) -> Option<Self> {
+        [
+            DnsProtocol::Udp,
+            DnsProtocol::Tcp,
+            DnsProtocol::Dot,
+            DnsProtocol::Doh,
+            DnsProtocol::Quic,
+        ]
+        .into_iter()
+        .find(|protocol| protocol.id() == id)
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            DnsProtocol::Udp => "UDP",
+            DnsProtocol::Tcp => "TCP",
+            DnsProtocol::Dot => "DoT",
+            DnsProtocol::Doh => "DoH",
+            DnsProtocol::Quic => "DoQ",
+        }
+    }
+}
+
+/// A resolver endpoint used by the propagation and benchmark tools.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DnsResolverSpec {
+    /// Display label chosen by the user or from a preset.
+    pub label: String,
+    pub protocol: DnsProtocol,
+    /// Address for UDP/TCP, `tls://` endpoint for DoT or `https://` URL for DoH.
+    pub endpoint: String,
+}
+
+impl DnsResolverSpec {
+    pub fn new(
+        label: impl Into<String>,
+        protocol: DnsProtocol,
+        endpoint: impl Into<String>,
+    ) -> Self {
+        Self {
+            label: label.into(),
+            protocol,
+            endpoint: endpoint.into(),
+        }
+    }
+}
+
+/// DNSSEC validation state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum DnsDnssecStatus {
+    #[default]
+    Disabled,
+    Secure,
+    Insecure,
+    Bogus,
+    Indeterminate,
+    Unsupported,
+}
+
+impl DnsDnssecStatus {
+    pub fn label(self) -> &'static str {
+        match self {
+            DnsDnssecStatus::Disabled => "disabled",
+            DnsDnssecStatus::Secure => "secure",
+            DnsDnssecStatus::Insecure => "insecure",
+            DnsDnssecStatus::Bogus => "bogus",
+            DnsDnssecStatus::Indeterminate => "indeterminate",
+            DnsDnssecStatus::Unsupported => "unsupported",
+        }
+    }
+}
+
+/// One step in the DNSSEC chain of trust.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct DnsDnssecChainStep {
+    pub zone: String,
+    pub key_tag: Option<u16>,
+    pub algorithm: Option<String>,
+    pub ds_present: bool,
+    pub dnskey_present: bool,
+    pub secure: bool,
+    pub detail: Option<String>,
+}
+
+/// DNSSEC validation summary for one query.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct DnsDnssecReport {
+    pub status: DnsDnssecStatus,
+    /// AD flag returned by the resolver.
+    pub ad: bool,
+    pub rrsig_count: usize,
+    pub nsec_count: usize,
+    pub ds_present: bool,
+    pub dnskey_present: bool,
+    pub chain: Vec<DnsDnssecChainStep>,
+    pub error: Option<String>,
+}
+
+/// One resource record rendered for display.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct DnsRecordView {
+    pub name: String,
+    pub ttl: u32,
+    pub record_type: String,
+    pub value: String,
+}
+
+/// Result of one recursive query.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct DnsQueryResult {
+    pub target: String,
+    pub record_type: String,
+    pub server: String,
+    pub protocol: DnsProtocol,
+    pub response_code: String,
+    pub elapsed_ms: u64,
+    pub transport: String,
+    pub flags: String,
+    pub answers: Vec<DnsRecordView>,
+    pub authorities: Vec<DnsRecordView>,
+    pub additionals: Vec<DnsRecordView>,
+    pub raw: String,
+    pub dnssec: DnsDnssecReport,
+    pub error: Option<String>,
+}
+
+/// Result of one resolver in a propagation comparison.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct DnsResolverResult {
+    pub resolver: DnsResolverSpec,
+    pub response_code: Option<String>,
+    pub elapsed_ms: u64,
+    pub answers: Vec<String>,
+    pub avg_ttl: Option<u32>,
+    pub ad: bool,
+    pub dnssec: DnsDnssecStatus,
+    pub error: Option<String>,
+}
+
+impl DnsResolverResult {
+    /// Stable key used to group identical answer sets.
+    pub fn answer_key(&self) -> String {
+        let mut answers = self.answers.clone();
+        answers.sort();
+        answers.join("\n")
+    }
+}
+
+/// A group of resolvers that returned the same answer set.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct DnsAnswerGroup {
+    pub key: String,
+    pub resolvers: Vec<String>,
+}
+
+/// Propagation comparison report.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct DnsPropagationReport {
+    pub target: String,
+    pub record_type: String,
+    pub protocol: DnsProtocol,
+    pub results: Vec<DnsResolverResult>,
+    pub groups: Vec<DnsAnswerGroup>,
+    pub consistent: usize,
+    pub total: usize,
+    pub failed: usize,
+}
+
+/// One resolver row in the benchmark report.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct DnsBenchmarkRow {
+    pub resolver: DnsResolverSpec,
+    pub success: usize,
+    pub failure: usize,
+    pub min_ms: f64,
+    pub avg_ms: f64,
+    pub p50_ms: f64,
+    pub p95_ms: f64,
+    pub max_ms: f64,
+    pub stddev_ms: f64,
+    pub avg_ttl: Option<f64>,
+    pub error: Option<String>,
+}
+
+/// Benchmark report for all selected resolvers.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct DnsBenchmarkReport {
+    pub target: String,
+    pub record_type: String,
+    pub protocol: DnsProtocol,
+    pub samples: usize,
+    pub rows: Vec<DnsBenchmarkRow>,
+}
+
+/// Progress of a propagation or benchmark run.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct DnsRunProgress {
+    pub done: usize,
+    pub total: usize,
+    pub current: String,
+}
+
+/// Severity used by domain health findings.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default, Serialize, Deserialize)]
+pub enum HealthSeverity {
+    #[default]
+    Info,
+    Ok,
+    Warning,
+    Error,
+}
+
+impl HealthSeverity {
+    pub fn label(self) -> &'static str {
+        match self {
+            HealthSeverity::Info => "info",
+            HealthSeverity::Ok => "ok",
+            HealthSeverity::Warning => "warning",
+            HealthSeverity::Error => "error",
+        }
+    }
+}
+
+/// One finding produced by the domain health check.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct HealthIssue {
+    pub category: String,
+    pub severity: HealthSeverity,
+    pub title: String,
+    pub detail: String,
+    pub evidence: Vec<String>,
+    pub advice: Option<String>,
+}
+
+/// Per-category health summary.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct HealthCategoryResult {
+    pub category: String,
+    pub severity: HealthSeverity,
+    pub summary: String,
+}
+
+/// Complete domain health report.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct DomainHealthReport {
+    pub domain: String,
+    pub severity: HealthSeverity,
+    pub categories: Vec<HealthCategoryResult>,
+    pub issues: Vec<HealthIssue>,
+    pub dnssec: Option<DnsDnssecReport>,
+    pub generated_at: String,
+    pub elapsed_ms: u64,
+}
+
 /// Unified event streamed from a probe task back to the UI.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ProbeEvent {
@@ -1356,6 +1666,16 @@ pub enum ProbeEvent {
     Lookup(LookupResult),
     /// A block of text emitted by the DNS query / trace task.
     DnsText(String),
+    /// Structured result of one DNS query.
+    DnsQuery(Box<DnsQueryResult>),
+    /// Progress of a multi-resolver DNS run.
+    DnsProgress(DnsRunProgress),
+    /// DNS propagation comparison result.
+    DnsPropagation(Box<DnsPropagationReport>),
+    /// DNS resolver benchmark result.
+    DnsBenchmark(Box<DnsBenchmarkReport>),
+    /// Domain health check result.
+    DnsHealth(Box<DomainHealthReport>),
     /// An NTP query result.
     Ntp(NtpResult),
     /// A Wake-on-LAN send result.

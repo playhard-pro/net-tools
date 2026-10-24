@@ -28,7 +28,7 @@ it.
 | Connections | Local TCP/UDP socket inventory with process/PID, state and remote endpoint, filters, process termination and best-effort connection close. |
 | IP Insight | Parallel IP geolocation queries across multiple providers. |
 | Lookup | RDAP domain/IP lookup with JSON tree, parsed contacts and parent-domain fallback. |
-| DNS | dig-like queries, custom server with Google/Cloudflare/OpenDNS/Quad9 IPv4 and IPv6 presets, UDP with TCP fallback, and iterative trace from the root servers. |
+| DNS | Query (UDP/TCP/DoT/DoH/DoQ with local DNSSEC validation and iterative trace), multi-resolver propagation comparison, resolver latency benchmark, and domain health checks (MX/SPF/DKIM/DMARC/PTR/CAA/NS/SOA/DNSSEC). |
 | NTP | SNTP query, live analog clock, local/UTC time in milliseconds, server metrics, presets and optional system clock update. |
 | Utils | Subnet/CIDR calculator, Wake-on-LAN, IANA port/protocol reference, MAC vendor lookup and timestamp/timezone conversion. |
 | Speedtest | LibreSpeed, iperf3 client and built-in iperf3 server; live throughput, RTT/jitter and TCP/UDP metrics. |
@@ -103,6 +103,24 @@ CAA checks add OCSP/CRL downloads, a single `HEAD /` request and DNS lookups.
 Concurrency is capped at ten targets. TLS uses the rustls `ring` provider, so
 post-quantum hybrid key-exchange groups are not offered; TLS 1.2/1.3 and the
 standard cipher suites are unaffected.
+
+The DNS tab has four sub-tabs. **Query** supports UDP, TCP, DNS over TLS, DNS
+over HTTPS and DNS over QUIC, keeps the dig-like raw response, and shows a
+structured answer plus local DNSSEC validation. **Propagation** queries the same name through several
+resolvers and groups identical answers. **Benchmark** warms up each resolver and
+reports min/avg/P50/P95/stddev with a bounded number of samples. **Health**
+checks MX, SPF, DKIM, DMARC, PTR/FCrDNS, CAA, NS/SOA and DNSSEC and lists findings
+by severity. Structured results can be copied or exported as CSV, JSON or HTML.
+
+DNSSEC validation uses the root KSK trust anchors bundled with hickory. These are
+public keys rather than TLS certificates, so there is no certificate renewal
+process; updating hickory is only needed when the IANA root KSK rolls over. DoT,
+DoH and DoQ use the rustls `ring` provider and the bundled webpki roots. Propagation
+is capped at twenty resolvers and eight concurrent queries; benchmarks are capped
+at twenty resolvers, twenty samples per resolver, four concurrent resolvers and a
+minimum sample interval of one hundred milliseconds.
+
+The health check does not implement AXFR/IXFR or bulk domain scanning.
 
 The Utils port reference is generated from the IANA service-name and port-number
 registry, which IANA and IETF dedicate to the public domain under CC0 1.0. The

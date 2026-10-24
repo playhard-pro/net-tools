@@ -254,10 +254,107 @@ dns:
   trace: Trace
   record_type: Record type
   server: Server
-  server_hint: "host or host:port, e.g. 8.8.8.8 or 1.1.1.1:53"
+  server_hint: "IP for UDP/TCP, or a full endpoint: tls://dns.google, https://dns.google/dns-query, quic://dns.quad9.net"
   force_tcp: Force TCP
   trace_mode: Full trace
   common_types: Common types
+  tools:
+    query: Query
+    propagation: Propagation
+    benchmark: Benchmark
+    health: Health
+    coming_soon: This sub-tool is being prepared.
+  protocol: Protocol
+  dnssec: DNSSEC validation
+  trace_protocol_hint: Iterative trace always starts from the root servers and ignores the selected encrypted transport.
+  empty_query: Run a query to see the result.
+  raw_output: Raw response
+  no_answers: No answer records.
+  summary:
+    status: "Status: %{status}"
+    time: "%{time} ms"
+    server: "Server: %{server}"
+    transport: "Transport: %{transport}"
+  columns:
+    name: Name
+    ttl: TTL
+    type: Type
+    value: Value
+  dnssec_details: DNSSEC details
+  dnssec_status: Validation
+  dnssec_ad: AD flag
+  dnssec_rrsig: RRSIG records
+  dnssec_nsec: NSEC/NSEC3 records
+  dnssec_ds: DS present
+  dnssec_dnskey: DNSKEY present
+  resolvers:
+    title: Resolvers
+    select_all: Select all
+    select_none: Select none
+    custom: Custom resolvers
+    custom_hint: "label=1.1.1.1, label=tls://dns.example, label=https://dns.example/dns-query"
+  progress: "%{done}/%{total} · %{current}"
+  empty_propagation: Run a comparison to see how resolvers answer.
+  empty_benchmark: Run a benchmark to compare resolver latency.
+  empty_health: Run a health check to see domain configuration findings.
+  health:
+    details: Details
+    details_count: "Details (%{count})"
+    no_findings: No findings.
+    domain: Domain
+    dkim_selectors: Extra DKIM selectors
+    selectors_hint: comma or newline separated
+    checks: Checks
+    check_mx: MX
+    check_spf: SPF
+    check_dkim: DKIM
+    check_dmarc: DMARC
+    check_ptr: PTR / FCrDNS
+    check_caa: CAA
+    check_ns_soa: NS / SOA
+    check_dnssec: DNSSEC
+    hint: Checks use the selected resolver. DKIM selectors cannot be enumerated; a missing selector does not prove that DKIM is unused.
+    summary: "Domain %{domain} · %{time} ms"
+    severity: "Overall: %{severity}"
+    columns:
+      category: Category
+      status: Status
+      summary: Summary
+    category:
+      mx: MX
+      spf: SPF
+      dkim: DKIM
+      dmarc: DMARC
+      ptr: PTR
+      caa: CAA
+      ns_soa: NS / SOA
+      dnssec: DNSSEC
+  benchmark:
+    samples: Samples
+    interval: Sample interval
+    hint: Each resolver is warmed up once, then sampled sequentially; resolvers run with bounded concurrency. Results are affected by resolver caches and network conditions.
+    summary: "Target %{target} · %{samples} samples × %{count} resolvers"
+    best: "Fastest average: %{resolver} (%{avg} ms)"
+    columns:
+      success: OK
+      fail: Fail
+      avg: Avg
+      min: Min
+      max: Max
+      stddev: Stddev
+  propagation:
+    error: error
+    summary:
+      consistent: "Consensus: %{consistent}/%{total}"
+      groups: "Answer groups: %{count}"
+      failed: "Failed: %{count}"
+    columns:
+      resolver: Resolver
+      status: Status
+      answers: Answers
+      ttl: TTL
+      time: Time
+      dnssec: DNSSEC
   output: Output
 ntp:
   query: Query

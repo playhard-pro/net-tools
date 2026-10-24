@@ -253,10 +253,107 @@ dns:
   trace: 跟踪
   record_type: 记录类型
   server: 服务器
-  server_hint: "支持 IP 或 IP:端口，如 8.8.8.8 或 1.1.1.1:53"
+  server_hint: "UDP/TCP 可填 IP；DoT/DoH/DoQ 可直接填 tls://dns.google、https://dns.google/dns-query 或 quic://dns.quad9.net"
   force_tcp: 强制 TCP
   trace_mode: 完整跟踪
   common_types: 常用类型
+  tools:
+    query: 查询
+    propagation: 传播
+    benchmark: 基准
+    health: 健康
+    coming_soon: 该子工具正在准备中。
+  protocol: 传输协议
+  dnssec: DNSSEC 验证
+  trace_protocol_hint: 迭代跟踪始终从根服务器开始，不使用所选的加密传输。
+  empty_query: 执行查询后在此显示结果。
+  raw_output: 原始响应
+  no_answers: 没有应答记录。
+  summary:
+    status: "状态：%{status}"
+    time: "%{time} 毫秒"
+    server: "服务器：%{server}"
+    transport: "传输：%{transport}"
+  columns:
+    name: 名称
+    ttl: TTL
+    type: 类型
+    value: 值
+  dnssec_details: DNSSEC 详情
+  dnssec_status: 验证结果
+  dnssec_ad: AD 标志
+  dnssec_rrsig: RRSIG 记录数
+  dnssec_nsec: NSEC/NSEC3 记录数
+  dnssec_ds: 存在 DS
+  dnssec_dnskey: 存在 DNSKEY
+  resolvers:
+    title: 解析器
+    select_all: 全选
+    select_none: 全不选
+    custom: 自定义解析器
+    custom_hint: "名称=1.1.1.1、名称=tls://dns.example、名称=https://dns.example/dns-query"
+  progress: "%{done}/%{total} · %{current}"
+  empty_propagation: 开始对比后显示各解析器的结果。
+  empty_benchmark: 开始基准测试后显示解析器延迟对比。
+  empty_health: 开始健康检查后显示域名配置问题。
+  health:
+    details: 详细信息
+    details_count: "详细信息（%{count}）"
+    no_findings: 没有发现问题。
+    domain: 域名
+    dkim_selectors: 额外 DKIM selector
+    selectors_hint: 使用逗号或换行分隔
+    checks: 检查项
+    check_mx: MX
+    check_spf: SPF
+    check_dkim: DKIM
+    check_dmarc: DMARC
+    check_ptr: PTR / FCrDNS
+    check_caa: CAA
+    check_ns_soa: NS / SOA
+    check_dnssec: DNSSEC
+    hint: 检查使用所选解析器。DKIM selector 无法枚举，未找到不代表未使用 DKIM。
+    summary: "域名 %{domain} · %{time} 毫秒"
+    severity: "总体：%{severity}"
+    columns:
+      category: 分类
+      status: 状态
+      summary: 摘要
+    category:
+      mx: MX
+      spf: SPF
+      dkim: DKIM
+      dmarc: DMARC
+      ptr: PTR
+      caa: CAA
+      ns_soa: NS / SOA
+      dnssec: DNSSEC
+  benchmark:
+    samples: 采样次数
+    interval: 采样间隔
+    hint: 每个解析器先预热一次，再串行采样；解析器之间并发受限。结果受解析器缓存和网络状况影响。
+    summary: "目标 %{target} · %{samples} 次采样 × %{count} 个解析器"
+    best: "最快平均：%{resolver}（%{avg} 毫秒）"
+    columns:
+      success: 成功
+      fail: 失败
+      avg: 平均
+      min: 最小
+      max: 最大
+      stddev: 标准差
+  propagation:
+    error: 错误
+    summary:
+      consistent: "一致：%{consistent}/%{total}"
+      groups: "答案分组：%{count}"
+      failed: "失败：%{count}"
+    columns:
+      resolver: 解析器
+      status: 状态
+      answers: 答案
+      ttl: TTL
+      time: 耗时
+      dnssec: DNSSEC
   output: 输出
 ntp:
   query: 查询

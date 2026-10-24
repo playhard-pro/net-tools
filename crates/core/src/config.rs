@@ -5,8 +5,8 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 
 use crate::model::{
-    IpVersion, Iperf3Protocol, NatTestMode, PortPreset, PortReferenceView, PortTransportFilter,
-    ProbeMode, ScanMode, SpeedtestTool, TimestampUnit, UtilsTool,
+    DnsProtocol, DnsTool, IpVersion, Iperf3Protocol, NatTestMode, PortPreset, PortReferenceView,
+    PortTransportFilter, ProbeMode, ScanMode, SpeedtestTool, TimestampUnit, UtilsTool,
 };
 
 /// Maximum number of remembered values kept for each input field. Older entries
@@ -288,6 +288,7 @@ impl Default for LookupSettings {
 
 /// Settings for the DNS tab: a dig-like query and an optional iterative trace.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct DnsSettings {
     /// Domain name, or an IP address when querying PTR records.
     pub target: String,
@@ -297,10 +298,22 @@ pub struct DnsSettings {
     pub server: String,
     /// Timeout for a single query, in milliseconds.
     pub timeout_ms: u64,
-    /// Use TCP instead of UDP.
+    /// Legacy TCP switch kept so old configuration files keep working.
     pub force_tcp: bool,
     /// Run a full iterative trace from the root servers.
     pub trace: bool,
+    /// DNS sub-tool selected inside the DNS tab.
+    pub active_tool: DnsTool,
+    /// Transport used by the single-query tool.
+    pub protocol: DnsProtocol,
+    /// Validate DNSSEC answers locally.
+    pub dnssec: bool,
+    /// Multi-resolver propagation comparison settings.
+    pub propagation: DnsPropagationSettings,
+    /// Resolver latency benchmark settings.
+    pub benchmark: DnsBenchmarkSettings,
+    /// Domain health check settings.
+    pub health: DomainHealthSettings,
 }
 
 impl Default for DnsSettings {
@@ -312,6 +325,127 @@ impl Default for DnsSettings {
             timeout_ms: 5000,
             force_tcp: false,
             trace: false,
+            active_tool: DnsTool::Query,
+            protocol: DnsProtocol::Udp,
+            dnssec: true,
+            propagation: DnsPropagationSettings::default(),
+            benchmark: DnsBenchmarkSettings::default(),
+            health: DomainHealthSettings::default(),
+        }
+    }
+}
+
+impl DnsSettings {
+    /// Effective protocol, mapping the legacy TCP switch to the new selector.
+    pub fn effective_protocol(&self) -> DnsProtocol {
+        if self.force_tcp && self.protocol == DnsProtocol::Udp {
+            DnsProtocol::Tcp
+        } else {
+            self.protocol
+        }
+    }
+}
+
+/// Settings for the multi-resolver propagation comparison.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct DnsPropagationSettings {
+    pub target: String,
+    pub record_type: String,
+    pub protocol: DnsProtocol,
+    /// Selected built-in resolver ids, in display order.
+    pub resolvers: Vec<String>,
+    /// One custom resolver per line: `label=endpoint`.
+    pub custom: String,
+    pub timeout_ms: u64,
+    pub concurrency: usize,
+}
+
+impl Default for DnsPropagationSettings {
+    fn default() -> Self {
+        Self {
+            target: "example.com".into(),
+            record_type: "A".into(),
+            protocol: DnsProtocol::Udp,
+            resolvers: vec!["cloudflare".into(), "google".into(), "quad9".into()],
+            custom: String::new(),
+            timeout_ms: 3000,
+            concurrency: 4,
+        }
+    }
+}
+
+/// Settings for the resolver latency benchmark.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct DnsBenchmarkSettings {
+    pub target: String,
+    pub record_type: String,
+    pub protocol: DnsProtocol,
+    pub resolvers: Vec<String>,
+    pub custom: String,
+    pub samples: usize,
+    pub interval_ms: u64,
+    pub timeout_ms: u64,
+    pub concurrency: usize,
+}
+
+impl Default for DnsBenchmarkSettings {
+    fn default() -> Self {
+        Self {
+            target: "example.com".into(),
+            record_type: "A".into(),
+            protocol: DnsProtocol::Udp,
+            resolvers: vec!["cloudflare".into(), "google".into(), "quad9".into()],
+            custom: String::new(),
+            samples: 10,
+            interval_ms: 500,
+            timeout_ms: 3000,
+            concurrency: 4,
+        }
+    }
+}
+
+/// Settings for the domain health check.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct DomainHealthSettings {
+    pub domain: String,
+    /// Extra DKIM selectors, separated by commas or newlines.
+    pub dkim_selectors: String,
+    /// Resolver endpoint; empty means use the system resolver.
+    pub server: String,
+    /// Transport used for the health-check resolver.
+    pub protocol: DnsProtocol,
+    pub timeout_ms: u64,
+    pub concurrency: usize,
+    pub check_mx: bool,
+    pub check_spf: bool,
+    pub check_dkim: bool,
+    pub check_dmarc: bool,
+    pub check_ptr: bool,
+    pub check_caa: bool,
+    pub check_ns_soa: bool,
+    pub check_dnssec: bool,
+}
+
+impl Default for DomainHealthSettings {
+    fn default() -> Self {
+        Self {
+            domain: "example.com".into(),
+            dkim_selectors: String::new(),
+            server: String::new(),
+            protocol: DnsProtocol::Udp,
+            timeout_ms: 5000,
+            concurrency: 2,
+            check_mx: true,
+            check_spf: true,
+            check_dkim: true,
+            check_dmarc: true,
+            check_ptr: true,
+            check_caa: true,
+            check_ns_soa: true,
+            check_dnssec: true,
         }
     }
 }
