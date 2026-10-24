@@ -45,6 +45,7 @@ tab:
   tls: TLS
   portscan: Port Scan
   lan_discovery: LAN Discovery
+  wifi: Wi-Fi
   connections: Connections
   ip_insight: IP Insight
   lookup: Lookup
@@ -518,6 +519,100 @@ lan_discovery:
   services: Services / device
   scanned: Scanned
   found: Found
+
+wifi:
+  scan_interval: Scan interval
+  sample_interval: Sample interval
+  show_hidden: Show hidden networks
+  min_signal: Minimum signal
+  overview: Overview
+  networks: Networks
+  channels: Channels
+  start_hint: Start monitoring to sample the current connection and scan nearby networks.
+  empty: Start monitoring to see the current Wi-Fi connection.
+  not_connected: No Wi-Fi connection is active.
+  scan_unavailable: Nearby scanning is not available on this platform; current connection details are still shown.
+  no_scan: No scan results yet. Start monitoring or wait for the next scan round.
+  search: Search
+  search_hint: SSID, BSSID or vendor
+  band_all: All bands
+  security_all: All security
+  security_open_wep: Open / WEP
+  security_other: Other / unknown
+  sort_signal: Signal
+  sort_channel: Channel
+  sort_ssid: SSID
+  sort_seen: Seen count
+  no_matches: No networks match the current filters.
+  ssid: SSID
+  bssid: BSSID
+  vendor: Vendor
+  band: Band
+  channel: Channel
+  width: Width
+  frequency: Frequency
+  signal: Signal
+  signal_dbm: Signal (dBm)
+  quality: Quality
+  security: Security
+  standard: Standard
+  max_rate: Max rate
+  seen: Seen
+  noise: Noise
+  snr: SNR
+  hidden: Hidden network
+  current: Current
+  access_points: Access points
+  access_points_short: APs
+  unique_ssids: Unique SSIDs
+  open_networks: Open
+  wep_networks: WEP
+  hidden_networks: Hidden
+  strongest: Strongest
+  busiest_channel: Busiest channel
+  recommendations: Recommended channels
+  channel_disclaimer: Recommendations are based on the latest scan and do not account for regulatory domains or DFS.
+  samples: Samples
+  signal_min: Min
+  signal_max: Max
+  signal_avg: Average
+  signal_stddev: Std. deviation
+  stability: Stability
+  stability_stable: stable
+  stability_moderate: moderate
+  stability_unstable: unstable
+  analysis: Analysis
+  strongest_signal: Strongest
+  interference: Interference
+  occupancy: Occupancy
+  open_location_settings: Open Location settings
+  msg_radio_off: The Wi-Fi radio is turned off
+  msg_radio_on_hint: Turn Wi-Fi on in the Windows quick settings or Settings > Network & Internet > Wi-Fi, then retry.
+  msg_unc_scan: "Windows denies Wi-Fi scanning when the executable runs from a network/UNC path such as \\wsl.localhost. Copy net-tools.exe to a local drive and run it there."
+  msg_unc_capabilities: "Windows blocks Wi-Fi scanning when net-tools runs from a network/UNC path such as \\wsl.localhost. Copy the executable to a local drive and run it there."
+  msg_location_denied: "Windows blocks nearby Wi-Fi scans while Location Services is off. Open Settings > Privacy & security > Location and enable Location services and the global desktop-app location access. Windows does not list net-tools as a separate app there. Administrator rights do not bypass this restriction."
+  msg_wlan_service: The WLAN AutoConfig service is not running. Start the service, then retry.
+  msg_windows_api: Using the native Windows WLAN API. Nearby scanning requires Location Services.
+  msg_nm_active: "Using NetworkManager on %{interfaces}."
+  msg_nm_missing: NetworkManager is unavailable; using iw. Some scans may require privileges.
+  msg_iwlist: Using iwlist. Detail fields may be limited.
+  msg_install_tools: Install NetworkManager (nmcli) or iw to scan Wi-Fi networks.
+  msg_no_wireless_iface: No wireless interface was found.
+  msg_no_wlan_iface: No WLAN interface was found.
+  msg_no_scan_results: The Wi-Fi scan returned no usable results.
+  msg_scan_privileges: Wireless scanning may require NetworkManager or additional privileges.
+  msg_macos_capabilities: macOS shows current connection details through wdutil; nearby scanning is not available.
+  msg_macos_scan: macOS only exposes the current connection through wdutil; nearby scanning is not available.
+  msg_wdutil_missing: wdutil is not available on this system.
+  msg_wdutil_permission: wdutil may require elevated privileges or Location Services permission.
+  msg_wdutil_too_large: wdutil returned more output than expected.
+  msg_wlan_task_failed: "WLAN task failed: %{error}"
+  msg_wlan_open_error: "WlanOpenHandle failed with error %{code}"
+  msg_wlan_enum_error: "WlanEnumInterfaces failed with error %{code}"
+  msg_wlan_bss_error: "WlanGetNetworkBssList failed with error %{code}"
+  msg_command_timeout: "%{program} timed out"
+  no_channel_data: No channel data for this band in the latest scan.
+  mbps: Mbps
 
 nat:
   mode: Mode

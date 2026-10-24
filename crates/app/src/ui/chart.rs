@@ -4,6 +4,8 @@ use eframe::egui;
 use egui_plot::{Bar, BarChart, Line, Plot, PlotPoints};
 use rust_i18n::t;
 
+use net_tools_core::model::{WifiChannelUsage, WifiSignalSample};
+
 use super::theme::Palette;
 
 /// One bucket of a latency histogram.
@@ -223,6 +225,81 @@ pub fn network_rate_chart(
                     Line::new("TX", PlotPoints::from(tx.to_vec())).color(palette.chart_secondary),
                 );
             }
+        });
+}
+
+/// Render the current-link RSSI history as a line chart.
+pub fn wifi_signal_chart(ui: &mut egui::Ui, id: &str, samples: &[WifiSignalSample], height: f32) {
+    let points = samples
+        .iter()
+        .filter_map(|sample| {
+            sample
+                .signal_dbm
+                .map(|signal| [sample.elapsed_s, signal as f64])
+        })
+        .collect::<Vec<_>>();
+    if points.is_empty() {
+        return;
+    }
+    let min = points
+        .iter()
+        .map(|point| point[1])
+        .fold(f64::INFINITY, f64::min);
+    let max = points
+        .iter()
+        .map(|point| point[1])
+        .fold(f64::NEG_INFINITY, f64::max);
+    let color = Palette::from_ui(ui).chart_primary;
+    let width = ui.available_width().max(1.0);
+
+    Plot::new(id)
+        .width(width)
+        .height(height)
+        .show_x(true)
+        .show_y(true)
+        .include_y(min)
+        .include_y(max)
+        .x_axis_label(t!("overview.elapsed_s"))
+        .y_axis_label(t!("wifi.signal_dbm"))
+        .show(ui, |plot_ui| {
+            plot_ui.line(Line::new("RSSI", PlotPoints::from(points)).color(color));
+        });
+}
+
+/// Render channel occupancy as bars for one band.
+pub fn wifi_channel_chart(ui: &mut egui::Ui, id: &str, usage: &[WifiChannelUsage], height: f32) {
+    if usage.is_empty() {
+        return;
+    }
+    let color = Palette::from_ui(ui).chart_primary;
+    let bars = usage
+        .iter()
+        .map(|entry| {
+            let label = format!(
+                "{} ch {}: {} AP, {:.0}%",
+                entry.band.label(),
+                entry.channel,
+                entry.access_points,
+                entry.occupancy
+            );
+            Bar::new(entry.channel as f64, entry.occupancy)
+                .width(0.75)
+                .name(label)
+        })
+        .collect::<Vec<_>>();
+    let width = ui.available_width().max(1.0);
+
+    Plot::new(id)
+        .width(width)
+        .height(height)
+        .show_x(true)
+        .show_y(true)
+        .include_y(0.0)
+        .include_y(100.0)
+        .x_axis_label(t!("wifi.channel"))
+        .y_axis_label(t!("wifi.occupancy"))
+        .show(ui, |plot_ui| {
+            plot_ui.bar_chart(BarChart::new("channels", bars).color(color));
         });
 }
 

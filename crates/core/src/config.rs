@@ -231,6 +231,30 @@ impl Default for LanDiscoverySettings {
     }
 }
 
+/// Settings for the Wi-Fi tab.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WifiSettings {
+    /// Whether hidden SSIDs are included in the result table.
+    pub show_hidden: bool,
+    /// Minimum RSSI shown in the table. Lower values are filtered out.
+    pub min_signal_dbm: i32,
+    /// Delay between full scans, in milliseconds.
+    pub scan_interval_ms: u64,
+    /// Delay between current-link samples, in milliseconds.
+    pub sample_interval_ms: u64,
+}
+
+impl Default for WifiSettings {
+    fn default() -> Self {
+        Self {
+            show_hidden: true,
+            min_signal_dbm: -100,
+            scan_interval_ms: 5_000,
+            sample_interval_ms: 1_000,
+        }
+    }
+}
+
 /// Settings for the Connections tab: local socket inventory refresh behavior.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConnectionSettings {
@@ -902,6 +926,9 @@ pub struct AppConfig {
     pub lan_discovery: LanDiscoverySettings,
     /// Added after the first release, so older config files still load.
     #[serde(default)]
+    pub wifi: WifiSettings,
+    /// Added after the first release, so older config files still load.
+    #[serde(default)]
     pub connections: ConnectionSettings,
     /// Added after the first release, so older config files still load.
     #[serde(default)]
@@ -947,6 +974,7 @@ impl Default for AppConfig {
             http: HttpSettings::default(),
             port_scan: PortScanSettings::default(),
             lan_discovery: LanDiscoverySettings::default(),
+            wifi: WifiSettings::default(),
             connections: ConnectionSettings::default(),
             ip_insight: IpInsightSettings::default(),
             lookup: LookupSettings::default(),
@@ -989,6 +1017,10 @@ mod tests {
             back.lan_discovery.allow_online_mac,
             cfg.lan_discovery.allow_online_mac
         );
+        assert_eq!(back.wifi.show_hidden, cfg.wifi.show_hidden);
+        assert_eq!(back.wifi.min_signal_dbm, cfg.wifi.min_signal_dbm);
+        assert_eq!(back.wifi.scan_interval_ms, cfg.wifi.scan_interval_ms);
+        assert_eq!(back.wifi.sample_interval_ms, cfg.wifi.sample_interval_ms);
         assert_eq!(back.connections.auto_refresh, cfg.connections.auto_refresh);
         assert_eq!(back.connections.interval_ms, cfg.connections.interval_ms);
         assert_eq!(back.ip_insight.target, cfg.ip_insight.target);
@@ -1162,6 +1194,21 @@ mod tests {
     }
 
     #[test]
+    fn old_config_without_wifi_still_loads() {
+        let mut value = toml::Value::try_from(AppConfig::default()).unwrap();
+        value
+            .as_table_mut()
+            .expect("config is a table")
+            .remove("wifi");
+        let text = toml::to_string(&value).unwrap();
+        let back: AppConfig = toml::from_str(&text).unwrap();
+        assert!(back.wifi.show_hidden);
+        assert_eq!(back.wifi.min_signal_dbm, -100);
+        assert!(back.wifi.scan_interval_ms > 0);
+        assert!(back.wifi.sample_interval_ms > 0);
+    }
+
+    #[test]
     fn old_config_without_tls_still_loads() {
         let mut value = toml::Value::try_from(AppConfig::default()).unwrap();
         value
@@ -1223,6 +1270,10 @@ mod tests {
         assert!(lan.timeout_ms > 0);
         assert!(lan.icmp_scan);
         assert!(!lan.allow_online_mac);
+        let wifi = WifiSettings::default();
+        assert!(wifi.show_hidden);
+        assert!(wifi.scan_interval_ms > 0);
+        assert!(wifi.sample_interval_ms > 0);
         let connections = ConnectionSettings::default();
         assert!(connections.auto_refresh);
         assert!(connections.interval_ms > 0);

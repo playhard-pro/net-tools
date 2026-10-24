@@ -935,6 +935,297 @@ pub struct LocalSubnet {
     pub cidr: String,
 }
 
+/// Radio band of a Wi-Fi network.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum WifiBand {
+    Ghz24,
+    Ghz5,
+    Ghz6,
+    #[default]
+    Unknown,
+}
+
+impl WifiBand {
+    pub fn label(self) -> &'static str {
+        match self {
+            WifiBand::Ghz24 => "2.4 GHz",
+            WifiBand::Ghz5 => "5 GHz",
+            WifiBand::Ghz6 => "6 GHz",
+            WifiBand::Unknown => "Unknown",
+        }
+    }
+}
+
+/// Security mode advertised by a Wi-Fi network.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum WifiSecurity {
+    Open,
+    Wep,
+    Wpa,
+    Wpa2,
+    Wpa2Wpa3,
+    Wpa3,
+    Enterprise,
+    Owe,
+    #[default]
+    Unknown,
+}
+
+impl WifiSecurity {
+    pub fn label(self) -> &'static str {
+        match self {
+            WifiSecurity::Open => "Open",
+            WifiSecurity::Wep => "WEP",
+            WifiSecurity::Wpa => "WPA",
+            WifiSecurity::Wpa2 => "WPA2",
+            WifiSecurity::Wpa2Wpa3 => "WPA2/WPA3",
+            WifiSecurity::Wpa3 => "WPA3",
+            WifiSecurity::Enterprise => "Enterprise",
+            WifiSecurity::Owe => "OWE",
+            WifiSecurity::Unknown => "Unknown",
+        }
+    }
+
+    /// Whether this mode is commonly considered insecure for public use.
+    pub fn is_insecure(self) -> bool {
+        matches!(self, WifiSecurity::Open | WifiSecurity::Wep)
+    }
+}
+
+/// Generation of the IEEE 802.11 standard used by a network.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum WifiStandard {
+    Legacy,
+    Wifi4,
+    Wifi5,
+    Wifi6,
+    Wifi6E,
+    Wifi7,
+    #[default]
+    Unknown,
+}
+
+impl WifiStandard {
+    pub fn label(self) -> &'static str {
+        match self {
+            WifiStandard::Legacy => "Legacy",
+            WifiStandard::Wifi4 => "Wi-Fi 4",
+            WifiStandard::Wifi5 => "Wi-Fi 5",
+            WifiStandard::Wifi6 => "Wi-Fi 6",
+            WifiStandard::Wifi6E => "Wi-Fi 6E",
+            WifiStandard::Wifi7 => "Wi-Fi 7",
+            WifiStandard::Unknown => "Unknown",
+        }
+    }
+}
+
+/// One access point discovered during a Wi-Fi scan.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WifiNetwork {
+    pub ssid: String,
+    pub bssid: String,
+    pub vendor: Option<String>,
+    pub signal_dbm: Option<i32>,
+    pub signal_quality: Option<u8>,
+    pub noise_dbm: Option<i32>,
+    pub snr_db: Option<i32>,
+    pub channel: Option<u32>,
+    pub frequency_mhz: Option<u32>,
+    pub width_mhz: Option<u32>,
+    pub band: WifiBand,
+    pub security: WifiSecurity,
+    pub security_detail: String,
+    pub standard: WifiStandard,
+    pub max_rate_mbps: Option<f64>,
+    pub is_hidden: bool,
+    pub is_current: bool,
+    /// Number of scan rounds in which this BSSID was observed.
+    pub seen_scans: u32,
+    /// Average RSSI across the observations in this session.
+    pub average_signal_dbm: Option<f64>,
+    /// Scan round number of the most recent observation.
+    pub last_seen_scan: u64,
+}
+
+impl WifiNetwork {
+    /// Create a row for one BSSID before the first observation is applied.
+    pub fn new(bssid: impl Into<String>) -> Self {
+        Self {
+            ssid: String::new(),
+            bssid: bssid.into(),
+            vendor: None,
+            signal_dbm: None,
+            signal_quality: None,
+            noise_dbm: None,
+            snr_db: None,
+            channel: None,
+            frequency_mhz: None,
+            width_mhz: None,
+            band: WifiBand::Unknown,
+            security: WifiSecurity::Unknown,
+            security_detail: String::new(),
+            standard: WifiStandard::Unknown,
+            max_rate_mbps: None,
+            is_hidden: false,
+            is_current: false,
+            seen_scans: 0,
+            average_signal_dbm: None,
+            last_seen_scan: 0,
+        }
+    }
+
+    /// Fold one new scan observation into the session history.
+    pub fn observe(&mut self, scan_count: u64) {
+        self.seen_scans = self.seen_scans.saturating_add(1);
+        self.last_seen_scan = scan_count;
+        if let Some(signal) = self.signal_dbm {
+            let previous = self.average_signal_dbm.unwrap_or(signal as f64);
+            let count = self.seen_scans as f64;
+            self.average_signal_dbm = Some(previous + (signal as f64 - previous) / count);
+        }
+    }
+}
+
+/// Current association reported by the operating system.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct WifiCurrentConnection {
+    pub interface: String,
+    pub ssid: String,
+    pub bssid: String,
+    pub vendor: Option<String>,
+    pub signal_dbm: Option<i32>,
+    pub signal_quality: Option<u8>,
+    pub noise_dbm: Option<i32>,
+    pub snr_db: Option<i32>,
+    pub channel: Option<u32>,
+    pub frequency_mhz: Option<u32>,
+    pub width_mhz: Option<u32>,
+    pub band: WifiBand,
+    pub security: WifiSecurity,
+    pub security_detail: String,
+    pub standard: WifiStandard,
+    pub rx_rate_mbps: Option<f64>,
+    pub tx_rate_mbps: Option<f64>,
+}
+
+impl WifiCurrentConnection {
+    /// Whether the operating system reported a usable association.
+    pub fn is_connected(&self) -> bool {
+        !self.ssid.is_empty() || !self.bssid.is_empty()
+    }
+}
+
+/// One sample of the current link, used for trend analysis.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
+pub struct WifiSignalSample {
+    /// Seconds since the monitoring session started.
+    pub elapsed_s: f64,
+    pub signal_dbm: Option<i32>,
+    pub signal_quality: Option<u8>,
+    pub rx_rate_mbps: Option<f64>,
+    pub tx_rate_mbps: Option<f64>,
+}
+
+/// Aggregate statistics for the current link samples.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
+pub struct WifiSignalStats {
+    pub samples: u32,
+    pub min_signal_dbm: Option<i32>,
+    pub max_signal_dbm: Option<i32>,
+    pub average_signal_dbm: Option<f64>,
+    pub stddev_db: Option<f64>,
+    pub average_rx_rate_mbps: Option<f64>,
+    pub average_tx_rate_mbps: Option<f64>,
+}
+
+/// Aggregated usage of one candidate channel.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WifiChannelUsage {
+    pub band: WifiBand,
+    pub channel: u32,
+    pub frequency_mhz: u32,
+    pub width_mhz: u32,
+    pub access_points: u32,
+    pub strongest_signal_dbm: Option<i32>,
+    pub interference_dbm: Option<f64>,
+    /// Normalized occupancy score, where a higher value means more contention.
+    pub occupancy: f64,
+    pub is_current: bool,
+}
+
+/// One recommended channel for a band.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WifiChannelRecommendation {
+    pub band: WifiBand,
+    pub channel: u32,
+    pub interference_dbm: Option<f64>,
+    pub occupancy: f64,
+    pub overlapping_aps: u32,
+    pub is_current: bool,
+}
+
+/// Number of access points observed in one band.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WifiBandCount {
+    pub band: WifiBand,
+    pub count: u32,
+}
+
+/// Busiest channel in one band.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WifiBusiestChannel {
+    pub band: WifiBand,
+    pub channel: u32,
+    pub access_points: u32,
+}
+
+/// High-level summary of one scan round.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct WifiScanSummary {
+    pub access_points: u32,
+    pub unique_ssids: u32,
+    pub band_counts: Vec<WifiBandCount>,
+    pub open_networks: u32,
+    pub wep_networks: u32,
+    pub hidden_networks: u32,
+    pub strongest_ssid: Option<String>,
+    pub strongest_bssid: Option<String>,
+    pub strongest_signal_dbm: Option<i32>,
+    pub busiest_channels: Vec<WifiBusiestChannel>,
+}
+
+/// Current-link snapshot emitted on every sampling interval.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct WifiCurrentSnapshot {
+    pub connection: Option<WifiCurrentConnection>,
+    pub history: Vec<WifiSignalSample>,
+    pub stats: WifiSignalStats,
+    pub captured_at: String,
+    pub warnings: Vec<String>,
+}
+
+/// Full scan result emitted after each completed scan round.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct WifiScanSnapshot {
+    pub networks: Vec<WifiNetwork>,
+    pub channel_usage: Vec<WifiChannelUsage>,
+    pub recommendations: Vec<WifiChannelRecommendation>,
+    pub summary: WifiScanSummary,
+    pub scan_count: u64,
+    pub duration_ms: u64,
+    pub captured_at: String,
+    pub warnings: Vec<String>,
+}
+
+/// Platform capabilities detected at the start of a monitoring session.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct WifiCapabilities {
+    pub platform: String,
+    pub current_supported: bool,
+    pub scan_supported: bool,
+    pub note: Option<String>,
+}
+
 /// Speed test tool shown inside the Speedtest tab.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum SpeedtestTool {
@@ -1706,6 +1997,12 @@ pub enum ProbeEvent {
     LanDevice(LanDevice),
     /// Progress of a LAN discovery scan.
     LanProgress(LanScanProgress),
+    /// Platform Wi-Fi capabilities detected at task start.
+    WifiCapabilities(WifiCapabilities),
+    /// A current-link sample with the accumulated signal history.
+    WifiCurrent(Box<WifiCurrentSnapshot>),
+    /// A completed Wi-Fi scan with analysis results.
+    WifiScan(Box<WifiScanSnapshot>),
     /// The task finished naturally.
     Finished,
 }
@@ -1731,5 +2028,27 @@ mod lan_tests {
         assert_eq!(LanNameSource::Mdns.label(), "mDNS");
         assert_eq!(LanDiscoverySource::Ssdp.label(), "SSDP");
         assert_eq!(LanDiscoverySource::Netbios.label(), "NetBIOS");
+    }
+
+    #[test]
+    fn wifi_labels_are_stable() {
+        assert_eq!(WifiBand::Ghz5.label(), "5 GHz");
+        assert_eq!(WifiSecurity::Wpa3.label(), "WPA3");
+        assert_eq!(WifiStandard::Wifi6E.label(), "Wi-Fi 6E");
+        assert!(WifiSecurity::Open.is_insecure());
+        assert!(!WifiSecurity::Wpa2.is_insecure());
+    }
+
+    #[test]
+    fn wifi_network_tracks_observation_history() {
+        let mut network = WifiNetwork::new("aa:bb:cc:dd:ee:ff");
+        network.signal_dbm = Some(-70);
+        network.observe(1);
+        network.signal_dbm = Some(-50);
+        network.observe(2);
+
+        assert_eq!(network.seen_scans, 2);
+        assert_eq!(network.last_seen_scan, 2);
+        assert_eq!(network.average_signal_dbm, Some(-60.0));
     }
 }

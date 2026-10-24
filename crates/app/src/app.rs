@@ -20,6 +20,7 @@ use crate::tabs::port_scan::PortScanTab;
 use crate::tabs::speedtest::SpeedtestTab;
 use crate::tabs::tls::TlsTab;
 use crate::tabs::utils::UtilsTab;
+use crate::tabs::wifi::WifiTab;
 use crate::ui::theme::Palette;
 use crate::update::{UpdateChecker, UpdateDialog};
 
@@ -50,6 +51,7 @@ pub enum Tab {
     Tls,
     PortScan,
     LanDiscovery,
+    Wifi,
     Connections,
     IpInsight,
     Lookup,
@@ -63,7 +65,7 @@ pub enum Tab {
 impl Tab {
     /// Built-in order. The overview is pinned first and missing tabs are
     /// appended when a saved order is loaded.
-    pub const ALL: [Tab; 15] = [
+    pub const ALL: [Tab; 16] = [
         Tab::Overview,
         Tab::Ping,
         Tab::Mtr,
@@ -71,6 +73,7 @@ impl Tab {
         Tab::Tls,
         Tab::PortScan,
         Tab::LanDiscovery,
+        Tab::Wifi,
         Tab::Connections,
         Tab::IpInsight,
         Tab::Lookup,
@@ -92,6 +95,7 @@ impl Tab {
             Tab::Tls => "tls",
             Tab::PortScan => "port_scan",
             Tab::LanDiscovery => "lan_discovery",
+            Tab::Wifi => "wifi",
             Tab::Connections => "connections",
             Tab::IpInsight => "ip_insight",
             Tab::Lookup => "lookup",
@@ -122,6 +126,7 @@ pub struct App {
     pub tls: TlsTab,
     pub portscan: PortScanTab,
     pub lan_discovery: LanDiscoveryTab,
+    pub wifi: WifiTab,
     pub connections: ConnectionsTab,
     pub ip_insight: IpInsightTab,
     pub lookup: LookupTab,
@@ -166,6 +171,7 @@ impl App {
             tls: TlsTab::new(),
             portscan: PortScanTab::new(),
             lan_discovery: LanDiscoveryTab::new(),
+            wifi: WifiTab::new(),
             connections: ConnectionsTab::new(),
             ip_insight: IpInsightTab::new(),
             lookup: LookupTab::new(),
@@ -215,6 +221,9 @@ impl App {
         // results stay available for the next visit.
         if self.tab == Tab::LanDiscovery && tab != Tab::LanDiscovery {
             self.lan_discovery.clear_on_hide();
+        }
+        if self.tab == Tab::Wifi && tab != Tab::Wifi {
+            self.wifi.clear_on_hide();
         }
         // Leaving the Connections tab stops automatic polling and drops any
         // outstanding collection result.
@@ -634,6 +643,7 @@ fn tab_label(tab: Tab) -> String {
         Tab::Tls => t!("tab.tls"),
         Tab::PortScan => t!("tab.portscan"),
         Tab::LanDiscovery => t!("tab.lan_discovery"),
+        Tab::Wifi => t!("tab.wifi"),
         Tab::Connections => t!("tab.connections"),
         Tab::IpInsight => t!("tab.ip_insight"),
         Tab::Lookup => t!("tab.lookup"),
@@ -788,6 +798,9 @@ impl eframe::App for App {
                 &self.rt,
                 settings_expanded,
             ),
+            Tab::Wifi => self
+                .wifi
+                .ui(ui, &mut self.cfg.wifi, &self.rt, settings_expanded),
             Tab::Connections => {
                 self.connections
                     .ui(ui, &mut self.cfg.connections, settings_expanded)
@@ -1030,6 +1043,7 @@ mod tests {
             tls: TlsTab::new(),
             portscan: PortScanTab::new(),
             lan_discovery: LanDiscoveryTab::new(),
+            wifi: WifiTab::new(),
             connections: ConnectionsTab::new(),
             ip_insight: IpInsightTab::new(),
             lookup: LookupTab::new(),

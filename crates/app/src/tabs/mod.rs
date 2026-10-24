@@ -16,3 +16,4 @@ pub mod port_scan;
 pub mod speedtest;
 pub mod tls;
 pub mod utils;
+pub mod wifi;

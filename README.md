@@ -25,6 +25,7 @@ it.
 | TLS | Batch certificate and chain inspection, SAN, key details, expiry warnings, TLS/ALPN support, revocation (OCSP/CRL), HSTS, CT and CAA checks. |
 | Port Scan | TCP connect, SYN half-open and UDP scans, with banner grabbing, live progress and immediate cancellation. |
 | LAN Discovery | Neighbor table and ICMP sweep for private IPv4 LANs, with MAC vendor, PTR, mDNS, SSDP/UPnP and NetBIOS enrichment. |
+| Wi-Fi | Continuous current-link sampling and nearby AP scanning with signal history, channel occupancy analysis, recommended channels, security/vendor details and export. |
 | Connections | Local TCP/UDP socket inventory with process/PID, state and remote endpoint, filters, process termination and best-effort connection close. |
 | IP Insight | Parallel IP geolocation queries across multiple providers. |
 | Lookup | RDAP domain/IP lookup with JSON tree, parsed contacts and parent-domain fallback. |
@@ -64,6 +65,30 @@ MAC addresses for hosts that do not answer ICMP.
   Optional online MAC vendor lookup sends only the OUI prefix.
 - Results can be copied or exported as CSV, JSON or HTML. Discovery is manual;
   there is no automatic rescan.
+
+### Wi-Fi
+
+The Wi-Fi tab monitors the current wireless link and scans nearby access points
+until it is stopped. Current-link samples update the signal and rate history,
+while full scans update access-point observations and channel analysis.
+
+- Linux uses NetworkManager (`nmcli`) where available and falls back to `iw` or
+  `iwlist`. Detailed dBm, width and standard fields require `iw` and may need
+  additional privileges.
+- Windows uses the native WLAN API. Windows blocks nearby-network scans when
+  Location Services is disabled; this is a location permission, not an
+  administrator-rights restriction. Desktop apps use the global
+  "Let desktop apps access your location" switch and do not appear as separate
+  entries in the location page. Windows also denies Wi-Fi scans when the
+  executable runs from a network/UNC path such as `\\wsl.localhost`; copy the
+  executable to a local drive before running it.
+- macOS only shows current-connection details through `wdutil`; nearby scanning
+  is not available on current macOS releases.
+- Channel occupancy and recommendations are based on the latest scan and are
+  informational only; regulatory domains, DFS and wider channel bonding are not
+  modeled.
+- Results can be copied or exported as CSV, JSON or HTML. Switching away from the
+  tab stops monitoring while keeping the latest results.
 
 ### Connections viewer
 

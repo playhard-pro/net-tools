@@ -45,6 +45,7 @@ tab:
   tls: TLS
   portscan: 端口扫描
   lan_discovery: 局域网发现
+  wifi: Wi-Fi
   connections: 连接
   ip_insight: IP 洞察
   lookup: 注册查询
@@ -517,6 +518,100 @@ lan_discovery:
   services: 服务/设备
   scanned: 已扫描
   found: 已发现
+
+wifi:
+  scan_interval: 扫描间隔
+  sample_interval: 采样间隔
+  show_hidden: 显示隐藏网络
+  min_signal: 最低信号
+  overview: 概览
+  networks: 网络
+  channels: 信道
+  start_hint: 点击开始后持续采样当前连接并扫描周边网络。
+  empty: 点击开始以查看当前 Wi-Fi 连接。
+  not_connected: 当前没有活动的 Wi-Fi 连接。
+  scan_unavailable: 当前平台不提供周边扫描；仍会显示当前连接信息。
+  no_scan: 暂无扫描结果，请等待下一轮扫描。
+  search: 搜索
+  search_hint: SSID、BSSID 或厂商
+  band_all: 全部频段
+  security_all: 全部安全类型
+  security_open_wep: 开放 / WEP
+  security_other: 其他 / 未知
+  sort_signal: 信号
+  sort_channel: 信道
+  sort_ssid: SSID
+  sort_seen: 出现次数
+  no_matches: 没有符合当前筛选条件的网络。
+  ssid: SSID
+  bssid: BSSID
+  vendor: 厂商
+  band: 频段
+  channel: 信道
+  width: 宽度
+  frequency: 频率
+  signal: 信号
+  signal_dbm: 信号 (dBm)
+  quality: 质量
+  security: 安全
+  standard: 标准
+  max_rate: 最大速率
+  seen: 出现次数
+  noise: 噪声
+  snr: 信噪比
+  hidden: 隐藏网络
+  current: 当前
+  access_points: 接入点
+  access_points_short: AP 数
+  unique_ssids: 独立 SSID
+  open_networks: 开放网络
+  wep_networks: WEP
+  hidden_networks: 隐藏网络
+  strongest: 最强信号
+  busiest_channel: 最拥挤信道
+  recommendations: 推荐信道
+  channel_disclaimer: 推荐结果基于最近一次扫描，未考虑法规域和 DFS。
+  samples: 样本数
+  signal_min: 最小
+  signal_max: 最大
+  signal_avg: 平均
+  signal_stddev: 标准差
+  stability: 稳定性
+  stability_stable: 稳定
+  stability_moderate: 一般
+  stability_unstable: 波动较大
+  analysis: 分析
+  strongest_signal: 最强信号
+  interference: 干扰
+  occupancy: 占用
+  open_location_settings: 打开定位设置
+  msg_radio_off: Wi-Fi 无线电已关闭
+  msg_radio_on_hint: 请在 Windows 快捷设置中打开 Wi-Fi，或进入“设置 > 网络和 Internet > Wi-Fi”打开后重试。
+  msg_unc_scan: "Windows 不允许从网络/UNC 路径（例如 \\wsl.localhost）运行的程序扫描 Wi-Fi。请将 net-tools.exe 复制到本地磁盘后再运行。"
+  msg_unc_capabilities: "Windows 不允许从网络/UNC 路径（例如 \\wsl.localhost）运行的程序扫描 Wi-Fi。请将程序复制到本地磁盘后再运行。"
+  msg_location_denied: "Windows 关闭位置服务时会阻止附近的 Wi-Fi 扫描。请打开“设置 > 隐私和安全性 > 位置”，启用“位置服务”和“让桌面应用访问你的位置”。Windows 不会在此处单独列出 net-tools。管理员权限无法绕过此限制。"
+  msg_wlan_service: WLAN AutoConfig 服务未运行。请启动该服务后重试。
+  msg_windows_api: 正在使用 Windows 原生 WLAN API。扫描周边网络需要位置服务。
+  msg_nm_active: "正在通过 NetworkManager 使用 %{interfaces}。"
+  msg_nm_missing: NetworkManager 不可用，已改用 iw。部分扫描可能需要额外权限。
+  msg_iwlist: 正在使用 iwlist，部分详细信息可能缺失。
+  msg_install_tools: 请安装 NetworkManager（nmcli）或 iw 以扫描 Wi-Fi 网络。
+  msg_no_wireless_iface: 未找到无线网卡。
+  msg_no_wlan_iface: 未找到 WLAN 接口。
+  msg_no_scan_results: Wi-Fi 扫描未返回可用结果。
+  msg_scan_privileges: 无线扫描可能需要 NetworkManager 或额外权限。
+  msg_macos_capabilities: macOS 仅通过 wdutil 显示当前连接信息，不支持扫描周边网络。
+  msg_macos_scan: macOS 仅通过 wdutil 提供当前连接信息，不支持扫描周边网络。
+  msg_wdutil_missing: 当前系统没有可用的 wdutil。
+  msg_wdutil_permission: wdutil 可能需要提权或位置服务权限。
+  msg_wdutil_too_large: wdutil 返回的输出超出预期。
+  msg_wlan_task_failed: "WLAN 任务失败：%{error}"
+  msg_wlan_open_error: "WlanOpenHandle 调用失败，错误码 %{code}"
+  msg_wlan_enum_error: "WlanEnumInterfaces 调用失败，错误码 %{code}"
+  msg_wlan_bss_error: "WlanGetNetworkBssList 调用失败，错误码 %{code}"
+  msg_command_timeout: "%{program} 执行超时"
+  no_channel_data: 最近一次扫描中没有该频段的信道数据。
+  mbps: Mbps
 
 nat:
   mode: 检测模式

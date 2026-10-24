@@ -38,6 +38,7 @@ pub mod stun;
 pub mod tcp;
 pub mod tls;
 pub mod udp;
+pub mod wifi;
 #[cfg(windows)]
 pub(crate) mod windows_icmp;
 pub mod wol;
