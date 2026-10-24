@@ -23,6 +23,11 @@ ignore = [
     # application never enables iperf3 authentication, so no RSA operation runs;
     # the advisory is not reachable through our code path.
     { id = "RUSTSEC-2023-0071", reason = "rsa is an unused transitive dependency of riperf3; iperf3 authentication is not enabled" },
+    # pkix-path and pkix-revocation use p256/crypto-bigint only to verify
+    # public certificate signatures and OCSP/CRL data. This application does
+    # not perform secret-key arithmetic with that dependency, so the timing
+    # side-channel described by the advisory is not reachable through our code.
+    { id = "RUSTSEC-2026-0387", reason = "crypto-bigint is used only for public P-256 signature verification; no secret-key operations run" },
 ]
 
 [licenses]
