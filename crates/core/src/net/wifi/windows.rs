@@ -414,11 +414,7 @@ fn network_from_bss_entry(
     network
 }
 
-fn ie_bytes<'a>(
-    entry: &'a WLAN_BSS_ENTRY,
-    list_start: *const u8,
-    list_end: *const u8,
-) -> Option<&'a [u8]> {
+fn ie_bytes(entry: &WLAN_BSS_ENTRY, list_start: *const u8, list_end: *const u8) -> Option<&[u8]> {
     let size = entry.ulIeSize as usize;
     if size == 0 {
         return None;
