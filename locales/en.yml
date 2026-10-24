@@ -585,6 +585,7 @@ wifi:
   strongest_signal: Strongest
   interference: Interference
   occupancy: Occupancy
+  open_network_settings: Open network settings
   open_location_settings: Open Location settings
   msg_radio_off: The Wi-Fi radio is turned off
   msg_radio_on_hint: Turn Wi-Fi on in the Windows quick settings or Settings > Network & Internet > Wi-Fi, then retry.

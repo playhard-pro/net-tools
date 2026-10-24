@@ -124,12 +124,19 @@ impl NetworkSort {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum WifiErrorAction {
+    LocationSettings,
+    NetworkSettings,
+}
+
 pub struct WifiTab {
     ctrl: TaskController<ProbeEvent>,
     capabilities: Option<WifiCapabilities>,
     current: Option<WifiCurrentSnapshot>,
     scan: Option<WifiScanSnapshot>,
     error: Option<(String, Option<String>)>,
+    error_action: Option<WifiErrorAction>,
     info: Vec<String>,
     view: WifiView,
     query: String,
@@ -153,6 +160,7 @@ impl WifiTab {
             current: None,
             scan: None,
             error: None,
+            error_action: None,
             info: Vec::new(),
             view: WifiView::Overview,
             query: String::new(),
@@ -175,6 +183,7 @@ impl WifiTab {
         self.current = None;
         self.scan = None;
         self.error = None;
+        self.error_action = None;
         self.info.clear();
     }
 
@@ -214,6 +223,7 @@ impl WifiTab {
                     }
                 }
                 ProbeEvent::Error { message, hint } => {
+                    self.error_action = wifi_error_action(&message, hint.as_deref());
                     self.error = Some((
                         localize_wifi_text(&message),
                         hint.map(|hint| localize_wifi_text(&hint)),
@@ -310,11 +320,19 @@ impl WifiTab {
             if let Some((message, hint)) = &self.error {
                 error_banner(ui, message, hint.as_deref());
             }
-            if cfg!(windows)
-                && self.error.is_some()
-                && ui.button(t!("wifi.open_location_settings")).clicked()
-            {
-                open_location_settings();
+            if cfg!(windows) {
+                if let Some(action) = self.error_action {
+                    let label = match action {
+                        WifiErrorAction::LocationSettings => t!("wifi.open_location_settings"),
+                        WifiErrorAction::NetworkSettings => t!("wifi.open_network_settings"),
+                    };
+                    if ui.button(label).clicked() {
+                        match action {
+                            WifiErrorAction::LocationSettings => open_location_settings(),
+                            WifiErrorAction::NetworkSettings => open_network_settings(),
+                        }
+                    }
+                }
             }
             for line in self.info.iter().rev().take(5) {
                 info_line(ui, line);
@@ -1239,11 +1257,39 @@ fn localize_wifi_text(text: &str) -> String {
     translated
 }
 
+fn wifi_error_action(message: &str, hint: Option<&str>) -> Option<WifiErrorAction> {
+    let message = message.to_ascii_lowercase();
+    let hint = hint.unwrap_or_default().to_ascii_lowercase();
+    if message.contains("radio is turned off") || hint.contains("turn wi-fi on") {
+        return Some(WifiErrorAction::NetworkSettings);
+    }
+    // A UNC/network path failure cannot be fixed by changing Windows settings.
+    if message.contains("network/unc") || hint.contains("network/unc") {
+        return None;
+    }
+    if message.contains("location services") || hint.contains("location services") {
+        return Some(WifiErrorAction::LocationSettings);
+    }
+    if message.contains("wlangetnetworkbsslist failed with error 5") {
+        return Some(WifiErrorAction::LocationSettings);
+    }
+    None
+}
+
 fn open_location_settings() {
     #[cfg(windows)]
     {
         let _ = std::process::Command::new("cmd")
             .args(["/C", "start", "ms-settings:privacy-location"])
+            .spawn();
+    }
+}
+
+fn open_network_settings() {
+    #[cfg(windows)]
+    {
+        let _ = std::process::Command::new("cmd")
+            .args(["/C", "start", "ms-settings:network-wifi"])
             .spawn();
     }
 }
@@ -1355,13 +1401,44 @@ mod tests {
         let previous = rust_i18n::locale().to_string();
         rust_i18n::set_locale("zh-CN");
         let message = localize_wifi_text("WlanGetNetworkBssList failed with error 5");
+        let radio = localize_wifi_text("The Wi-Fi radio is turned off");
+        let radio_hint = localize_wifi_text(
+            "Turn Wi-Fi on in the Windows quick settings or Settings > Network & Internet > Wi-Fi, then retry.",
+        );
         let hint = localize_wifi_text(
             "Windows denies Wi-Fi scanning when the executable runs from a network/UNC path such as \\wsl.localhost. Copy net-tools.exe to a local drive and run it there.",
         );
         rust_i18n::set_locale(&previous);
         assert!(message.contains("调用失败"), "message was {message}");
+        assert!(radio.contains("无线电"), "radio was {radio}");
+        assert!(
+            radio_hint.contains("快捷设置"),
+            "radio hint was {radio_hint}"
+        );
         assert!(hint.contains("UNC"), "hint was {hint}");
         assert!(hint.contains("本地磁盘"), "hint was {hint}");
+    }
+
+    #[test]
+    fn error_actions_match_the_suggested_settings_page() {
+        assert_eq!(
+            wifi_error_action(
+                "The Wi-Fi radio is turned off",
+                Some("Turn Wi-Fi on in the Windows quick settings"),
+            ),
+            Some(WifiErrorAction::NetworkSettings)
+        );
+        assert_eq!(
+            wifi_error_action("WlanGetNetworkBssList failed with error 5", None),
+            Some(WifiErrorAction::LocationSettings)
+        );
+        assert_eq!(
+            wifi_error_action(
+                "Windows denies Wi-Fi scanning when the executable runs from a network/UNC path",
+                None,
+            ),
+            None
+        );
     }
 
     #[test]

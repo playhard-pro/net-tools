@@ -584,6 +584,7 @@ wifi:
   strongest_signal: 最强信号
   interference: 干扰
   occupancy: 占用
+  open_network_settings: 打开网络设置
   open_location_settings: 打开定位设置
   msg_radio_off: Wi-Fi 无线电已关闭
   msg_radio_on_hint: 请在 Windows 快捷设置中打开 Wi-Fi，或进入“设置 > 网络和 Internet > Wi-Fi”打开后重试。
