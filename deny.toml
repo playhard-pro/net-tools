@@ -53,9 +53,6 @@ allow = [
 ]
 confidence-threshold = 0.9
 
-# The bundled font is embedded in the binary, not a build dependency, so it does
-# not appear here. Its license notice is tracked in assets/fonts/.
-
 [bans]
 # Warn (do not fail) on duplicate crate versions.
 multiple-versions = "warn"

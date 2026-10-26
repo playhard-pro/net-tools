@@ -8,7 +8,10 @@ use rust_i18n::t;
 use super::theme::Palette;
 
 /// Colored task-state badge.
-pub fn state_badge(ui: &mut egui::Ui, state: TaskState) {
+///
+/// The badge is painted at the same height as a regular button so it stays
+/// vertically aligned when placed next to controls in a horizontal row.
+pub fn state_badge(ui: &mut egui::Ui, state: TaskState) -> egui::Response {
     let palette = Palette::from_ui(ui);
     let text = match state {
         TaskState::Idle => t!("state.idle"),
@@ -18,13 +21,26 @@ pub fn state_badge(ui: &mut egui::Ui, state: TaskState) {
         TaskState::Finished => t!("state.finished"),
     };
     let color = palette.state_color(state);
-    egui::Frame::new()
-        .fill(palette.badge_bg(color))
-        .corner_radius(6.0)
-        .inner_margin(egui::Margin::symmetric(8, 3))
-        .show(ui, |ui| {
-            ui.colored_label(color, text);
-        });
+    let font_id = egui::TextStyle::Body.resolve(ui.style());
+    let galley = ui
+        .painter()
+        .layout_no_wrap(text.to_string(), font_id, color);
+
+    // Match the effective button height, including text that grows with the
+    // font scale, while respecting the minimum interaction size.
+    let button_padding = ui.spacing().button_padding.y;
+    let height = ui
+        .spacing()
+        .interact_size
+        .y
+        .max(galley.size().y + 2.0 * button_padding);
+    let width = galley.size().x + 16.0;
+    let (rect, response) = ui.allocate_exact_size(egui::vec2(width, height), egui::Sense::hover());
+
+    let painter = ui.painter();
+    painter.rect_filled(rect, 6.0, palette.badge_bg(color));
+    painter.galley(rect.center() - galley.size() * 0.5, galley, color);
+    response
 }
 
 /// Inline note for a mode whose capability is currently unavailable.
@@ -73,7 +89,7 @@ pub fn error_banner(ui: &mut egui::Ui, message: &str, hint: Option<&str>) {
 }
 
 /// Small drop-down button whose arrow is painted instead of rendered from a
-/// font glyph. This keeps the control independent of the bundled CJK subset.
+/// font glyph. This keeps the control independent of the CJK fallback font.
 pub fn dropdown_button(ui: &mut egui::Ui, tooltip: &str) -> egui::Response {
     let height = ui.spacing().interact_size.y;
     let response = ui.add(egui::Button::new("").min_size(egui::vec2(height.max(20.0), height)));
@@ -149,4 +165,37 @@ pub fn result_toolbar(ui: &mut egui::Ui) -> ToolbarAction {
         }
     });
     action
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The badge must line up with buttons placed in the same row, both in
+    /// height and in vertical center.
+    #[test]
+    fn state_badge_aligns_with_button_height() {
+        let ctx = egui::Context::default();
+        let mut sizes = None;
+        let input = egui::RawInput {
+            screen_rect: Some(egui::Rect::from_min_size(
+                egui::pos2(0.0, 0.0),
+                egui::vec2(400.0, 200.0),
+            )),
+            ..Default::default()
+        };
+        ctx.run_ui(input, |ui| {
+            ui.horizontal(|ui| {
+                let button = ui.button("Start");
+                let badge = state_badge(ui, TaskState::Idle);
+                sizes = Some((button.rect, badge.rect));
+            });
+        })
+        .textures_delta
+        .clear();
+
+        let (button, badge) = sizes.expect("the row must be laid out");
+        assert!((button.height() - badge.height()).abs() < 0.5);
+        assert!((button.center().y - badge.center().y).abs() < 0.5);
+    }
 }

@@ -43,7 +43,7 @@ session.
 crates/core    # probing engines and config models (no UI), independently testable
 crates/app     # egui desktop application (tabs and widgets)
 locales/       # i18n locale files (en / zh-CN, extensible)
-assets/        # icons and the bundled CJK font
+assets/        # application icons
 scripts/       # helper scripts (icon generation)
 packager.toml  # cargo-packager configuration
 deny.toml      # cargo-deny configuration

@@ -487,7 +487,7 @@ The workspace `Cargo.toml` is the version source; member crates inherit it.
 crates/core    # probing engines and config models (no UI)
 crates/app     # egui desktop application
 locales/       # i18n files (en / zh-CN)
-assets/        # icons and bundled font
+assets/        # application icons
 scripts/       # icon, packaging and version helpers
 screenshots/   # README screenshots
 packager.toml  # cargo-packager configuration
@@ -518,13 +518,13 @@ request checklist.
 
 ## Third-party licenses
 
-The bundled WenQuanYi Micro Hei font subset is Apache-2.0; attribution and
-license files ship with the packages. The IANA protocol registry data is CC0
-1.0. Rust dependency licenses are listed in
+The application does not ship or redistribute font files; CJK text uses fonts
+installed on the host system. The IANA protocol registry data is CC0 1.0. Rust
+dependency licenses are listed in
 [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md), generated with
 [cargo-about](https://github.com/EmbarkStudios/cargo-about).
 
 ## License
 
 Released under **MIT OR Apache-2.0**; see [LICENSE-MIT](LICENSE-MIT) and
-[LICENSE-APACHE](LICENSE-APACHE). The bundled font remains Apache-2.0.
+[LICENSE-APACHE](LICENSE-APACHE).

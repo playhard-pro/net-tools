@@ -153,7 +153,7 @@ pub struct App {
 
 impl App {
     pub fn new(cc: &eframe::CreationContext<'_>, rt: tokio::runtime::Handle) -> Self {
-        // Install the bundled CJK font so CJK characters are not shown as boxes.
+        // Install a system CJK font fallback so CJK characters are not shown as boxes.
         crate::fonts::install(&cc.egui_ctx);
         let cfg = crate::config_store::load().unwrap_or_default();
         let tab_order = normalize_tab_order(&cfg.tab_order);

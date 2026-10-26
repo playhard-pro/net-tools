@@ -47,9 +47,7 @@ Copy-Item -Force (Join-Path $root "target/release/net-tools.exe") `
 $licenseFiles = @(
     "LICENSE-MIT",
     "LICENSE-APACHE",
-    "THIRD_PARTY_LICENSES.md",
-    "assets/fonts/LICENSE-wqy-microhei.txt",
-    "assets/fonts/APACHE-2.0.txt"
+    "THIRD_PARTY_LICENSES.md"
 )
 foreach ($relative in $licenseFiles) {
     $leaf = Split-Path -Leaf $relative
