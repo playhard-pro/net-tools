@@ -3,7 +3,9 @@
 //! egui only ships Latin/emoji fonts, so Chinese (and other CJK) text would be
 //! rendered as missing-glyph boxes. Instead of embedding a font in the binary,
 //! we look up a CJK font installed on the host and register it as a fallback
-//! for both the proportional and monospace families.
+//! for both the proportional and monospace families. The font file is memory
+//! mapped and its glyph data is paged in on demand, so startup does not copy
+//! the whole font into the heap.
 
 use std::sync::Arc;
 
@@ -50,7 +52,9 @@ const CJK_FAMILIES: &[&str] = &[
 
 /// A font face loaded from the system font database.
 struct LoadedFace {
-    data: Vec<u8>,
+    /// Font file contents backed by a memory mapping that lives for the rest
+    /// of the process.
+    data: &'static [u8],
     index: u32,
 }
 
@@ -62,7 +66,7 @@ pub fn install(ctx: &egui::Context) {
     };
 
     let mut fonts = egui::FontDefinitions::default();
-    let mut data = egui::FontData::from_owned(face.data);
+    let mut data = egui::FontData::from_static(face.data);
     data.index = face.index;
     fonts
         .font_data
@@ -80,8 +84,7 @@ pub fn install(ctx: &egui::Context) {
     ctx.set_fonts(fonts);
 }
 
-/// Find the first available CJK font family and copy its data out of the
-/// system font database.
+/// Find the first available CJK font family and memory map its data.
 fn load_cjk_face() -> Option<LoadedFace> {
     let mut db = Database::new();
     db.load_system_fonts();
@@ -93,8 +96,14 @@ fn load_cjk_face() -> Option<LoadedFace> {
     };
     let id = db.query(&query)?;
 
-    db.with_face_data(id, |data, index| LoadedFace {
-        data: data.to_vec(),
+    // SAFETY: The mapping is kept alive for the rest of the process by leaking
+    // the shared font data. System font files are read-only from our side, so
+    // the mapping stays valid after the database is dropped.
+    let (shared, index) = unsafe { db.make_shared_face_data(id)? };
+    let shared: &'static Arc<dyn AsRef<[u8]> + Send + Sync> = Box::leak(Box::new(shared));
+
+    Some(LoadedFace {
+        data: (*shared).as_ref().as_ref(),
         index,
     })
 }
