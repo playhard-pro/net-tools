@@ -3,15 +3,15 @@
 
 product_name = "net-tools"
 name = "net-tools"
-version = "0.4.4"
+version = "0.4.5"
 identifier = "io.github.net-tools.app"
 description = "Cross-platform network diagnostics toolkit"
 long_description = "A cross-platform GUI for ping, MTR, HTTP ping and port scanning."
 homepage = "https://github.com/playhard-pro"
 authors = ["playhard.pro <rex@playhard.pro>"]
 category = "Utility"
-license_file = "LICENSE-MIT"
-resources = ["LICENSE-MIT", "LICENSE-APACHE", "THIRD_PARTY_LICENSES.md"]
+license_file = "LICENSE"
+resources = ["LICENSE", "THIRD_PARTY_LICENSES.md"]
 
 out_dir = "dist"
 binaries_dir = "target/release"

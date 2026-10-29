@@ -45,8 +45,7 @@ Copy-Item -Force (Join-Path $root "target/release/net-tools.exe") `
     (Join-Path $staging "net-tools.exe")
 
 $licenseFiles = @(
-    "LICENSE-MIT",
-    "LICENSE-APACHE",
+    "LICENSE",
     "THIRD_PARTY_LICENSES.md"
 )
 foreach ($relative in $licenseFiles) {

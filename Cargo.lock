@@ -2843,7 +2843,7 @@ dependencies = [
 
 [[package]]
 name = "net-tools"
-version = "0.4.4"
+version = "0.4.5"
 dependencies = [
  "anyhow",
  "clap",
@@ -2867,7 +2867,7 @@ dependencies = [
 
 [[package]]
 name = "net-tools-core"
-version = "0.4.4"
+version = "0.4.5"
 dependencies = [
  "anyhow",
  "base64 0.22.1",

@@ -1,6 +1,6 @@
 # net-tools
 
-[![License: MIT OR Apache-2.0](https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-blue.svg)](#license)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](#license)
 
 Cross-platform desktop network diagnostics for Windows, macOS and Linux, built
 with Rust and egui. Each tool lives in its own tab, and concurrent probes run
@@ -526,5 +526,4 @@ dependency licenses are listed in
 
 ## License
 
-Released under **MIT OR Apache-2.0**; see [LICENSE-MIT](LICENSE-MIT) and
-[LICENSE-APACHE](LICENSE-APACHE).
+Released under the **MIT License**; see [LICENSE](LICENSE).

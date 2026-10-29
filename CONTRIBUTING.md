@@ -150,6 +150,26 @@ Please include:
 ## License of contributions
 
 By submitting a contribution you agree that it is licensed under the project's
-dual [MIT OR Apache-2.0](README.md#license) terms, and that you have the right
-to do so. Bundled third-party assets keep their own licenses (see the README
-"Third-party licenses" section).
+[MIT License](LICENSE), and that you have the right to do so. Bundled
+third-party assets keep their own licenses (see the README "Third-party
+licenses" section).
+
+### Patent grant
+
+The MIT License does not contain an express patent grant, so contributors grant
+one explicitly. By submitting a contribution (patch, pull request, commit or any
+other form of code, documentation or asset) to this project, you grant the
+project maintainers and every recipient of the software a perpetual, worldwide,
+non-exclusive, royalty-free, irrevocable patent license to make, have made, use,
+offer to sell, sell, import and otherwise transfer the contribution, limited to
+the patent claims you own or control that are necessarily infringed by your
+contribution alone or by its combination with the project. This grant mirrors
+the patent terms of the Apache License, Version 2.0, and applies to the project's
+MIT-licensed code without changing the project license.
+
+If you cannot grant this patent license for a contribution (for example because
+your employer owns the relevant patents), do not submit it; please open an issue
+to discuss alternatives first. If any entity files a patent lawsuit alleging
+that the project or a contribution infringes a patent, the patent license
+granted to that entity for the project terminates as of the date the claim is
+filed.
