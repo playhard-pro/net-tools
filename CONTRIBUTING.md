@@ -88,7 +88,7 @@ to the code you change.
 dependency graph changes:
 
 ```bash
-cargo install cargo-about --locked --features cli
+cargo install cargo-about --locked --features cli --version 0.9.3
 cargo about generate about.md.hbs -o THIRD_PARTY_LICENSES.md
 ```
 

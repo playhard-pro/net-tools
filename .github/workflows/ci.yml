@@ -91,8 +91,10 @@ jobs:
       - name: Cache cargo registry
         uses: Swatinem/rust-cache@v2
 
+      # Keep the generator version in sync with about.toml; the generated text
+      # changes between cargo-about releases, which would fail the diff below.
       - name: Install cargo-about
-        run: cargo install cargo-about --locked --features cli
+        run: cargo install cargo-about --locked --features cli --version 0.9.3
 
       - name: Verify THIRD_PARTY_LICENSES.md is up to date
         run: |

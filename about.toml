@@ -1,6 +1,11 @@
 # Configuration for cargo-about (third-party license listing).
 # Regenerate THIRD_PARTY_LICENSES.md with:
+#   cargo install cargo-about --locked --features cli --version 0.9.3
 #   cargo about generate about.md.hbs -o THIRD_PARTY_LICENSES.md
+#
+# The cargo-about version is pinned because the generated text (license file
+# discovery, ordering) changes between releases. Bump it together with a
+# regeneration of THIRD_PARTY_LICENSES.md.
 
 # Pin the platforms so the generated list is identical on any host and covers
 # every platform net-tools supports.
