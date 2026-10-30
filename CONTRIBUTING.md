@@ -12,11 +12,12 @@ By participating, you agree to keep the discussion respectful and constructive.
   rustup toolchain install stable
   rustup component add rustfmt clippy
   ```
-- **Linux only**: GUI runtime libraries (egui uses the glow/OpenGL backend). On
-  Debian/Ubuntu:
+- **Linux only**: GUI runtime libraries (egui uses the wgpu Vulkan backend, with
+  GLES as a fallback). On Debian/Ubuntu:
   ```bash
   sudo apt-get install -y libxkbcommon0 libxkbcommon-x11-0 libxcursor1 libxi6 \
-    libxrandr2 libxfixes3 libxinerama1 libwayland-client0 libgl1 libegl1 xkb-data
+    libxrandr2 libxfixes3 libxinerama1 libwayland-client0 \
+    libvulkan1 mesa-vulkan-drivers libegl1 libgles2 xkb-data
   ```
   Windows and macOS need no extra dependencies.
 

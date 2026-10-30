@@ -13,9 +13,9 @@ cargo about generate about.md.hbs -o THIRD_PARTY_LICENSES.md
 
 ## Overview
 
-- **MIT License** (504)
+- **MIT License** (527)
 - **ISC License** (24)
-- **Apache License 2.0** (20)
+- **Apache License 2.0** (19)
 - **Unicode License v3** (19)
 - **BSD 3-Clause "New" or "Revised" License** (3)
 - **Boost Software License 1.0** (2)
@@ -948,6 +948,7 @@ Used by:
 
 Used by:
 
+- codespan-reporting 0.13.1 — https://github.com/brendanzab/codespan
 - self_cell 1.3.0 — https://github.com/Voultapher/self_cell
 
 ```text
@@ -1582,9 +1583,6 @@ limitations under the License.
 
 Used by:
 
-- glutin 0.32.3 — https://github.com/rust-windowing/glutin
-- glutin_egl_sys 0.7.1 — https://github.com/rust-windowing/glutin
-- glutin_glx_sys 0.6.1 — https://github.com/rust-windowing/glutin
 - glutin_wgl_sys 0.6.1 — https://github.com/rust-windowing/glutin
 
 ```text
@@ -2011,6 +2009,7 @@ Used by:
 - gl_generator 0.14.0 — https://github.com/brendanzab/gl-rs/
 - khronos_api 3.1.0 — https://github.com/brendanzab/gl-rs/
 - rpassword 5.0.1 — https://github.com/conradkleinespel/rpassword
+- spirv 0.4.0+sdk-1.4.341.0 — https://github.com/gfx-rs/rspirv
 - sync_wrapper 1.0.2 — https://github.com/Actyx/sync_wrapper
 
 ```text
@@ -3377,7 +3376,6 @@ DEALINGS IN THE SOFTWARE.
 
 Used by:
 
-- cgl 0.3.2 — https://github.com/servo/cgl-rs
 - core-foundation-sys 0.8.7 — https://github.com/servo/core-foundation-rs
 - core-foundation 0.10.1 — https://github.com/servo/core-foundation-rs
 - core-foundation 0.9.4 — https://github.com/servo/core-foundation-rs
@@ -4112,6 +4110,41 @@ THE SOFTWARE.
 
 Used by:
 
+- ordered-float 5.5.1 — https://github.com/reem/rust-ordered-float
+
+```text
+Copyright (c) 2015 Jonathan Reem
+
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+
+```
+
+### MIT License
+
+Used by:
+
 - tempfile 3.27.0 — https://github.com/Stebalien/tempfile
 
 ```text
@@ -4407,6 +4440,41 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
+
+```
+
+### MIT License
+
+Used by:
+
+- ash 0.38.0+1.3.281 — https://github.com/ash-rs/ash
+
+```text
+Copyright (c) 2016 ASH
+
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
 
 ```
 
@@ -6029,6 +6097,41 @@ SOFTWARE.
 
 Used by:
 
+- presser 0.3.1 — https://github.com/EmbarkStudios/presser
+
+```text
+Copyright (c) 2019 Embark Studios
+
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+
+```
+
+### MIT License
+
+Used by:
+
 - font-types 0.12.6 — https://github.com/googlefonts/fontations
 - read-fonts 0.41.0 — https://github.com/googlefonts/fontations
 - skrifa 0.44.0 — https://github.com/googlefonts/fontations
@@ -6454,6 +6557,7 @@ DEALINGS IN THE SOFTWARE.
 Used by:
 
 - pollster 0.4.0 — https://github.com/zesterer/pollster
+- pollster 1.0.1 — https://github.com/zesterer/pollster
 
 ```text
 Copyright (c) 2020-2021 Joshua Barretto
@@ -6802,6 +6906,22 @@ DEALINGS IN THE SOFTWARE.
 
 Used by:
 
+- gpu-allocator 0.28.0 — https://github.com/Traverse-Research/gpu-allocator
+
+```text
+Copyright (c) 2021 Traverse Research B.V.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+```
+
+### MIT License
+
+Used by:
+
 - sec1 0.7.3 — https://github.com/RustCrypto/formats/tree/master/sec1
 
 ```text
@@ -6877,6 +6997,41 @@ Used by:
 
 ```text
 Copyright (c) 2021-2024 The RustCrypto Project Developers
+
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+
+```
+
+### MIT License
+
+Used by:
+
+- renderdoc-sys 1.1.0 — https://github.com/ebkalderon/renderdoc-rs
+
+```text
+Copyright (c) 2022 Eyal Kalderon
 
 Permission is hereby granted, free of charge, to any
 person obtaining a copy of this software and associated
@@ -7126,6 +7281,41 @@ SOFTWARE.
 
 Used by:
 
+- bit-vec 0.9.1 — https://github.com/contain-rs/bit-vec
+
+```text
+Copyright (c) 2023 The Rust Project Developers
+
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+
+```
+
+### MIT License
+
+Used by:
+
 - hyper-util 0.1.21 — https://github.com/hyperium/hyper-util
 
 ```text
@@ -7246,6 +7436,41 @@ Used by:
 
 ```text
 Copyright (c) 2024 Zeeshan Ali Khan & zbus contributors
+
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+
+```
+
+### MIT License
+
+Used by:
+
+- bit-set 0.10.0 — https://github.com/contain-rs/bit-set
+
+```text
+Copyright (c) 2026 The Rust Project Developers
 
 Permission is hereby granted, free of charge, to any
 person obtaining a copy of this software and associated
@@ -7943,35 +8168,6 @@ THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR I
 
 Used by:
 
-- glutin-winit 0.5.0 — https://github.com/rust-windowing/glutin
-
-```text
-Copyright © 2022 Kirill Chibisov
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the “Software”), to deal
-in the Software without restriction, including without limitation the rights to
-use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
-of the Software, and to permit persons to whom the Software is furnished to do
-so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
-THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-
-```
-
-### MIT License
-
-Used by:
-
 - epaint_default_fonts 0.36.2 — https://github.com/emilk/egui/tree/main/crates/epaint_default_fonts
 
 ```text
@@ -8533,12 +8729,82 @@ SOFTWARE.
 
 Used by:
 
+- range-alloc 0.1.5 — https://github.com/gfx-rs/range-alloc
+
+```text
+MIT License
+
+Copyright (c) 2023 The gfx-rs developers
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+```
+
+### MIT License
+
+Used by:
+
 - web-time 1.1.0 — https://github.com/daxpedda/web-time
 
 ```text
 MIT License
 
 Copyright (c) 2023 dAxpeDDa
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+```
+
+### MIT License
+
+Used by:
+
+- naga-types 30.0.1 — https://github.com/gfx-rs/wgpu
+- naga 30.0.1 — https://github.com/gfx-rs/wgpu
+- wgpu-core-deps-apple 30.0.1 — https://github.com/gfx-rs/wgpu
+- wgpu-core-deps-windows-linux-android 30.0.1 — https://github.com/gfx-rs/wgpu
+- wgpu-core 30.0.1 — https://github.com/gfx-rs/wgpu
+- wgpu-hal 30.0.1 — https://github.com/gfx-rs/wgpu
+- wgpu-naga-bridge 30.0.1 — https://github.com/gfx-rs/wgpu
+- wgpu-types 30.0.1 — https://github.com/gfx-rs/wgpu
+- wgpu 30.0.1 — https://github.com/gfx-rs/wgpu
+
+```text
+MIT License
+
+Copyright (c) 2025 The gfx-rs developers
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -8582,10 +8848,10 @@ Used by:
 - dpi 0.1.2 — https://github.com/rust-windowing/winit
 - ecolor 0.36.2 — https://github.com/emilk/egui
 - eframe 0.36.2 — https://github.com/emilk/egui/tree/main/crates/eframe
+- egui-wgpu 0.36.2 — https://github.com/emilk/egui/tree/main/crates/egui-wgpu
 - egui-winit 0.36.2 — https://github.com/emilk/egui/tree/main/crates/egui-winit
 - egui 0.36.2 — https://github.com/emilk/egui
 - egui_extras 0.36.2 — https://github.com/emilk/egui
-- egui_glow 0.36.2 — https://github.com/emilk/egui/tree/main/crates/egui_glow
 - egui_plot 0.37.0 — https://github.com/emilk/egui_plot
 - emath 0.36.2 — https://github.com/emilk/egui/tree/main/crates/emath
 - epaint 0.36.2 — https://github.com/emilk/egui/tree/main/crates/epaint
@@ -8599,6 +8865,8 @@ Used by:
 - objc2-encode 4.1.0 — https://github.com/madsmtm/objc2
 - objc2-foundation 0.2.2 — https://github.com/madsmtm/objc2
 - objc2-foundation 0.3.2 — https://github.com/madsmtm/objc2
+- objc2-metal 0.3.2 — https://github.com/madsmtm/objc2
+- objc2-quartz-core 0.3.2 — https://github.com/madsmtm/objc2
 - objc2 0.5.2 — https://github.com/madsmtm/objc2
 - objc2 0.6.4 — https://github.com/madsmtm/objc2
 - pkix-path 0.3.2 — https://github.com/MarkAtwood/crate-pkix
@@ -8608,6 +8876,7 @@ Used by:
 - riperf3 0.8.0 — https://github.com/therealevanhenry/riperf3
 - rust-i18n-macro 4.2.4 — https://github.com/longbridge/rust-i18n
 - rust-i18n-support 4.2.4 — https://github.com/longbridge/rust-i18n
+- type-map 0.5.1 — https://github.com/kardeiz/type-map
 - windows-collections 0.3.2 — https://github.com/microsoft/windows-rs
 - windows-core 0.62.2 — https://github.com/microsoft/windows-rs
 - windows-future 0.3.2 — https://github.com/microsoft/windows-rs
@@ -9053,6 +9322,7 @@ Used by:
 - futures-lite 2.6.1 — https://github.com/smol-rs/futures-lite
 - group 0.13.0 — https://github.com/zkcrypto/group
 - itoa 1.0.18 — https://github.com/dtolnay/itoa
+- khronos-egl 6.0.0 — https://github.com/timothee-haudebourg/khronos-egl
 - lazy_static 1.5.1 — https://github.com/rust-lang-nursery/lazy-static.rs
 - linux-raw-sys 0.12.1 — https://github.com/sunfishcode/linux-raw-sys
 - linux-raw-sys 0.4.15 — https://github.com/sunfishcode/linux-raw-sys
@@ -9067,6 +9337,7 @@ Used by:
 - proc-macro-crate 3.5.0 — https://github.com/bkchr/proc-macro-crate
 - proc-macro2 1.0.107 — https://github.com/dtolnay/proc-macro2
 - quote 1.0.47 — https://github.com/dtolnay/quote
+- rustc-hash 1.1.0 — https://github.com/rust-lang-nursery/rustc-hash
 - rustix 0.38.44 — https://github.com/bytecodealliance/rustix
 - rustix 1.1.5 — https://github.com/bytecodealliance/rustix
 - rustversion 1.0.23 — https://github.com/dtolnay/rustversion
@@ -9154,6 +9425,39 @@ DEALINGS IN THE SOFTWARE.
 
 Used by:
 
+- allocator-api2 0.2.21 — https://github.com/zakarumych/allocator-api2
+
+```text
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+
+```
+
+### MIT License
+
+Used by:
+
 - winnow 0.7.15 — https://github.com/winnow-rs/winnow
 - winnow 1.0.4 — https://github.com/winnow-rs/winnow
 
@@ -9183,6 +9487,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 Used by:
 
+- raw-window-metal 1.1.0 — https://github.com/rust-windowing/raw-window-metal
 - siphasher 1.0.4 — https://github.com/jedisct1/rust-siphash
 
 ```text

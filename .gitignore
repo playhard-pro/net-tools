@@ -5,7 +5,6 @@
 
 # Packaged release artifacts
 /dist
-/packaging
 
 # Dependency directories
 node_modules/

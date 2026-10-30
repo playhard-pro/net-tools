@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Product Id="*"
+           Name="net-tools"
+           Language="1033"
+           Version="$(var.Version)"
+           Manufacturer="playhard.pro"
+           UpgradeCode="1bffcac4-1ac2-4197-9b84-49839f06fe0d">
+    <!-- Install for the current user so the MSI does not need an elevated
+         installer session. Network features request elevation at runtime. -->
+    <Package InstallerVersion="500"
+             Compressed="yes"
+             InstallScope="perUser"/>
+    <MajorUpgrade DowngradeErrorMessage="A newer version of net-tools is already installed."
+                  AllowSameVersionUpgrades="yes"/>
+    <MediaTemplate EmbedCab="yes"/>
+    <!-- Rewrite files and shortcuts even when reinstalling the same version. -->
+    <Property Id="REINSTALLMODE" Value="amus"/>
+
+    <Icon Id="AppIcon" SourceFile="$(var.IconPath)"/>
+    <Property Id="ARPPRODUCTICON" Value="AppIcon"/>
+    <Property Id="ARPHELPLINK" Value="https://github.com/playhard-pro/net-tools"/>
+    <UIRef Id="WixUI_Minimal"/>
+
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="LocalAppDataFolder">
+        <Directory Id="INSTALLFOLDER" Name="net-tools">
+          <Component Id="AppComponent" Guid="*">
+            <File Id="AppExe" Source="$(var.AppPath)" KeyPath="yes"/>
+          </Component>
+          <Component Id="LicenseComponent" Guid="*">
+            <File Id="LicenseFile" Source="$(var.LicensePath)" KeyPath="yes"/>
+          </Component>
+          <Component Id="ThirdPartyLicenseComponent" Guid="*">
+            <File Id="ThirdPartyLicenseFile" Source="$(var.ThirdPartyLicensePath)" KeyPath="yes"/>
+          </Component>
+        </Directory>
+      </Directory>
+      <Directory Id="ProgramMenuFolder">
+        <Directory Id="ProgramMenuDir" Name="net-tools"/>
+      </Directory>
+      <Directory Id="DesktopFolder"/>
+    </Directory>
+
+    <DirectoryRef Id="ProgramMenuDir">
+      <Component Id="ProgramMenuShortcut" Guid="*">
+        <Shortcut Id="StartMenuShortcut"
+                  Name="net-tools"
+                  Description="Cross-platform network diagnostics toolkit"
+                  Target="[!AppExe]"
+                  WorkingDirectory="INSTALLFOLDER"
+                  Icon="AppIcon"/>
+        <RemoveFolder Id="RemoveProgramMenuDir" On="uninstall"/>
+        <RegistryValue Root="HKCU" Key="Software\net-tools" Name="StartMenuShortcut" Type="integer" Value="1" KeyPath="yes"/>
+      </Component>
+    </DirectoryRef>
+
+    <DirectoryRef Id="DesktopFolder">
+      <Component Id="DesktopShortcut" Guid="*">
+        <Shortcut Id="DesktopShortcut"
+                  Name="net-tools"
+                  Description="Cross-platform network diagnostics toolkit"
+                  Target="[!AppExe]"
+                  WorkingDirectory="INSTALLFOLDER"
+                  Icon="AppIcon"/>
+        <RegistryValue Root="HKCU" Key="Software\net-tools" Name="DesktopShortcut" Type="integer" Value="1" KeyPath="yes"/>
+      </Component>
+    </DirectoryRef>
+
+    <Feature Id="MainFeature" Title="net-tools" Level="1">
+      <ComponentRef Id="AppComponent"/>
+      <ComponentRef Id="LicenseComponent"/>
+      <ComponentRef Id="ThirdPartyLicenseComponent"/>
+      <ComponentRef Id="ProgramMenuShortcut"/>
+      <ComponentRef Id="DesktopShortcut"/>
+    </Feature>
+  </Product>
+</Wix>

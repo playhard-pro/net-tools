@@ -872,7 +872,7 @@ impl eframe::App for App {
         }
     }
 
-    fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
+    fn on_exit(&mut self) {
         // Stop a running speed test so its hidden worker does not outlive the
         // application.
         self.speedtest.clear_on_hide();

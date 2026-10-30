@@ -21,9 +21,9 @@ i18n!("../../locales", fallback = "en");
 
 /// Prefer Xwayland inside WSLg.
 ///
-/// The WSLg Wayland compositor uses a software GL path and can terminate while
-/// an OpenGL window is being resized. WSLg always provides Xwayland as well, so
-/// the X11 backend is the safer choice there. Other Wayland sessions keep their
+/// If Linux falls back to GLES, the WSLg Wayland compositor can terminate while
+/// a GL window is being resized. WSLg always provides Xwayland as well, so the
+/// X11 backend is the safer choice there. Other Wayland sessions keep their
 /// native backend.
 #[cfg(target_os = "linux")]
 fn prefer_x11_on_wslg() {
@@ -34,6 +34,45 @@ fn prefer_x11_on_wslg() {
 
 #[cfg(not(target_os = "linux"))]
 fn prefer_x11_on_wslg() {}
+
+/// Native rendering backend used by wgpu on each desktop platform.
+#[cfg(target_os = "windows")]
+fn platform_wgpu_backends() -> eframe::wgpu::Backends {
+    eframe::wgpu::Backends::DX12
+}
+
+/// Native rendering backend used by wgpu on each desktop platform.
+#[cfg(target_os = "macos")]
+fn platform_wgpu_backends() -> eframe::wgpu::Backends {
+    eframe::wgpu::Backends::METAL
+}
+
+/// Native rendering backend used by wgpu on each desktop platform.
+///
+/// Vulkan is preferred when an adapter is available; the GL backend provides a
+/// GLES fallback for machines without a Vulkan driver.
+#[cfg(target_os = "linux")]
+fn platform_wgpu_backends() -> eframe::wgpu::Backends {
+    eframe::wgpu::Backends::VULKAN | eframe::wgpu::Backends::GL
+}
+
+/// Keep wgpu usable on desktop targets that are not explicitly configured.
+#[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+fn platform_wgpu_backends() -> eframe::wgpu::Backends {
+    eframe::wgpu::Backends::empty()
+}
+
+/// Configure wgpu to use the platform's native backend.
+fn wgpu_options() -> eframe::egui_wgpu::WgpuConfiguration {
+    let mut config = eframe::egui_wgpu::WgpuConfiguration::default()
+        .with_surface_config(eframe::egui_wgpu::SurfaceConfig::LOW_LATENCY);
+
+    if let eframe::egui_wgpu::WgpuSetup::CreateNew(setup) = &mut config.wgpu_setup {
+        setup.instance_descriptor.backends = platform_wgpu_backends();
+    }
+
+    config
+}
 
 fn main() -> eframe::Result {
     // The speed test runs iperf3 in a hidden child process of this same
@@ -89,6 +128,8 @@ fn main() -> eframe::Result {
         // is deterministic instead of being chosen by the window manager.
         // Note: not supported on Wayland, where the compositor decides placement.
         centered: true,
+        // Render every platform through wgpu with the native backend selected above.
+        wgpu_options: wgpu_options(),
         ..Default::default()
     };
 

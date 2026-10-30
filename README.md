@@ -268,11 +268,13 @@ cargo run --release -p net-tools
 
 ### Linux runtime dependencies
 
-Install X11/Wayland and OpenGL client libraries, for example on Debian/Ubuntu:
+Install X11/Wayland, Vulkan, and EGL/GLES client libraries, for example on
+Debian/Ubuntu:
 
 ```bash
 sudo apt-get install -y libxkbcommon0 libxkbcommon-x11-0 libxcursor1 libxi6 \
-  libxrandr2 libxfixes3 libxinerama1 libwayland-client0 libgl1 libegl1 xkb-data
+  libxrandr2 libxfixes3 libxinerama1 libwayland-client0 \
+  libvulkan1 mesa-vulkan-drivers libegl1 libgles2 xkb-data
 ```
 
 Windows and macOS need no extra libraries.
@@ -310,9 +312,10 @@ shows permission hints for real permission errors.
 ## Packaging
 
 Linux and macOS packages use
-[cargo-packager](https://github.com/crabnebula-dev/cargo-packager). Windows uses
-a zip so the executable can run elevated. Artifacts are written to `dist/`, and
-each architecture is packaged on a native runner.
+[cargo-packager](https://github.com/crabnebula-dev/cargo-packager). Windows
+releases use a zip so the executable can run elevated; the WSL/Linux script
+below can also produce an MSI for local distribution. Artifacts are written to
+`dist/`, and each architecture is packaged on a native runner.
 
 ```bash
 cargo install cargo-packager --locked
@@ -328,6 +331,21 @@ pwsh scripts/package_windows.ps1 -Arch arm64
 ```
 
 The macOS script creates the dmg from the verified app after signing.
+
+### Windows MSI from WSL/Linux
+
+`scripts/build-windows-wsl.sh` builds the Windows executable with `cargo-xwin`
+and assembles both an MSI and a portable zip without a Windows toolchain:
+
+```bash
+sudo apt-get install -y clang lld
+cargo install cargo-xwin --locked
+bash scripts/build-windows-wsl.sh
+```
+
+`wixl`/`msitools` are bootstrapped locally when they are not installed. The
+packages are written to `dist/windows/`, and the executable links the MSVC CRT
+statically so it does not require the Visual C++ redistributable.
 
 ### Application icon
 
@@ -346,8 +364,10 @@ the Windows executable by `crates/app/build.rs`.
 
 ## Cross-compilation
 
-Cross-compilation builds only the executable. Packages still require native
-tooling, so releases are built on native CI runners.
+Cross-compilation usually builds only the executable, and packages generally
+require native tooling, so releases are built on native CI runners. The Windows
+MSI and portable zip are the exception and can be built from WSL/Linux with
+`scripts/build-windows-wsl.sh`.
 
 ### Windows (MSVC, recommended)
 
