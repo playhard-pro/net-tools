@@ -13,7 +13,7 @@ use net_tools_core::net::overview::{
 use rust_i18n::t;
 
 use crate::tabs::speedtest::metric_card;
-use crate::ui::common::{error_banner, result_toolbar, ToolbarAction};
+use crate::ui::common::error_banner;
 use crate::ui::result_table::{cell_with_tooltip, table_fixed_rows_with_columns};
 use crate::ui::theme::Palette;
 
@@ -83,10 +83,6 @@ impl RateTracker {
             history: BTreeMap::new(),
             all_history: VecDeque::new(),
         }
-    }
-
-    fn reset(&mut self) {
-        *self = Self::new();
     }
 
     /// Compute per-interface and aggregate rates from the new snapshot.
@@ -258,7 +254,6 @@ impl OverviewTab {
         }
 
         crate::ui::layout::results_panel(ui, |ui| {
-            self.toolbar(ui);
             if let Some(error) = &self.error {
                 error_banner(ui, error, None);
             }
@@ -365,8 +360,8 @@ impl OverviewTab {
         }
     }
 
-    fn toolbar(&mut self, ui: &mut egui::Ui) {
-        ui.horizontal(|ui| {
+    fn refresh_controls(&mut self, ui: &mut egui::Ui) {
+        ui.horizontal_wrapped(|ui| {
             if ui.button(t!("overview.refresh")).clicked() {
                 self.request_refresh();
             }
@@ -378,37 +373,6 @@ impl OverviewTab {
             )
             .on_hover_text(t!("overview.refresh_interval"));
         });
-
-        // Keep the compact copy/export/clear actions on their own row. Mixing
-        // them with the regular refresh controls above makes the toolbar look
-        // ragged because the two button sizes have different heights.
-        match result_toolbar(ui) {
-            ToolbarAction::Copy => ui.ctx().copy_text(self.to_text()),
-            ToolbarAction::ExportCsv => {
-                crate::ui::export::save_file("network-overview", "csv", &self.to_csv())
-            }
-            ToolbarAction::ExportJson => {
-                crate::ui::export::save_file("network-overview", "json", &self.to_json())
-            }
-            ToolbarAction::ExportHtml => {
-                crate::ui::export::save_file("network-overview", "html", &self.to_html())
-            }
-            ToolbarAction::Clear => {
-                self.tracker.reset();
-                self.public_egress = None;
-                self.public_ip_error = None;
-                self.request_refresh();
-            }
-            ToolbarAction::None => {}
-        }
-
-        if let Some(snapshot) = &self.snapshot {
-            ui.weak(format!(
-                "{} {}",
-                t!("overview.captured"),
-                snapshot.captured_at
-            ));
-        }
     }
 
     fn content(
@@ -421,6 +385,12 @@ impl OverviewTab {
             .id_salt("network_overview_scroll")
             .auto_shrink([false, false])
             .show(ui, |ui| {
+                ui.weak(format!(
+                    "{} {}",
+                    t!("overview.captured"),
+                    snapshot.captured_at
+                ));
+                ui.add_space(2.0);
                 ui.columns(2, |columns| {
                     // First column: local configuration, public egress and
                     // the routing table.
@@ -439,6 +409,7 @@ impl OverviewTab {
     }
 
     fn rates_ui(&mut self, ui: &mut egui::Ui, snapshot: &NetworkSnapshot, stack_charts: bool) {
+        self.refresh_controls(ui);
         section_heading(ui, &t!("overview.live_rates"));
 
         let mut options: Vec<(String, String)> = vec![(
@@ -591,260 +562,6 @@ impl OverviewTab {
             });
         }
     }
-
-    /// Human-readable text used by the copy action.
-    pub fn to_text(&self) -> String {
-        let Some(snapshot) = &self.snapshot else {
-            return String::new();
-        };
-        let mut out = String::new();
-        out.push_str(&format!(
-            "{} {}\n\n{}\n",
-            t!("overview.captured"),
-            snapshot.captured_at,
-            t!("overview.interfaces")
-        ));
-        for interface in &snapshot.interfaces {
-            out.push_str(&format!(
-                "{}  {}  {}  MTU {}  {}  RX {}  TX {}\n",
-                interface.name,
-                if interface.up {
-                    t!("overview.up")
-                } else {
-                    t!("overview.down")
-                },
-                interface.mac.as_deref().unwrap_or("-"),
-                interface
-                    .mtu
-                    .map(|mtu| mtu.to_string())
-                    .unwrap_or_else(|| "-".to_string()),
-                format_link_speed(interface.link_speed_bps),
-                format_bytes_rate(
-                    self.tracker
-                        .latest
-                        .get(&interface.name)
-                        .map(|rate| rate.rx_bytes)
-                        .unwrap_or(0.0)
-                ),
-                format_bytes_rate(
-                    self.tracker
-                        .latest
-                        .get(&interface.name)
-                        .map(|rate| rate.tx_bytes)
-                        .unwrap_or(0.0)
-                ),
-            ));
-            if !interface.ipv4.is_empty() {
-                out.push_str(&format!("  IPv4: {}\n", interface.ipv4.join(", ")));
-            }
-            if !interface.ipv6.is_empty() {
-                out.push_str(&format!("  IPv6: {}\n", interface.ipv6.join(", ")));
-            }
-        }
-
-        out.push_str(&format!("\n{}\n", t!("overview.default_gateway")));
-        for gateway in &snapshot.default_gateways {
-            out.push_str(&format!(
-                "{}  {}  {}  metric {}\n",
-                gateway.family,
-                gateway.gateway,
-                gateway.interface,
-                gateway
-                    .metric
-                    .map(|metric| metric.to_string())
-                    .unwrap_or_else(|| "-".to_string())
-            ));
-        }
-        out.push_str(&format!("\n{}\n", t!("overview.dns_servers")));
-        for server in &snapshot.dns_servers {
-            out.push_str(&format!("{server}\n"));
-        }
-
-        out.push_str(&format!("\n{}\n", t!("overview.routes")));
-        for route in &snapshot.routes {
-            out.push_str(&format!(
-                "{}\t{}\t{}\t{}\tmetric {}\n",
-                route.family,
-                route.destination,
-                route.gateway,
-                route.interface,
-                route
-                    .metric
-                    .map(|metric| metric.to_string())
-                    .unwrap_or_else(|| "-".to_string())
-            ));
-        }
-
-        if let Some(egress) = &self.public_egress {
-            out.push_str(&format!("\n{}\n", t!("overview.public_egress")));
-            for (family, public_ip) in [
-                ("IPv4", egress.ipv4.as_ref()),
-                ("IPv6", egress.ipv6.as_ref()),
-            ] {
-                match public_ip {
-                    Some(public_ip) => {
-                        out.push_str(&format!("{family}\n"));
-                        for (key, value) in public_ip_fields(public_ip) {
-                            out.push_str(&format!("  {key}: {value}\n"));
-                        }
-                    }
-                    None => out.push_str(&format!("{family}: {}\n", t!("overview.unavailable"))),
-                }
-            }
-            for error in &egress.errors {
-                out.push_str(&format!("{error}\n"));
-            }
-        }
-        out
-    }
-
-    pub fn to_csv(&self) -> String {
-        let mut out = String::from("section,item,key,value\n");
-        let Some(snapshot) = &self.snapshot else {
-            return out;
-        };
-        for interface in &snapshot.interfaces {
-            let item = interface.name.as_str();
-            csv_row(&mut out, "interface", item, "name", item);
-            csv_row(
-                &mut out,
-                "interface",
-                item,
-                "status",
-                if interface.up { "up" } else { "down" },
-            );
-            csv_row(
-                &mut out,
-                "interface",
-                item,
-                "mac",
-                interface.mac.as_deref().unwrap_or("-"),
-            );
-            csv_row(
-                &mut out,
-                "interface",
-                item,
-                "ipv4",
-                &interface.ipv4.join(" "),
-            );
-            csv_row(
-                &mut out,
-                "interface",
-                item,
-                "ipv6",
-                &interface.ipv6.join(" "),
-            );
-            csv_row(
-                &mut out,
-                "interface",
-                item,
-                "mtu",
-                &interface
-                    .mtu
-                    .map(|mtu| mtu.to_string())
-                    .unwrap_or_else(|| "-".to_string()),
-            );
-            csv_row(
-                &mut out,
-                "interface",
-                item,
-                "link_speed",
-                &format_link_speed(interface.link_speed_bps),
-            );
-            if let Some(rate) = self.tracker.latest.get(item) {
-                csv_row(
-                    &mut out,
-                    "interface",
-                    item,
-                    "rx_rate",
-                    &format_bytes_rate(rate.rx_bytes),
-                );
-                csv_row(
-                    &mut out,
-                    "interface",
-                    item,
-                    "tx_rate",
-                    &format_bytes_rate(rate.tx_bytes),
-                );
-            }
-        }
-
-        for gateway in &snapshot.default_gateways {
-            csv_row(
-                &mut out,
-                "gateway",
-                &gateway.family,
-                "gateway",
-                &gateway.gateway,
-            );
-            csv_row(
-                &mut out,
-                "gateway",
-                &gateway.family,
-                "interface",
-                &gateway.interface,
-            );
-            csv_row(
-                &mut out,
-                "gateway",
-                &gateway.family,
-                "metric",
-                &gateway
-                    .metric
-                    .map(|metric| metric.to_string())
-                    .unwrap_or_else(|| "-".to_string()),
-            );
-        }
-
-        for (index, server) in snapshot.dns_servers.iter().enumerate() {
-            csv_row(&mut out, "dns", &index.to_string(), "server", server);
-        }
-
-        for route in &snapshot.routes {
-            let item = format!("{} {}", route.family, route.destination);
-            csv_row(&mut out, "route", &item, "gateway", &route.gateway);
-            csv_row(&mut out, "route", &item, "interface", &route.interface);
-            csv_row(
-                &mut out,
-                "route",
-                &item,
-                "metric",
-                &route
-                    .metric
-                    .map(|metric| metric.to_string())
-                    .unwrap_or_else(|| "-".to_string()),
-            );
-        }
-
-        if let Some(egress) = &self.public_egress {
-            for (family, public_ip) in [
-                ("IPv4", egress.ipv4.as_ref()),
-                ("IPv6", egress.ipv6.as_ref()),
-            ] {
-                if let Some(public_ip) = public_ip {
-                    for (key, value) in public_ip_fields(public_ip) {
-                        csv_row(&mut out, "public_ip", family, key, &value);
-                    }
-                }
-            }
-            for error in &egress.errors {
-                csv_row(&mut out, "public_ip", "error", "message", error);
-            }
-        }
-        out
-    }
-
-    pub fn to_json(&self) -> String {
-        let value = serde_json::json!({
-            "snapshot": self.snapshot,
-            "public_egress": self.public_egress,
-        });
-        serde_json::to_string_pretty(&value).unwrap_or_default()
-    }
-
-    pub fn to_html(&self) -> String {
-        crate::ui::export::csv_to_html(&self.to_csv())
-    }
 }
 
 /// Render one public address family as a compact information card.
@@ -961,46 +678,6 @@ fn format_offset(seconds: i64) -> String {
         seconds / 3600,
         (seconds % 3600) / 60
     )
-}
-
-/// Export fields in the same names the IP.SB response uses.
-fn public_ip_fields(public_ip: &PublicIp) -> Vec<(&'static str, String)> {
-    let mut fields = vec![("ip", public_ip.address.clone())];
-    push_export_field(&mut fields, "country_code", &public_ip.country_code);
-    push_export_field(&mut fields, "country", &public_ip.country);
-    push_export_field(&mut fields, "region_code", &public_ip.region_code);
-    push_export_field(&mut fields, "region", &public_ip.region);
-    push_export_field(&mut fields, "city", &public_ip.city);
-    push_export_field(&mut fields, "postal_code", &public_ip.postal_code);
-    push_export_field(&mut fields, "continent_code", &public_ip.continent_code);
-    if let Some(value) = public_ip.latitude {
-        fields.push(("latitude", value.to_string()));
-    }
-    if let Some(value) = public_ip.longitude {
-        fields.push(("longitude", value.to_string()));
-    }
-    push_export_field(&mut fields, "timezone", &public_ip.timezone);
-    if let Some(value) = public_ip.offset {
-        fields.push(("offset", value.to_string()));
-    }
-    if let Some(value) = public_ip.asn {
-        fields.push(("asn", value.to_string()));
-    }
-    push_export_field(&mut fields, "asn_organization", &public_ip.asn_organization);
-    push_export_field(&mut fields, "isp", &public_ip.isp);
-    push_export_field(&mut fields, "organization", &public_ip.organization);
-    push_export_field(&mut fields, "source", &Some(public_ip.source.clone()));
-    fields
-}
-
-fn push_export_field(
-    fields: &mut Vec<(&'static str, String)>,
-    key: &'static str,
-    value: &Option<String>,
-) {
-    if let Some(value) = value.as_deref().filter(|value| !value.trim().is_empty()) {
-        fields.push((key, value.to_string()));
-    }
 }
 
 /// Compact default-gateway summary used by both dashboard layouts.
@@ -1257,16 +934,6 @@ fn format_packet_rate(packets_per_second: f64) -> String {
     } else {
         format!("{value:.0} pps")
     }
-}
-
-fn csv_row(out: &mut String, section: &str, item: &str, key: &str, value: &str) {
-    out.push_str(&format!(
-        "{},{},{},{}\n",
-        crate::ui::export::csv_field(section),
-        crate::ui::export::csv_field(item),
-        crate::ui::export::csv_field(key),
-        crate::ui::export::csv_field(value),
-    ));
 }
 
 #[cfg(test)]
