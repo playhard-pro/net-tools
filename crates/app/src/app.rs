@@ -21,7 +21,7 @@ use crate::tabs::speedtest::SpeedtestTab;
 use crate::tabs::tls::TlsTab;
 use crate::tabs::utils::UtilsTab;
 use crate::tabs::wifi::WifiTab;
-use crate::ui::theme::Palette;
+use crate::ui::theme::{self, Palette};
 use crate::update::{UpdateChecker, UpdateDialog};
 
 /// Project homepage, shown as the title link. Taken from the manifest so the
@@ -136,8 +136,8 @@ pub struct App {
     pub speedtest: SpeedtestTab,
     pub nat: NatTab,
     pub privilege: PrivilegeStatus,
-    /// Manual or system-following theme preference.
-    pub theme_preference: egui::ThemePreference,
+    /// Active interface theme id.
+    pub theme: &'static str,
     /// Whether the shared settings panel is expanded. The same value is used by
     /// every tab so collapsing it stays consistent while switching tools.
     pub settings_expanded: bool,
@@ -153,12 +153,14 @@ pub struct App {
 
 impl App {
     pub fn new(cc: &eframe::CreationContext<'_>, rt: tokio::runtime::Handle) -> Self {
-        // Install a system CJK font fallback so CJK characters are not shown as boxes.
+        // Install system font fallbacks before the theme writes its text
+        // styles, so every family uses the same sharpened glyph settings.
         crate::fonts::install(&cc.egui_ctx);
-        let cfg = crate::config_store::load().unwrap_or_default();
+        let mut cfg = crate::config_store::load().unwrap_or_default();
         let tab_order = normalize_tab_order(&cfg.tab_order);
-        let theme_preference = theme_preference_from_key(&cfg.theme);
-        cc.egui_ctx.set_theme(theme_preference);
+        let theme = theme::normalize(&cfg.theme);
+        cfg.theme = theme.to_owned();
+        theme::apply(&cc.egui_ctx, theme);
         Self {
             rt,
             cfg,
@@ -181,7 +183,7 @@ impl App {
             speedtest: SpeedtestTab::new(),
             nat: NatTab::new(),
             privilege: net_tools_core::net::privilege::probe(),
-            theme_preference,
+            theme,
             settings_expanded: true,
             show_about: false,
             show_about_clear_confirm: false,
@@ -329,9 +331,12 @@ impl App {
     /// right-to-left layout this produces the visual order
     /// `Theme, Language, Auto check, Check update, About, privileges`.
     fn app_controls(&mut self, ui: &mut egui::Ui) {
+        // Keep regular-size buttons here so they match the combo boxes and
+        // checkboxes in the same bar. Compact buttons are reserved for the
+        // result toolbars inside result panels.
         self.privilege_badge(ui);
         ui.separator();
-        if ui.small_button(t!("about.button")).clicked() {
+        if ui.button(t!("about.button")).clicked() {
             self.show_about = true;
             self.show_about_clear_confirm = false;
             self.about_clear_result = None;
@@ -349,7 +354,7 @@ impl App {
             t!("update.check").to_string()
         };
         let clicked = ui
-            .add_enabled_ui(!checking, |ui| ui.small_button(label))
+            .add_enabled_ui(!checking, |ui| ui.button(label))
             .inner
             .clicked();
         if clicked {
@@ -407,26 +412,22 @@ impl App {
         response.response.on_hover_text(t!("common.language"));
     }
 
-    /// Theme selector: system, light or dark. The choice is applied immediately
-    /// and persisted so it survives a restart.
+    /// Theme selector. The choice is applied immediately and persisted so it
+    /// survives a restart.
     fn theme_selector(&mut self, ui: &mut egui::Ui) {
-        let current = self.theme_preference;
+        let current = self.theme;
         let response = egui::ComboBox::from_id_salt("theme")
-            .selected_text(theme_label(current))
-            .width(76.0)
+            .selected_text(theme::label(current))
+            .width(88.0)
             .show_ui(ui, |ui| {
-                for theme in [
-                    egui::ThemePreference::System,
-                    egui::ThemePreference::Light,
-                    egui::ThemePreference::Dark,
-                ] {
+                for id in theme::THEME_IDS {
                     if ui
-                        .selectable_label(current == theme, theme_label(theme))
+                        .selectable_label(current == id, theme::label(id))
                         .clicked()
                     {
-                        self.theme_preference = theme;
-                        ui.ctx().set_theme(theme);
-                        self.cfg.theme = theme_key(theme).to_string();
+                        self.theme = id;
+                        self.cfg.theme = id.to_owned();
+                        theme::apply(ui.ctx(), id);
                         crate::config_store::save(&self.cfg);
                     }
                 }
@@ -463,7 +464,7 @@ impl App {
 
         if let Some(hint) = &self.privilege.hint {
             if ui
-                .small_button(t!("privilege.copy_cmd"))
+                .button(t!("privilege.copy_cmd"))
                 .on_hover_text(hint)
                 .clicked()
             {
@@ -509,7 +510,7 @@ impl App {
             .split_once('<')
             .and_then(|(_, rest)| rest.split_once('>'))
             .map_or(PROJECT_AUTHORS, |(addr, _)| addr);
-        let modal = egui::Modal::new(egui::Id::new("about_dialog")).show(ctx, |ui| {
+        let modal = egui::Modal::new(egui::Id::unique("about_dialog")).show(ctx, |ui| {
             ui.set_width(360.0);
             ui.heading(t!("about.title"));
             ui.add_space(4.0);
@@ -573,7 +574,7 @@ impl App {
         let mut cancel = false;
         let mut clear = false;
         let path = crate::config_store::config_dir();
-        let modal = egui::Modal::new(egui::Id::new("about_clear_config")).show(ctx, |ui| {
+        let modal = egui::Modal::new(egui::Id::unique("about_clear_config")).show(ctx, |ui| {
             ui.set_width(420.0);
             ui.heading(t!("about.clear_config_title"));
             ui.add_space(4.0);
@@ -622,8 +623,8 @@ impl App {
                     // (including the save on exit) would restore the old data.
                     self.cfg = AppConfig::default();
                     self.tab_order = normalize_tab_order(&self.cfg.tab_order);
-                    self.theme_preference = theme_preference_from_key(&self.cfg.theme);
-                    ctx.set_theme(self.theme_preference);
+                    self.theme = theme::normalize(&self.cfg.theme);
+                    theme::apply(ctx, self.theme);
                     rust_i18n::set_locale(&self.cfg.language);
                     self.about_clear_result = Some(Ok(()));
                 }
@@ -702,34 +703,6 @@ fn move_tab(order: &mut Vec<Tab>, dragged: Tab, target: Tab, after: bool) {
         to += 1;
     }
     order.insert(to, dragged);
-}
-
-/// Map the persisted theme value to egui's preference type.
-fn theme_preference_from_key(key: &str) -> egui::ThemePreference {
-    match key {
-        "light" => egui::ThemePreference::Light,
-        "dark" => egui::ThemePreference::Dark,
-        _ => egui::ThemePreference::System,
-    }
-}
-
-/// Stable config value for a theme preference.
-fn theme_key(theme: egui::ThemePreference) -> &'static str {
-    match theme {
-        egui::ThemePreference::System => "system",
-        egui::ThemePreference::Light => "light",
-        egui::ThemePreference::Dark => "dark",
-    }
-}
-
-/// Localized display label for the theme selector.
-fn theme_label(theme: egui::ThemePreference) -> String {
-    match theme {
-        egui::ThemePreference::System => t!("theme.system"),
-        egui::ThemePreference::Light => t!("theme.light"),
-        egui::ThemePreference::Dark => t!("theme.dark"),
-    }
-    .to_string()
 }
 
 fn language_display_name(code: &str) -> String {
@@ -891,7 +864,7 @@ impl App {
         };
         let mut close = false;
         let mut skip = false;
-        let modal = egui::Modal::new(egui::Id::new("update_dialog")).show(ctx, |ui| {
+        let modal = egui::Modal::new(egui::Id::unique("update_dialog")).show(ctx, |ui| {
             ui.set_width(400.0);
             match &dialog {
                 UpdateDialog::Available(update) => {
@@ -1000,19 +973,12 @@ mod tests {
     }
 
     #[test]
-    fn theme_keys_roundtrip_and_default_to_system() {
-        for theme in [
-            egui::ThemePreference::System,
-            egui::ThemePreference::Light,
-            egui::ThemePreference::Dark,
-        ] {
-            assert_eq!(theme_preference_from_key(theme_key(theme)), theme);
-        }
-        assert_eq!(theme_preference_from_key(""), egui::ThemePreference::System);
-        assert_eq!(
-            theme_preference_from_key("unknown"),
-            egui::ThemePreference::System
-        );
+    fn theme_ids_resolve_and_cycle() {
+        assert_eq!(theme::normalize("paper"), "paper");
+        assert_eq!(theme::normalize("dark"), "slate");
+        assert_eq!(theme::normalize("light"), "frost");
+        assert_eq!(theme::normalize("system"), theme::DEFAULT_THEME);
+        assert_eq!(theme::normalize("unknown"), theme::DEFAULT_THEME);
     }
 
     #[test]
@@ -1053,7 +1019,7 @@ mod tests {
             speedtest: SpeedtestTab::new(),
             nat: NatTab::new(),
             privilege: net_tools_core::net::privilege::probe(),
-            theme_preference: egui::ThemePreference::System,
+            theme: theme::DEFAULT_THEME,
             settings_expanded: true,
             show_about: false,
             show_about_clear_confirm: false,

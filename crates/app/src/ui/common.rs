@@ -134,6 +134,22 @@ pub enum ToolbarAction {
     Clear,
 }
 
+/// Render a menu button using the compact button size.
+///
+/// `Ui::menu_button` always builds a regular-size button. Result toolbars mix
+/// menu buttons with `small_button`s, so using the regular size there makes the
+/// export control visibly taller than its neighbours.
+fn small_menu_button<R>(
+    ui: &mut egui::Ui,
+    text: impl Into<egui::WidgetText>,
+    add_contents: impl FnOnce(&mut egui::Ui) -> R,
+) -> egui::Response {
+    let (response, _) =
+        egui::containers::menu::MenuButton::from_button(egui::Button::new(text.into()).small())
+            .ui(ui, add_contents);
+    response
+}
+
 /// Render the result toolbar (copy all / export / clear) and return the user's
 /// choice.
 ///
@@ -146,7 +162,7 @@ pub fn result_toolbar(ui: &mut egui::Ui) -> ToolbarAction {
         if ui.small_button(t!("common.copy_all")).clicked() {
             action = ToolbarAction::Copy;
         }
-        ui.menu_button(t!("common.export"), |ui| {
+        small_menu_button(ui, t!("common.export"), |ui| {
             if ui.button("CSV").clicked() {
                 ui.close();
                 action = ToolbarAction::ExportCsv;
@@ -197,5 +213,39 @@ mod tests {
         let (button, badge) = sizes.expect("the row must be laid out");
         assert!((button.height() - badge.height()).abs() < 0.5);
         assert!((button.center().y - badge.center().y).abs() < 0.5);
+    }
+
+    #[test]
+    fn toolbar_menu_button_matches_small_button_height() {
+        let ctx = egui::Context::default();
+        // Use the real theme so the test covers the same padding and sizing the
+        // application uses.
+        crate::ui::theme::apply(&ctx, crate::ui::theme::DEFAULT_THEME);
+        let input = egui::RawInput {
+            screen_rect: Some(egui::Rect::from_min_size(
+                egui::pos2(0.0, 0.0),
+                egui::vec2(400.0, 200.0),
+            )),
+            ..Default::default()
+        };
+        let mut rects = None;
+        ctx.run_ui(input, |ui| {
+            ui.horizontal(|ui| {
+                let copy = ui.small_button("Copy all");
+                let export = small_menu_button(ui, "Export", |ui| {
+                    let _ = ui.button("CSV");
+                });
+                let clear = ui.small_button("Clear");
+                rects = Some((copy.rect, export.rect, clear.rect));
+            });
+        })
+        .textures_delta
+        .clear();
+
+        let (copy, export, clear) = rects.expect("the toolbar must be laid out");
+        assert!((copy.height() - export.height()).abs() < 0.5);
+        assert!((export.height() - clear.height()).abs() < 0.5);
+        assert!((copy.center().y - export.center().y).abs() < 0.5);
+        assert!((export.center().y - clear.center().y).abs() < 0.5);
     }
 }

@@ -592,7 +592,7 @@ impl ConnectionsTab {
         };
         let mut apply = false;
         let mut cancel = false;
-        let modal = egui::Modal::new(egui::Id::new("connections_confirm")).show(ctx, |ui| {
+        let modal = egui::Modal::new(egui::Id::unique("connections_confirm")).show(ctx, |ui| {
             ui.set_width(460.0);
             let warning = Palette::from_ui(ui).warning_text;
             ui.heading(if terminating {

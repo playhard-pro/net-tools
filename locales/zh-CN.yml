@@ -33,9 +33,10 @@ update:
   error_title: 检查更新失败
   error: "无法检查更新：%{error}"
 theme:
-  system: 跟随系统
-  light: 浅色
-  dark: 深色
+  slate: 石板
+  frost: 霜白
+  charcoal: 炭黑
+  paper: 纸白
 
 tab:
   overview: 网络概览

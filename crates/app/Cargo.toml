@@ -18,9 +18,9 @@ tracing.workspace = true
 tracing-subscriber.workspace = true
 toml.workspace = true
 time.workspace = true
-eframe = { version = "0.36", default-features = false, features = ["accesskit", "default_fonts", "links", "wayland", "wgpu_no_default_features", "x11"] }
-egui_extras = "0.36.2"
-egui_plot = "0.37.0"
+eframe = { version = "0.37", default-features = false, features = ["accesskit", "clipboard", "default_fonts", "links", "wayland", "wgpu_no_default_features", "x11"] }
+egui_extras = "0.37.0"
+egui_plot = "0.38.0"
 rfd = "0.17.2"
 clap = "4.6.7"
 dirs = "7.0.0"
@@ -34,7 +34,7 @@ wgpu = { version = "30", default-features = false, features = ["dx12"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 wgpu = { version = "30", default-features = false, features = ["metal"] }
-egui-wgpu = { version = "0.36", default-features = false, features = ["macos-window-resize-jitter-fix"] }
+egui-wgpu = { version = "0.37", default-features = false, features = ["macos-window-resize-jitter-fix"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 # Vulkan is the primary backend; GLES keeps the application usable when no

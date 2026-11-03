@@ -908,8 +908,8 @@ impl Default for UpdateSettings {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
     pub language: String,
-    /// UI theme preference: `system`, `light` or `dark`. Unknown values fall
-    /// back to following the system theme.
+    /// UI theme id: `slate`, `frost`, `charcoal` or `paper`. Unknown values
+    /// fall back to the default Paper theme.
     #[serde(default)]
     pub theme: String,
     /// User-defined top-level tab order, stored as stable tab ids. An empty
@@ -967,7 +967,7 @@ impl Default for AppConfig {
     fn default() -> Self {
         Self {
             language: "en".into(),
-            theme: "system".into(),
+            theme: "paper".into(),
             tab_order: Vec::new(),
             ping: PingSettings::default(),
             mtr: MtrSettings::default(),
@@ -1076,6 +1076,11 @@ mod tests {
         assert!(back.update.auto_check);
         assert_eq!(back.update.last_checked, 0);
         assert!(back.update.skipped_version.is_empty());
+    }
+
+    #[test]
+    fn default_theme_is_paper() {
+        assert_eq!(AppConfig::default().theme, "paper");
     }
 
     #[test]

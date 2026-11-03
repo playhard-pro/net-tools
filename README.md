@@ -44,6 +44,11 @@ small manifest from the latest GitHub Release and open the release page for the
 user to choose the right package. Automatic checks run at most once per day and
 can be disabled; a specific version can be skipped.
 
+The interface ships with four themes: **Paper** (default), **Frost**, **Slate**
+and **Charcoal**. The active theme is selected from the bottom bar and persisted
+in the configuration; existing `light` and `dark` settings map to Frost and
+Slate.
+
 ### LAN discovery
 
 The LAN Discovery tab finds devices on the local network without sending raw
@@ -538,9 +543,10 @@ request checklist.
 
 ## Third-party licenses
 
-The application does not ship or redistribute font files; CJK text uses fonts
-installed on the host system. The IANA protocol registry data is CC0 1.0. Rust
-dependency licenses are listed in
+The application does not ship or redistribute font files; Latin text uses
+an optional native system family or egui's bundled fonts, while CJK, symbol and
+emoji glyphs use fonts installed on the host system. The IANA protocol registry
+data is CC0 1.0. Rust dependency licenses are listed in
 [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md), generated with
 [cargo-about](https://github.com/EmbarkStudios/cargo-about).
 

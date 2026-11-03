@@ -156,7 +156,7 @@ impl PingTab {
         };
         let mut proceed = false;
         let mut cancel = false;
-        let modal = egui::Modal::new(egui::Id::new("pmtu_elevation_confirm")).show(ctx, |ui| {
+        let modal = egui::Modal::new(egui::Id::unique("pmtu_elevation_confirm")).show(ctx, |ui| {
             ui.set_width(460.0);
             ui.heading(t!("common.elevation_title"));
             ui.add_space(4.0);

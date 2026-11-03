@@ -396,7 +396,7 @@ impl NtpTab {
 
         let mut apply = false;
         let mut cancel = false;
-        let modal = egui::Modal::new(egui::Id::new("ntp_set_time_confirm")).show(ctx, |ui| {
+        let modal = egui::Modal::new(egui::Id::unique("ntp_set_time_confirm")).show(ctx, |ui| {
             ui.set_width(460.0);
             ui.heading(t!("ntp.confirm_title"));
             let warning = Palette::from_ui(ui).warning_text;

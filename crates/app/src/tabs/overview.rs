@@ -377,27 +377,30 @@ impl OverviewTab {
                     .suffix(" ms"),
             )
             .on_hover_text(t!("overview.refresh_interval"));
-            ui.separator();
-            match result_toolbar(ui) {
-                ToolbarAction::Copy => ui.ctx().copy_text(self.to_text()),
-                ToolbarAction::ExportCsv => {
-                    crate::ui::export::save_file("network-overview", "csv", &self.to_csv())
-                }
-                ToolbarAction::ExportJson => {
-                    crate::ui::export::save_file("network-overview", "json", &self.to_json())
-                }
-                ToolbarAction::ExportHtml => {
-                    crate::ui::export::save_file("network-overview", "html", &self.to_html())
-                }
-                ToolbarAction::Clear => {
-                    self.tracker.reset();
-                    self.public_egress = None;
-                    self.public_ip_error = None;
-                    self.request_refresh();
-                }
-                ToolbarAction::None => {}
-            }
         });
+
+        // Keep the compact copy/export/clear actions on their own row. Mixing
+        // them with the regular refresh controls above makes the toolbar look
+        // ragged because the two button sizes have different heights.
+        match result_toolbar(ui) {
+            ToolbarAction::Copy => ui.ctx().copy_text(self.to_text()),
+            ToolbarAction::ExportCsv => {
+                crate::ui::export::save_file("network-overview", "csv", &self.to_csv())
+            }
+            ToolbarAction::ExportJson => {
+                crate::ui::export::save_file("network-overview", "json", &self.to_json())
+            }
+            ToolbarAction::ExportHtml => {
+                crate::ui::export::save_file("network-overview", "html", &self.to_html())
+            }
+            ToolbarAction::Clear => {
+                self.tracker.reset();
+                self.public_egress = None;
+                self.public_ip_error = None;
+                self.request_refresh();
+            }
+            ToolbarAction::None => {}
+        }
 
         if let Some(snapshot) = &self.snapshot {
             ui.weak(format!(

@@ -33,9 +33,10 @@ update:
   error_title: Update check failed
   error: "Could not check for updates: %{error}"
 theme:
-  system: System
-  light: Light
-  dark: Dark
+  slate: Slate
+  frost: Frost
+  charcoal: Charcoal
+  paper: Paper
 
 tab:
   overview: Overview
