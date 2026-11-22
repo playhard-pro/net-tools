@@ -420,14 +420,17 @@ fn probe_size_raw(
 /// Whether a local send failed because the packet exceeds the local MTU.
 fn is_message_too_long(error: &io::Error) -> bool {
     #[cfg(unix)]
-    if error.raw_os_error() == Some(libc::EMSGSIZE) {
-        return true;
+    {
+        error.raw_os_error() == Some(libc::EMSGSIZE)
     }
     #[cfg(windows)]
-    if error.raw_os_error() == Some(windows_sys::Win32::Networking::WinSock::WSAEMSGSIZE) {
-        return true;
+    {
+        error.raw_os_error() == Some(windows_sys::Win32::Networking::WinSock::WSAEMSGSIZE)
     }
-    false
+    #[cfg(not(any(unix, windows)))]
+    {
+        false
+    }
 }
 
 #[cfg(test)]

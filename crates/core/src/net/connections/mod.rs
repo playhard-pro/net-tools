@@ -183,23 +183,15 @@ pub fn close_connection_supported(entry: &ConnectionEntry) -> bool {
         return false;
     }
     #[cfg(target_os = "linux")]
-    {
-        true
-    }
+    let supported = true;
     #[cfg(windows)]
-    {
-        entry.protocol == ConnectionProtocol::Tcp
-            && entry.remote_addr.is_some_and(|address| address.is_ipv4())
-    }
+    let supported = entry.protocol == ConnectionProtocol::Tcp
+        && entry.remote_addr.is_some_and(|address| address.is_ipv4());
     #[cfg(target_os = "macos")]
-    {
-        let _ = entry;
-        false
-    }
+    let supported = false;
     #[cfg(not(any(target_os = "linux", target_os = "macos", windows)))]
-    {
-        false
-    }
+    let supported = false;
+    supported
 }
 
 /// Terminate a process.
