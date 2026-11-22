@@ -204,21 +204,24 @@ fn history_menu(
             ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Truncate);
             for (index, entry) in entries {
                 ui.horizontal(|ui| {
-                    let delete_width = ui.spacing().interact_size.y;
-                    let label_width =
-                        (ui.available_width() - delete_width - ui.spacing().item_spacing.x)
-                            .max(40.0);
-                    let label = ui.add_sized(
-                        [label_width, ui.spacing().interact_size.y],
-                        egui::Button::selectable(false, display_value(&entry)),
-                    );
-                    if label.clicked() {
-                        *text = entry.clone();
-                        ui.close();
-                    }
-                    if ui.small_button("x").clicked() {
-                        remove = Some(index);
-                    }
+                    // Lay the entry row out from the right so the delete button
+                    // keeps its natural size and the selectable label only uses
+                    // the space that is genuinely left over. Deriving the label
+                    // width from an assumed button width let the row overflow,
+                    // which made the pop-up grow a little on every frame.
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if ui.small_button("x").clicked() {
+                            remove = Some(index);
+                        }
+                        let label = ui.add_sized(
+                            [ui.available_width().max(1.0), ui.spacing().interact_size.y],
+                            egui::Button::selectable(false, display_value(&entry)),
+                        );
+                        if label.clicked() {
+                            *text = entry.clone();
+                            ui.close();
+                        }
+                    });
                 });
             }
         });
@@ -244,4 +247,50 @@ fn display_value(value: &str) -> String {
     let mut out: String = chars.into_iter().take(MAX_DISPLAY_CHARS).collect();
     out.push('…');
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The pop-up is sized from its contents, so an entry row that reports more
+    /// width than the pop-up has would make the next frame wider again. Render
+    /// the open pop-up over several frames and require the width to settle.
+    #[test]
+    fn history_popup_width_stays_stable() {
+        let ctx = egui::Context::default();
+        crate::ui::theme::apply(&ctx, crate::ui::theme::DEFAULT_THEME);
+        let mut history = InputHistory::default();
+        history.record("key", "some-value");
+        let mut text = String::new();
+        let mut widths = Vec::new();
+
+        for _ in 0..12 {
+            let input = egui::RawInput {
+                screen_rect: Some(egui::Rect::from_min_size(
+                    egui::pos2(0.0, 0.0),
+                    egui::vec2(900.0, 700.0),
+                )),
+                ..Default::default()
+            };
+            ctx.run_ui(input, |ui| {
+                let button = super::super::common::dropdown_button(ui, "history");
+                egui::Popup::from_toggle_button_response(&button)
+                    .open(true)
+                    .width(POPUP_WIDTH)
+                    .show(|ui| {
+                        history_menu(ui, "key", &[], &mut text, &mut history);
+                        widths.push(ui.min_rect().width());
+                    });
+            })
+            .textures_delta
+            .clear();
+        }
+
+        let first = widths[0];
+        assert!(
+            widths.iter().all(|width| (width - first).abs() < 0.5),
+            "pop-up width changed between frames: {widths:?}"
+        );
+    }
 }
